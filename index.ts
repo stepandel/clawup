@@ -58,7 +58,7 @@ const ownerName = config.get("ownerName") ?? "Boss";
 
 function loadPresetFiles(presetDir: string, baseDir: string = "base"): Record<string, string> {
   const files: Record<string, string> = {};
-  const presetsPath = path.join(__dirname, "presets");
+  const presetsPath = path.join(__dirname, "..", "presets");
 
   // Load base files first
   const basePath = path.join(presetsPath, baseDir);
@@ -114,7 +114,8 @@ function processTemplates(
 // Load Manifest
 // -----------------------------------------------------------------------------
 
-const manifestPath = path.join(__dirname, "agent-army.json");
+// __dirname is dist/ when running compiled JS, so go up to project root
+const manifestPath = path.join(__dirname, "..", "agent-army.json");
 if (!fs.existsSync(manifestPath)) {
   throw new Error(
     "agent-army.json not found. Run `agent-army init` to create it."
