@@ -30,6 +30,9 @@ npm-debug.log*
 .env.*
 !.env.example
 
+# Agent Army manifest (user-specific, created by `agent-army init`)
+agent-army.json
+
 # ESC secrets (never commit actual secrets)
 esc/agent-army-secrets.yaml
 !esc/*.example

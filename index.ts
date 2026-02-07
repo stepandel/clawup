@@ -1,14 +1,13 @@
 /**
- * Agent Army - Multi-Agent Pulumi Stack
+ * Agent Army - Data-Driven Multi-Agent Pulumi Stack
  *
- * Deploys a fleet of 3 specialized OpenClaw agents:
- * - PM (Sage): Project management, coordination, communication
- * - Eng (Atlas): Lead engineering, coding, shipping
- * - Tester (Scout): Quality assurance, verification, bug hunting
+ * Reads agent-army.json manifest to dynamically deploy OpenClaw agents.
+ * The manifest is created by `agent-army init` and serves as the single
+ * source of truth for the agent fleet configuration.
  *
  * All agents share a single VPC for cost optimization.
  * Each agent loads role-specific workspace files from presets.
- * Secrets are pulled from Pulumi ESC environment.
+ * Secrets are pulled from Pulumi config (set by CLI or ESC).
  */
 
 import * as pulumi from "@pulumi/pulumi";
@@ -18,30 +17,40 @@ import { OpenClawAgent } from "./src";
 import { SharedVpc } from "./shared-vpc";
 
 // -----------------------------------------------------------------------------
-// Configuration from Pulumi ESC
+// Manifest type (duplicated here to avoid importing from cli/)
+// -----------------------------------------------------------------------------
+
+interface ManifestAgent {
+  name: string;
+  displayName: string;
+  role: string;
+  preset: string | null;
+  volumeSize: number;
+  instanceType?: string;
+  soulContent?: string;
+  identityContent?: string;
+  envVars?: Record<string, string>;
+}
+
+interface Manifest {
+  stackName: string;
+  region: string;
+  instanceType: string;
+  ownerName: string;
+  agents: ManifestAgent[];
+}
+
+// -----------------------------------------------------------------------------
+// Configuration from Pulumi Config / ESC
 // -----------------------------------------------------------------------------
 
 const config = new pulumi.Config();
 
-// Shared configuration
 const anthropicApiKey = config.requireSecret("anthropicApiKey");
 const tailscaleAuthKey = config.requireSecret("tailscaleAuthKey");
 const tailnetDnsName = config.require("tailnetDnsName");
 const instanceType = config.get("instanceType") ?? "t3.medium";
 const ownerName = config.get("ownerName") ?? "Boss";
-
-// Per-agent Slack credentials from ESC
-const pmSlackToken = config.getSecret("pmSlackToken");
-const pmSlackSigningSecret = config.getSecret("pmSlackSigningSecret");
-const engSlackToken = config.getSecret("engSlackToken");
-const engSlackSigningSecret = config.getSecret("engSlackSigningSecret");
-const testerSlackToken = config.getSecret("testerSlackToken");
-const testerSlackSigningSecret = config.getSecret("testerSlackSigningSecret");
-
-// Per-agent Linear credentials from ESC
-const pmLinearToken = config.getSecret("pmLinearToken");
-const engLinearToken = config.getSecret("engLinearToken");
-const testerLinearToken = config.getSecret("testerLinearToken");
 
 // -----------------------------------------------------------------------------
 // Helper: Load preset workspace files from disk
@@ -102,6 +111,19 @@ function processTemplates(
 }
 
 // -----------------------------------------------------------------------------
+// Load Manifest
+// -----------------------------------------------------------------------------
+
+const manifestPath = path.join(__dirname, "agent-army.json");
+if (!fs.existsSync(manifestPath)) {
+  throw new Error(
+    "agent-army.json not found. Run `agent-army init` to create it."
+  );
+}
+
+const manifest: Manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+
+// -----------------------------------------------------------------------------
 // Resource Tags
 // -----------------------------------------------------------------------------
 
@@ -119,130 +141,88 @@ const sharedVpc = new SharedVpc("agent-army", {
   tags: baseTags,
 });
 
-// -----------------------------------------------------------------------------
-// Agent Deployments
-// -----------------------------------------------------------------------------
-
-// Load workspace files for each role
-const pmFiles = processTemplates(loadPresetFiles("pm"), { OWNER_NAME: ownerName });
-const engFiles = processTemplates(loadPresetFiles("eng"), { OWNER_NAME: ownerName });
-const testerFiles = processTemplates(loadPresetFiles("tester"), { OWNER_NAME: ownerName });
-
-// PM Agent (Sage)
-const pmAgent = new OpenClawAgent("agent-pm", {
-  anthropicApiKey,
-  tailscaleAuthKey,
-  tailnetDnsName,
-  instanceType,
-
-  // Use shared VPC
-  vpcId: sharedVpc.vpcId,
-  subnetId: sharedVpc.subnetId,
-  securityGroupId: sharedVpc.securityGroupId,
-
-  // Workspace files from presets/pm
-  workspaceFiles: pmFiles,
-
-  // Environment variables (Slack/Linear from ESC)
-  envVars: {
-    AGENT_ROLE: "pm",
-    AGENT_NAME: "Sage",
-  },
-
-  tags: {
-    ...baseTags,
-    AgentRole: "pm",
-    AgentName: "Sage",
-  },
-});
-
-// Eng Agent (Atlas)
-const engAgent = new OpenClawAgent("agent-eng", {
-  anthropicApiKey,
-  tailscaleAuthKey,
-  tailnetDnsName,
-  instanceType,
-
-  // Use shared VPC
-  vpcId: sharedVpc.vpcId,
-  subnetId: sharedVpc.subnetId,
-  securityGroupId: sharedVpc.securityGroupId,
-
-  // Workspace files from presets/eng
-  workspaceFiles: engFiles,
-
-  // Environment variables
-  envVars: {
-    AGENT_ROLE: "eng",
-    AGENT_NAME: "Atlas",
-  },
-
-  // Larger disk for engineering work
-  volumeSize: 50,
-
-  tags: {
-    ...baseTags,
-    AgentRole: "eng",
-    AgentName: "Atlas",
-  },
-});
-
-// Tester Agent (Scout)
-const testerAgent = new OpenClawAgent("agent-tester", {
-  anthropicApiKey,
-  tailscaleAuthKey,
-  tailnetDnsName,
-  instanceType,
-
-  // Use shared VPC
-  vpcId: sharedVpc.vpcId,
-  subnetId: sharedVpc.subnetId,
-  securityGroupId: sharedVpc.securityGroupId,
-
-  // Workspace files from presets/tester
-  workspaceFiles: testerFiles,
-
-  // Environment variables
-  envVars: {
-    AGENT_ROLE: "tester",
-    AGENT_NAME: "Scout",
-  },
-
-  tags: {
-    ...baseTags,
-    AgentRole: "tester",
-    AgentName: "Scout",
-  },
-});
-
-// -----------------------------------------------------------------------------
-// Stack Outputs (secrets are marked as such)
-// -----------------------------------------------------------------------------
-
-// VPC outputs (informational)
+// VPC outputs
 export const vpcId = sharedVpc.vpcId;
 export const subnetId = sharedVpc.subnetId;
 export const securityGroupId = sharedVpc.securityGroupId;
 
-// PM Agent outputs
-export const pmTailscaleUrl = pulumi.secret(pmAgent.tailscaleUrl);
-export const pmGatewayToken = pulumi.secret(pmAgent.gatewayToken);
-export const pmInstanceId = pmAgent.instanceId;
-export const pmPublicIp = pmAgent.publicIp;
+// -----------------------------------------------------------------------------
+// Dynamic Agent Deployments
+// -----------------------------------------------------------------------------
 
-// Eng Agent outputs
-export const engTailscaleUrl = pulumi.secret(engAgent.tailscaleUrl);
-export const engGatewayToken = pulumi.secret(engAgent.gatewayToken);
-export const engInstanceId = engAgent.instanceId;
-export const engPublicIp = engAgent.publicIp;
+const agentOutputs: Record<string, {
+  tailscaleUrl: pulumi.Output<string>;
+  gatewayToken: pulumi.Output<string>;
+  instanceId: pulumi.Output<string>;
+  publicIp: pulumi.Output<string>;
+  sshPrivateKey: pulumi.Output<string>;
+}> = {};
 
-// Tester Agent outputs
-export const testerTailscaleUrl = pulumi.secret(testerAgent.tailscaleUrl);
-export const testerGatewayToken = pulumi.secret(testerAgent.gatewayToken);
-export const testerInstanceId = testerAgent.instanceId;
-export const testerPublicIp = testerAgent.publicIp;
+for (const agent of manifest.agents) {
+  // Build workspace files
+  let workspaceFiles: Record<string, string>;
 
-// SSH keys (secrets)
-export const pmSshPrivateKey = pulumi.secret(pmAgent.sshPrivateKey);
-export const engSshPrivateKey = pulumi.secret(engAgent.sshPrivateKey);
-export const testerSshPrivateKey = pulumi.secret(testerAgent.sshPrivateKey);
+  if (agent.preset) {
+    // Preset agent: load from presets directory
+    workspaceFiles = processTemplates(loadPresetFiles(agent.preset), {
+      OWNER_NAME: ownerName,
+    });
+  } else {
+    // Custom agent: load base files + inline content from manifest
+    workspaceFiles = processTemplates(loadPresetFiles("base", "base"), {
+      OWNER_NAME: ownerName,
+    });
+    // Override base files with custom inline content if provided
+    if (agent.soulContent) workspaceFiles["SOUL.md"] = agent.soulContent;
+    if (agent.identityContent) workspaceFiles["IDENTITY.md"] = agent.identityContent;
+  }
+
+  const agentResource = new OpenClawAgent(agent.name, {
+    anthropicApiKey,
+    tailscaleAuthKey,
+    tailnetDnsName,
+    instanceType: agent.instanceType ?? instanceType,
+    volumeSize: agent.volumeSize ?? 30,
+
+    // Use shared VPC
+    vpcId: sharedVpc.vpcId,
+    subnetId: sharedVpc.subnetId,
+    securityGroupId: sharedVpc.securityGroupId,
+
+    // Workspace files
+    workspaceFiles,
+
+    // Environment variables
+    envVars: {
+      AGENT_ROLE: agent.role,
+      AGENT_NAME: agent.displayName,
+      ...agent.envVars,
+    },
+
+    tags: {
+      ...baseTags,
+      AgentRole: agent.role,
+      AgentName: agent.displayName,
+    },
+  });
+
+  agentOutputs[agent.role] = {
+    tailscaleUrl: agentResource.tailscaleUrl,
+    gatewayToken: agentResource.gatewayToken,
+    instanceId: agentResource.instanceId,
+    publicIp: agentResource.publicIp,
+    sshPrivateKey: agentResource.sshPrivateKey,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Dynamic Stack Outputs
+// -----------------------------------------------------------------------------
+
+for (const [role, outputs] of Object.entries(agentOutputs)) {
+  module.exports[`${role}TailscaleUrl`] = pulumi.secret(outputs.tailscaleUrl);
+  module.exports[`${role}GatewayToken`] = pulumi.secret(outputs.gatewayToken);
+  module.exports[`${role}InstanceId`] = outputs.instanceId;
+  module.exports[`${role}PublicIp`] = outputs.publicIp;
+  module.exports[`${role}SshPrivateKey`] = pulumi.secret(outputs.sshPrivateKey);
+}

@@ -13,6 +13,6 @@
     "sourceMap": true,
     "outDir": "./dist"
   },
-  "include": ["src/**/*", "index.ts", "shared-vpc.ts"],
+  "include": ["src/**/*", "cli/**/*", "index.ts", "shared-vpc.ts"],
   "exclude": ["node_modules", "dist", "examples"]
 }
