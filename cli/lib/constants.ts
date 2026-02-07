@@ -55,8 +55,8 @@ export const INSTANCE_TYPES = [
   { value: "t3.large", label: "t3.large — 2 vCPU, 8 GB (~$60/mo)" },
 ];
 
-/** Default SSH user for agent instances */
-export const SSH_USER = "stars";
+/** Default SSH user for agent instances (Ubuntu 24.04 AMI default) */
+export const SSH_USER = "ubuntu";
 
 /** Estimated monthly cost per instance type */
 export const COST_ESTIMATES: Record<string, number> = {

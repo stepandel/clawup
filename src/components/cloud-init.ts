@@ -34,6 +34,8 @@ export interface CloudInitConfig {
   envVars?: Record<string, string>;
   /** Custom shell commands to run after OpenClaw setup */
   postSetupCommands?: string[];
+  /** Tailscale hostname (default: system hostname) */
+  tailscaleHostname?: string;
   /** Skip Tailscale installation (default: false) */
   skipTailscale?: boolean;
   /** Create ubuntu user (for Hetzner which uses root) */
@@ -88,7 +90,7 @@ useradd -m -s /bin/bash -G docker ubuntu || true
 # Install and configure Tailscale
 echo "Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
-tailscale up --authkey="\${TAILSCALE_AUTH_KEY}" --ssh || echo "WARNING: Tailscale setup failed. Run 'sudo tailscale up' manually."
+tailscale up --authkey="\${TAILSCALE_AUTH_KEY}" --ssh${config.tailscaleHostname ? ` --hostname=${config.tailscaleHostname}` : ""} || echo "WARNING: Tailscale setup failed. Run 'sudo tailscale up' manually."
 `;
 
   // Tailscale serve section

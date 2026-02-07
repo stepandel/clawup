@@ -397,6 +397,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
             browserPort: brPort,
             model: mdl,
             enableSandbox: sandbox,
+            tailscaleHostname: name,
             workspaceFiles: args.workspaceFiles,
             envVars: args.envVars,
             postSetupCommands: args.postSetupCommands,
@@ -435,12 +436,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       defaultResourceOptions
     );
 
-    // Construct Tailscale MagicDNS hostname from private IP
-    // AWS private IPs like 10.0.1.15 become hostnames like ip-10-0-1-15
-    const tailscaleHostname = instance.privateIp.apply(
-      (ip) => `ip-${ip.replace(/\./g, "-")}`
-    );
-
     // Set outputs
     this.publicIp = instance.publicIp;
     this.publicDns = instance.publicDns;
@@ -451,7 +446,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     this.sshPrivateKey = sshKey.privateKeyOpenssh;
     this.sshPublicKey = sshKey.publicKeyOpenssh;
     this.gatewayToken = gatewayTokenValue;
-    this.tailscaleUrl = pulumi.interpolate`https://${tailscaleHostname}.${args.tailnetDnsName}/?token=${gatewayTokenValue}`;
+    // Tailscale hostname is set to the agent name via --hostname flag in cloud-init
+    this.tailscaleUrl = pulumi.interpolate`https://${name}.${args.tailnetDnsName}/?token=${gatewayTokenValue}`;
 
     // Register outputs
     this.registerOutputs({
