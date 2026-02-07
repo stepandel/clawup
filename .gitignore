@@ -27,3 +27,9 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+.env.*
+!.env.example
+
+# ESC secrets (never commit actual secrets)
+esc/agent-army-secrets.yaml
+!esc/*.example
