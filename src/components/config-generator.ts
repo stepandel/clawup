@@ -121,7 +121,7 @@ with open(config_path) as f:
 # Configure gateway for Tailscale Serve
 config["gateway"]["trustedProxies"] = ${JSON.stringify(configPatches.trustedProxies)}
 config["gateway"]["controlUi"] = {
-    "enabled": ${configPatches.enableControlUi},
+    "enabled": ${configPatches.enableControlUi ? "True" : "False"},
     "allowInsecureAuth": True
 }
 config["gateway"]["auth"] = {

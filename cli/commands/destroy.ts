@@ -4,11 +4,28 @@
 
 import * as p from "@clack/prompts";
 import { loadManifest } from "../lib/config";
-import { pulumiDestroy, selectOrCreateStack } from "../lib/pulumi";
+import { pulumiDestroy, selectOrCreateStack, getConfig } from "../lib/pulumi";
+import { capture } from "../lib/exec";
+import { SSH_USER } from "../lib/constants";
 import { showBanner, handleCancel, exitWithError, formatAgentList } from "../lib/ui";
 
 interface DestroyOptions {
   yes?: boolean;
+}
+
+/**
+ * Deregister an agent from Tailscale by SSHing in and running `tailscale logout`.
+ * Returns true if successful, false otherwise.
+ */
+function deregisterTailscale(host: string): boolean {
+  const result = capture("ssh", [
+    "-o", "ConnectTimeout=10",
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "BatchMode=yes",
+    `${SSH_USER}@${host}`,
+    "sudo tailscale down && sudo tailscale logout",
+  ]);
+  return result.exitCode === 0;
 }
 
 export async function destroyCommand(opts: DestroyOptions): Promise<void> {
@@ -39,6 +56,7 @@ export async function destroyCommand(opts: DestroyOptions): Promise<void> {
       `  - ${manifest.agents.length} EC2 instances`,
       `  - All workspace data on those instances`,
       `  - VPC, subnet, and security group`,
+      `  - Tailscale device registrations`,
     ].join("\n"),
     "Destruction Plan"
   );
@@ -64,6 +82,29 @@ export async function destroyCommand(opts: DestroyOptions): Promise<void> {
     }
   }
 
+  // Deregister agents from Tailscale before destroying infrastructure
+  const tailnetDnsName = getConfig("tailnetDnsName");
+  if (tailnetDnsName) {
+    const s = p.spinner();
+    s.start("Deregistering agents from Tailscale...");
+    const failed: string[] = [];
+
+    for (const agent of manifest.agents) {
+      const host = `${agent.name}.${tailnetDnsName}`;
+      const ok = deregisterTailscale(host);
+      if (!ok) failed.push(agent.displayName);
+    }
+
+    if (failed.length === 0) {
+      s.stop("All agents deregistered from Tailscale");
+    } else {
+      s.stop("Some agents could not be deregistered");
+      p.log.warn(
+        `Could not deregister: ${failed.join(", ")}. Remove manually from https://login.tailscale.com/admin/machines`
+      );
+    }
+  }
+
   // Destroy
   p.log.step("Running pulumi destroy...");
   console.log();
@@ -75,5 +116,5 @@ export async function destroyCommand(opts: DestroyOptions): Promise<void> {
   }
 
   p.log.success(`Stack "${manifest.stackName}" has been destroyed.`);
-  p.outro("Tailscale nodes may take a few minutes to disappear. Check with: tailscale status");
+  p.outro("Done!");
 }
