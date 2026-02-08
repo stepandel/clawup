@@ -201,6 +201,12 @@ config["gateway"]["auth"] = {
     "mode": "token",
     "token": os.environ["GATEWAY_TOKEN"]
 }
+
+# Configure environment variables for child processes (including Claude Code)
+config["env"] = {
+    "ANTHROPIC_API_KEY": os.environ.get("ANTHROPIC_API_KEY", "")
+}
+print("Configured environment variables")
 ${slackChannelConfig}${linearSkillConfig}${braveSearchConfig}
 with open(config_path, "w") as f:
     json.dump(config, f, indent=2)

@@ -302,6 +302,7 @@ openclaw daemon install || echo "WARNING: Daemon install failed. Run openclaw da
 echo "Configuring OpenClaw gateway..."
 sudo -H -u ubuntu \\
   GATEWAY_TOKEN="\${GATEWAY_TOKEN}" \\
+  ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}" \\
   SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN:-}" \\
   SLACK_APP_TOKEN="\${SLACK_APP_TOKEN:-}" \\
   LINEAR_API_KEY="\${LINEAR_API_KEY:-}" \\
