@@ -25,12 +25,13 @@ function runSshCheck(
   command: string,
   timeout: number
 ): { ok: boolean; output: string } {
+  // Quote the remote command so && and other shell operators are interpreted remotely
   const result = capture("ssh", [
     "-o", `ConnectTimeout=${timeout}`,
     "-o", "StrictHostKeyChecking=no",
     "-o", "BatchMode=yes",
     `${SSH_USER}@${host}`,
-    command,
+    `"${command.replace(/"/g, '\\"')}"`,
   ]);
   return { ok: result.exitCode === 0, output: result.stdout || result.stderr };
 }
@@ -77,13 +78,12 @@ export async function validateCommand(opts: ValidateOptions): Promise<void> {
     });
 
     if (ssh.ok) {
-      // Check 2: OpenClaw gateway running
-      const gateway = runSshCheck(host, "openclaw gateway status 2>&1", timeout);
-      const isRunning = gateway.ok && /running/i.test(gateway.output);
+      // Check 2: OpenClaw gateway running (systemd user service)
+      const gateway = runSshCheck(host, "systemctl --user is-active openclaw-gateway", timeout);
       checks.push({
         name: "OpenClaw gateway",
-        passed: isRunning,
-        detail: isRunning ? "running" : "not running",
+        passed: gateway.ok,
+        detail: gateway.ok ? "running" : gateway.output || "not running",
       });
 
       // Check 3: Workspace files present
