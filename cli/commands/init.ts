@@ -4,7 +4,13 @@
 
 import * as p from "@clack/prompts";
 import type { AgentDefinition, ArmyManifest } from "../types";
-import { PRESETS, AWS_REGIONS, INSTANCE_TYPES, COST_ESTIMATES } from "../lib/constants";
+import {
+  PRESETS,
+  AWS_REGIONS,
+  INSTANCE_TYPES,
+  COST_ESTIMATES,
+  KEY_INSTRUCTIONS,
+} from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
 import { saveManifest } from "../lib/config";
@@ -61,6 +67,11 @@ export async function initCommand(): Promise<void> {
   // Step 3: Collect secrets
   p.log.step("Configure secrets");
 
+  p.note(
+    KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
+    KEY_INSTRUCTIONS.anthropicApiKey.title
+  );
+
   const anthropicApiKey = await p.text({
     message: "Anthropic API key",
     placeholder: "sk-ant-...",
@@ -70,6 +81,11 @@ export async function initCommand(): Promise<void> {
   });
   handleCancel(anthropicApiKey);
 
+  p.note(
+    KEY_INSTRUCTIONS.tailscaleAuthKey.steps.join("\n"),
+    KEY_INSTRUCTIONS.tailscaleAuthKey.title
+  );
+
   const tailscaleAuthKey = await p.password({
     message: "Tailscale auth key",
     validate: (val) => {
@@ -77,6 +93,11 @@ export async function initCommand(): Promise<void> {
     },
   });
   handleCancel(tailscaleAuthKey);
+
+  p.note(
+    KEY_INSTRUCTIONS.tailnetDnsName.steps.join("\n"),
+    KEY_INSTRUCTIONS.tailnetDnsName.title
+  );
 
   const tailnetDnsName = await p.text({
     message: "Tailnet DNS name",

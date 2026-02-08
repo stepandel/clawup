@@ -67,3 +67,35 @@ export const COST_ESTIMATES: Record<string, number> = {
 
 /** Manifest filename */
 export const MANIFEST_FILE = "agent-army.json";
+
+/** Key instructions for onboarding prompts */
+export const KEY_INSTRUCTIONS = {
+  anthropicApiKey: {
+    title: "Anthropic API Key",
+    steps: [
+      "To get your Anthropic API key:",
+      "1. Go to https://console.anthropic.com/account/keys",
+      "2. Click \"Create Key\"",
+      "3. Copy the key (starts with sk-ant-)",
+    ],
+  },
+  tailscaleAuthKey: {
+    title: "Tailscale Auth Key",
+    steps: [
+      "To get your Tailscale auth key:",
+      "1. Go to https://login.tailscale.com/admin/settings/keys",
+      "2. Click \"Generate auth key\"",
+      "3. Enable \"Reusable\" if you plan to redeploy agents",
+      "4. Copy the key (starts with tskey-auth-)",
+    ],
+  },
+  tailnetDnsName: {
+    title: "Tailnet DNS Name",
+    steps: [
+      "To find your Tailnet DNS name:",
+      "1. Go to https://login.tailscale.com/admin/dns",
+      "2. Look for your tailnet name at the top",
+      "3. It looks like \"tailXXXXX.ts.net\" or a custom domain",
+    ],
+  },
+} as const;
