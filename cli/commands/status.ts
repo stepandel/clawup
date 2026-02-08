@@ -4,11 +4,49 @@
 
 import * as p from "@clack/prompts";
 import { loadManifest } from "../lib/config";
-import { getStackOutputs, selectOrCreateStack } from "../lib/pulumi";
+import { getConfig, getStackOutputs, selectOrCreateStack } from "../lib/pulumi";
+import { capture } from "../lib/exec";
+import { SSH_USER, tailscaleHostname } from "../lib/constants";
 import { showBanner, exitWithError } from "../lib/ui";
 
 interface StatusOptions {
   json?: boolean;
+}
+
+/**
+ * Fetch GitHub CLI version via SSH (best effort, returns "—" on failure)
+ */
+function getGhVersion(host: string, timeout: number = 5): string {
+  const result = capture("ssh", [
+    "-o", `ConnectTimeout=${timeout}`,
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "BatchMode=yes",
+    `${SSH_USER}@${host}`,
+    `"gh --version 2>/dev/null | head -n1 | awk '{print \\$3}' || echo ''"`,
+  ]);
+  if (result.exitCode === 0 && result.stdout?.trim()) {
+    return result.stdout.trim();
+  }
+  return "—";
+}
+
+/**
+ * Fetch GitHub CLI auth status via SSH (best effort, returns "✓" or "—")
+ */
+function getGhAuthStatus(host: string, timeout: number = 5): string {
+  const result = capture("ssh", [
+    "-o", `ConnectTimeout=${timeout}`,
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "BatchMode=yes",
+    `${SSH_USER}@${host}`,
+    `"gh auth status 2>&1 >/dev/null && echo 'OK' || echo 'no'"`,
+  ]);
+  if (result.exitCode === 0 && result.stdout?.trim() === "OK") {
+    return "✓";
+  }
+  return "—";
 }
 
 export async function statusCommand(opts: StatusOptions): Promise<void> {
@@ -33,14 +71,31 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     exitWithError("Could not fetch stack outputs. Has the stack been deployed?");
   }
 
-  // Build status data
-  const statusData = manifest.agents.map((agent) => ({
-    name: agent.displayName,
-    role: agent.role,
-    instanceId: (outputs[`${agent.role}InstanceId`] as string) ?? "—",
-    publicIp: (outputs[`${agent.role}PublicIp`] as string) ?? "—",
-    tailscaleUrl: (outputs[`${agent.role}TailscaleUrl`] as string) ?? "—",
-  }));
+  // Get tailnet DNS name for SSH connections
+  const tailnetDnsName = getConfig("tailnetDnsName");
+
+  // Build status data with GitHub CLI version (fetched via SSH)
+  const statusData = manifest.agents.map((agent) => {
+    let ghVersion = "—";
+    let ghAuth = "—";
+    if (tailnetDnsName) {
+      const tsHost = tailscaleHostname(manifest.stackName, agent.name);
+      const host = `${tsHost}.${tailnetDnsName}`;
+      ghVersion = getGhVersion(host);
+      if (ghVersion !== "—") {
+        ghAuth = getGhAuthStatus(host);
+      }
+    }
+    return {
+      name: agent.displayName,
+      role: agent.role,
+      instanceId: (outputs[`${agent.role}InstanceId`] as string) ?? "—",
+      publicIp: (outputs[`${agent.role}PublicIp`] as string) ?? "—",
+      tailscaleUrl: (outputs[`${agent.role}TailscaleUrl`] as string) ?? "—",
+      ghVersion,
+      ghAuth,
+    };
+  });
 
   // JSON output
   if (opts.json) {
@@ -57,12 +112,16 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
   const roleW = 10;
   const idW = 22;
   const ipW = 16;
+  const ghW = 8;
+  const authW = 6;
 
   const header = [
     "Agent".padEnd(nameW),
     "Role".padEnd(roleW),
     "Instance ID".padEnd(idW),
     "Public IP".padEnd(ipW),
+    "gh".padEnd(ghW),
+    "Auth".padEnd(authW),
   ].join("  ");
 
   const separator = [
@@ -70,6 +129,8 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     "─".repeat(roleW),
     "─".repeat(idW),
     "─".repeat(ipW),
+    "─".repeat(ghW),
+    "─".repeat(authW),
   ].join("  ");
 
   console.log(`  ${header}`);
@@ -81,6 +142,8 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       s.role.padEnd(roleW),
       s.instanceId.padEnd(idW),
       s.publicIp.padEnd(ipW),
+      s.ghVersion.padEnd(ghW),
+      s.ghAuth.padEnd(authW),
     ].join("  ");
     console.log(`  ${row}`);
   }

@@ -46,6 +46,8 @@ export interface CloudInitConfig {
   linear?: LinearConfigOptions;
   /** Brave Search API key */
   braveSearchApiKey?: string;
+  /** GitHub personal access token for gh CLI auth */
+  githubToken?: string;
 }
 
 /**
@@ -91,6 +93,33 @@ if ! grep -q 'DENO_INSTALL' ~/.bashrc; then
 fi
 DENO_INSTALL_SCRIPT
 echo "Deno and Linear CLI installed successfully"
+`
+    : "";
+
+  // GitHub CLI installation (system-level via official apt repo)
+  const ghCliInstallScript = `
+# Install GitHub CLI
+echo "Installing GitHub CLI..."
+type -p curl >/dev/null || apt-get install -y curl
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+apt-get update
+apt-get install -y gh
+echo "GitHub CLI installed: $(gh --version | head -n1)"
+`;
+
+  // GitHub CLI authentication (only if token provided)
+  const ghAuthScript = config.githubToken
+    ? `
+# Authenticate GitHub CLI for ubuntu user
+echo "Authenticating GitHub CLI..."
+sudo -u ubuntu bash << 'GH_AUTH_SCRIPT'
+set -e
+echo "\${GITHUB_TOKEN}" | gh auth login --with-token
+gh auth setup-git
+echo "GitHub CLI authenticated successfully"
+GH_AUTH_SCRIPT
 `
     : "";
 
@@ -170,6 +199,7 @@ systemctl enable docker
 systemctl start docker
 ${createUserSection}
 usermod -aG docker ubuntu
+${ghCliInstallScript}
 
 # Install NVM and Node.js for ubuntu user
 echo "Installing Node.js $NODE_VERSION via NVM..."
@@ -205,8 +235,9 @@ echo 'export ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}"' >> /home/ubuntu/.bashrc
 \${SLACK_APP_TOKEN:+echo 'export SLACK_APP_TOKEN="\${SLACK_APP_TOKEN}"' >> /home/ubuntu/.bashrc}
 \${LINEAR_API_KEY:+echo 'export LINEAR_API_KEY="\${LINEAR_API_KEY}"' >> /home/ubuntu/.bashrc}
 \${BRAVE_SEARCH_API_KEY:+echo 'export BRAVE_SEARCH_API_KEY="\${BRAVE_SEARCH_API_KEY}"' >> /home/ubuntu/.bashrc}
+\${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
-${tailscaleSection}${denoInstallScript}
+${tailscaleSection}${denoInstallScript}${ghAuthScript}
 # Enable systemd linger for ubuntu user (required for user services to run at boot)
 loginctl enable-linger ubuntu
 
@@ -308,6 +339,7 @@ export function interpolateCloudInit(
     slackAppToken?: string;
     linearApiKey?: string;
     braveSearchApiKey?: string;
+    githubToken?: string;
   }
 ): string {
   let result = script
@@ -324,6 +356,8 @@ export function interpolateCloudInit(
   result = result.replace(/\${LINEAR_API_KEY}/g, values.linearApiKey ?? "");
   result = result.replace(/\${BRAVE_SEARCH_API_KEY:-}/g, values.braveSearchApiKey ?? "");
   result = result.replace(/\${BRAVE_SEARCH_API_KEY}/g, values.braveSearchApiKey ?? "");
+  result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
+  result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
 
   return result;
 }
