@@ -6,7 +6,7 @@ import * as p from "@clack/prompts";
 import { loadManifest } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import { capture } from "../lib/exec";
-import { SSH_USER } from "../lib/constants";
+import { SSH_USER, tailscaleHostname } from "../lib/constants";
 import { showBanner, exitWithError } from "../lib/ui";
 import pc from "picocolors";
 
@@ -64,7 +64,8 @@ export async function validateCommand(opts: ValidateOptions): Promise<void> {
   console.log();
 
   for (const agent of manifest.agents) {
-    const host = `${agent.name}.${tailnetDnsName}`;
+    const tsHost = tailscaleHostname(manifest.stackName, agent.name);
+    const host = `${tsHost}.${tailnetDnsName}`;
     const checks: CheckResult["checks"] = [];
 
     p.log.info(`${pc.bold(agent.displayName)} (${agent.role}) — ${host}`);

@@ -5,7 +5,7 @@
 import * as p from "@clack/prompts";
 import { loadManifest } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
-import { AGENT_ALIASES, SSH_USER } from "../lib/constants";
+import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
 import { showBanner, exitWithError } from "../lib/ui";
 import { spawn } from "child_process";
 
@@ -54,7 +54,8 @@ export async function sshCommand(agentNameOrAlias: string, commandArgs: string[]
     exitWithError("Could not determine tailnet DNS name from Pulumi config.");
   }
 
-  const sshHost = `${agent.name}.${tailnetDnsName}`;
+  const tsHost = tailscaleHostname(manifest.stackName, agent.name);
+  const sshHost = `${tsHost}.${tailnetDnsName}`;
   const user = opts.user ?? SSH_USER;
 
   p.log.info(`Connecting to ${agent.displayName} (${sshHost})...`);

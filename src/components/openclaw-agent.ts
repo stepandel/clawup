@@ -423,6 +423,9 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           linearApiKey,
           braveSearchApiKey,
         ]) => {
+          // Include stack name in Tailscale hostname to avoid conflicts across deployments
+          const tsHostname = `${pulumi.getStack()}-${name}`;
+
           const cloudInitConfig: CloudInitConfig = {
             anthropicApiKey: apiKey,
             tailscaleAuthKey: tsAuthKey,
@@ -431,7 +434,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
             browserPort: browserPort as number,
             model: model as string,
             enableSandbox: enableSandbox as boolean,
-            tailscaleHostname: name,
+            tailscaleHostname: tsHostname,
             workspaceFiles: args.workspaceFiles,
             envVars: args.envVars,
             postSetupCommands: args.postSetupCommands,
@@ -492,8 +495,9 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     this.sshPrivateKey = sshKey.privateKeyOpenssh;
     this.sshPublicKey = sshKey.publicKeyOpenssh;
     this.gatewayToken = gatewayTokenValue;
-    // Tailscale hostname is set to the agent name via --hostname flag in cloud-init
-    this.tailscaleUrl = pulumi.interpolate`https://${name}.${args.tailnetDnsName}/?token=${gatewayTokenValue}`;
+    // Tailscale hostname includes stack name to avoid conflicts (e.g., dev-agent-pm)
+    const tsHostname = `${pulumi.getStack()}-${name}`;
+    this.tailscaleUrl = pulumi.interpolate`https://${tsHostname}.${args.tailnetDnsName}/?token=${gatewayTokenValue}`;
 
     // Register outputs
     this.registerOutputs({

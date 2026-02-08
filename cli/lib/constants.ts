@@ -68,6 +68,15 @@ export const COST_ESTIMATES: Record<string, number> = {
 /** Manifest filename */
 export const MANIFEST_FILE = "agent-army.json";
 
+/**
+ * Build the Tailscale hostname for an agent.
+ * Includes the stack name to avoid conflicts across deployments.
+ * Example: "dev-agent-pm", "prod-agent-eng"
+ */
+export function tailscaleHostname(stackName: string, agentName: string): string {
+  return `${stackName}-${agentName}`;
+}
+
 /** Key instructions for onboarding prompts */
 export const KEY_INSTRUCTIONS = {
   anthropicApiKey: {
@@ -85,8 +94,18 @@ export const KEY_INSTRUCTIONS = {
       "To get your Tailscale auth key:",
       "1. Go to https://login.tailscale.com/admin/settings/keys",
       "2. Click \"Generate auth key\"",
-      "3. Enable \"Reusable\" if you plan to redeploy agents",
+      "3. Enable \"Reusable\" AND \"Ephemeral\" — ephemeral nodes auto-remove when offline",
       "4. Copy the key (starts with tskey-auth-)",
+    ],
+  },
+  tailscaleApiKey: {
+    title: "Tailscale API Key (optional)",
+    steps: [
+      "For reliable cleanup of Tailscale devices during destroy:",
+      "1. Go to https://login.tailscale.com/admin/settings/keys",
+      "2. Under \"API access tokens\", click \"Generate access token\"",
+      "3. Copy the key (starts with tskey-api-)",
+      "4. This is optional but recommended for clean teardowns",
     ],
   },
   tailnetDnsName: {

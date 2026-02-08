@@ -108,6 +108,18 @@ export async function initCommand(): Promise<void> {
   });
   handleCancel(tailnetDnsName);
 
+  p.note(
+    KEY_INSTRUCTIONS.tailscaleApiKey.steps.join("\n"),
+    KEY_INSTRUCTIONS.tailscaleApiKey.title
+  );
+
+  const tailscaleApiKey = await p.text({
+    message: "Tailscale API key (press Enter to skip)",
+    placeholder: "tskey-api-... (optional)",
+    defaultValue: "",
+  });
+  handleCancel(tailscaleApiKey);
+
   // Step 4: Choose agents
   p.log.step("Configure agents");
 
@@ -278,6 +290,9 @@ export async function initCommand(): Promise<void> {
   setConfig("anthropicApiKey", anthropicApiKey as string, true);
   setConfig("tailscaleAuthKey", tailscaleAuthKey as string, true);
   setConfig("tailnetDnsName", tailnetDnsName as string);
+  if (tailscaleApiKey) {
+    setConfig("tailscaleApiKey", tailscaleApiKey as string, true);
+  }
   setConfig("instanceType", basicConfig.instanceType as string);
   setConfig("ownerName", basicConfig.ownerName as string);
   s.stop("Configuration saved");
