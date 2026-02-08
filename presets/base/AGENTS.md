@@ -50,6 +50,17 @@ Capture what matters. Decisions, context, things to remember.
 - `trash` > `rm` (recoverable beats gone forever)
 - When in doubt, ask.
 
+## Troubleshooting Tools
+
+Before reporting a tool as broken or not authenticated:
+
+1. **Test with a simple command first** (e.g., `linear --version`, `gh --version`)
+2. **Check the basics**: Is it in PATH? Does the binary exist?
+3. **Try a minimal operation** before assuming authentication failed
+4. **Read error messages carefully** — they often tell you exactly what's wrong
+
+Quick diagnosis saves time. "It's broken" → investigate → report specifics.
+
 ## External vs Internal
 
 **Safe to do freely:**
