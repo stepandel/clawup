@@ -41,10 +41,10 @@ export async function sshCommand(agentNameOrAlias: string, commandArgs: string[]
 
   if (!agent) {
     const validNames = manifest.agents
-      .map((a) => `${a.role} (${a.displayName})`)
-      .join(", ");
+      .map((a) => `${a.role}, ${a.displayName.toLowerCase()}, ${a.name}`)
+      .join("\n  ");
     exitWithError(
-      `Unknown agent: "${agentNameOrAlias}"\nValid agents: ${validNames}`
+      `Unknown agent: "${agentNameOrAlias}"\nValid identifiers (any of these work):\n  ${validNames}`
     );
   }
 

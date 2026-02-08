@@ -128,7 +128,13 @@ export async function validateCommand(opts: ValidateOptions): Promise<void> {
   if (failed > 0) {
     p.log.warn("Some agents failed validation.");
     p.log.message("  1. Wait 3-5 minutes for cloud-init to complete");
-    p.log.message("  2. Check logs: agent-army ssh <agent> 'journalctl -u openclaw'");
+    const agentHints = results
+      .filter((r) => !r.passed)
+      .map((r) => {
+        const agent = manifest.agents.find((a) => a.displayName === r.agent);
+        return agent ? agent.role : r.agent;
+      });
+    p.log.message(`  2. Check logs: agent-army ssh ${agentHints[0] ?? "<role>"} -- journalctl -u openclaw`);
     p.log.message("  3. Verify Tailscale: tailscale status");
     process.exit(1);
   } else {
