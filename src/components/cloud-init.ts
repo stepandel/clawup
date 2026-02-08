@@ -94,6 +94,32 @@ echo "Deno and Linear CLI installed successfully"
 `
     : "";
 
+  // Claude Code CLI installation (uses ANTHROPIC_API_KEY from .bashrc for auth)
+  const claudeCodeInstallScript = `
+# Install Claude Code CLI for ubuntu user
+echo "Installing Claude Code CLI..."
+sudo -u ubuntu bash << 'CLAUDE_CODE_INSTALL_SCRIPT'
+set -e
+cd ~
+
+# Install Claude Code via official installer
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Add Claude Code to PATH in .bashrc if not already there
+if ! grep -q '.local/bin' ~/.bashrc; then
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+fi
+
+# Verify installation
+if [ -x "$HOME/.local/bin/claude" ]; then
+  echo "Claude Code installed successfully at $HOME/.local/bin/claude"
+else
+  echo "WARNING: Claude Code installation may have failed"
+  exit 1
+fi
+CLAUDE_CODE_INSTALL_SCRIPT
+` + "|| echo \"WARNING: Claude Code installation failed. Install manually with: curl -fsSL https://claude.ai/install.sh | bash\"";
+
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
 
@@ -207,6 +233,8 @@ echo 'export ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}"' >> /home/ubuntu/.bashrc
 \${BRAVE_SEARCH_API_KEY:+echo 'export BRAVE_SEARCH_API_KEY="\${BRAVE_SEARCH_API_KEY}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
 ${tailscaleSection}${denoInstallScript}
+${claudeCodeInstallScript}
+
 # Enable systemd linger for ubuntu user (required for user services to run at boot)
 loginctl enable-linger ubuntu
 

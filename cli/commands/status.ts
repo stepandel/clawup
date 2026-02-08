@@ -4,11 +4,31 @@
 
 import * as p from "@clack/prompts";
 import { loadManifest } from "../lib/config";
-import { getStackOutputs, selectOrCreateStack } from "../lib/pulumi";
+import { getConfig, getStackOutputs, selectOrCreateStack } from "../lib/pulumi";
+import { capture } from "../lib/exec";
+import { SSH_USER, tailscaleHostname } from "../lib/constants";
 import { showBanner, exitWithError } from "../lib/ui";
 
 interface StatusOptions {
   json?: boolean;
+}
+
+/**
+ * Fetch Claude Code version via SSH (best effort, returns "—" on failure)
+ */
+function getClaudeCodeVersion(host: string, timeout: number = 5): string {
+  const result = capture("ssh", [
+    "-o", `ConnectTimeout=${timeout}`,
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "BatchMode=yes",
+    `${SSH_USER}@${host}`,
+    `"/home/${SSH_USER}/.local/bin/claude --version 2>/dev/null || echo ''"`,
+  ]);
+  if (result.exitCode === 0 && result.stdout?.trim()) {
+    return result.stdout.trim();
+  }
+  return "—";
 }
 
 export async function statusCommand(opts: StatusOptions): Promise<void> {
@@ -33,14 +53,26 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     exitWithError("Could not fetch stack outputs. Has the stack been deployed?");
   }
 
-  // Build status data
-  const statusData = manifest.agents.map((agent) => ({
-    name: agent.displayName,
-    role: agent.role,
-    instanceId: (outputs[`${agent.role}InstanceId`] as string) ?? "—",
-    publicIp: (outputs[`${agent.role}PublicIp`] as string) ?? "—",
-    tailscaleUrl: (outputs[`${agent.role}TailscaleUrl`] as string) ?? "—",
-  }));
+  // Get tailnet DNS name for SSH connections
+  const tailnetDnsName = getConfig("tailnetDnsName");
+
+  // Build status data with Claude Code version (fetched via SSH)
+  const statusData = manifest.agents.map((agent) => {
+    let claudeCodeVersion = "—";
+    if (tailnetDnsName) {
+      const tsHost = tailscaleHostname(manifest.stackName, agent.name);
+      const host = `${tsHost}.${tailnetDnsName}`;
+      claudeCodeVersion = getClaudeCodeVersion(host);
+    }
+    return {
+      name: agent.displayName,
+      role: agent.role,
+      instanceId: (outputs[`${agent.role}InstanceId`] as string) ?? "—",
+      publicIp: (outputs[`${agent.role}PublicIp`] as string) ?? "—",
+      tailscaleUrl: (outputs[`${agent.role}TailscaleUrl`] as string) ?? "—",
+      claudeCodeVersion,
+    };
+  });
 
   // JSON output
   if (opts.json) {
@@ -57,12 +89,14 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
   const roleW = 10;
   const idW = 22;
   const ipW = 16;
+  const claudeW = 16;
 
   const header = [
     "Agent".padEnd(nameW),
     "Role".padEnd(roleW),
     "Instance ID".padEnd(idW),
     "Public IP".padEnd(ipW),
+    "Claude Code".padEnd(claudeW),
   ].join("  ");
 
   const separator = [
@@ -70,6 +104,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     "─".repeat(roleW),
     "─".repeat(idW),
     "─".repeat(ipW),
+    "─".repeat(claudeW),
   ].join("  ");
 
   console.log(`  ${header}`);
@@ -81,6 +116,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       s.role.padEnd(roleW),
       s.instanceId.padEnd(idW),
       s.publicIp.padEnd(ipW),
+      s.claudeCodeVersion.padEnd(claudeW),
     ].join("  ");
     console.log(`  ${row}`);
   }
