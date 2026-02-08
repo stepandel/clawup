@@ -121,6 +121,12 @@ export interface OpenClawAgentArgs {
    * Brave Search API key for web search
    */
   braveSearchApiKey?: pulumi.Input<string>;
+
+  /**
+   * GitHub personal access token for gh CLI authentication
+   * Must start with ghp_ or github_pat_
+   */
+  githubToken?: pulumi.Input<string>;
 }
 
 /**
@@ -403,6 +409,9 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     const braveSearchApiKeyOutput = args.braveSearchApiKey 
       ? pulumi.output(args.braveSearchApiKey) 
       : pulumi.output("");
+    const githubTokenOutput = args.githubToken 
+      ? pulumi.output(args.githubToken) 
+      : pulumi.output("");
 
     const userData = pulumi
       .all([
@@ -413,6 +422,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
         slackAppTokenOutput,
         linearApiKeyOutput,
         braveSearchApiKeyOutput,
+        githubTokenOutput,
       ])
       .apply(
         ([
@@ -423,6 +433,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           slackAppToken,
           linearApiKey,
           braveSearchApiKey,
+          githubToken,
         ]) => {
           // Include stack name in Tailscale hostname to avoid conflicts across deployments
           const tsHostname = `${pulumi.getStack()}-${name}`;
@@ -447,6 +458,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
             linear: linearApiKey ? { apiKey: linearApiKey } : undefined,
             // Brave Search API key
             braveSearchApiKey: braveSearchApiKey || undefined,
+            // GitHub token for gh CLI auth
+            githubToken: githubToken || undefined,
           };
 
           const script = generateCloudInit(cloudInitConfig);
@@ -458,6 +471,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
             slackAppToken: slackAppToken || undefined,
             linearApiKey: linearApiKey || undefined,
             braveSearchApiKey: braveSearchApiKey || undefined,
+            githubToken: githubToken || undefined,
           });
         }
       );

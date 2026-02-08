@@ -57,6 +57,7 @@ const ownerName = config.get("ownerName") ?? "Boss";
 const agentSlackCredentials: Record<string, { botToken?: pulumi.Output<string>; appToken?: pulumi.Output<string> }> = {};
 const agentLinearCredentials: Record<string, pulumi.Output<string> | undefined> = {};
 const agentBraveSearchCredentials: Record<string, pulumi.Output<string> | undefined> = {};
+const agentGithubCredentials: Record<string, pulumi.Output<string> | undefined> = {};
 
 // Common roles to check for credentials
 const commonRoles = ["pm", "eng", "tester"];
@@ -75,6 +76,11 @@ for (const role of commonRoles) {
   const braveKey = config.getSecret(`${role}BraveSearchApiKey`);
   if (braveKey) {
     agentBraveSearchCredentials[role] = braveKey;
+  }
+  
+  const githubToken = config.getSecret(`${role}GithubToken`);
+  if (githubToken) {
+    agentGithubCredentials[role] = githubToken;
   }
 }
 
@@ -208,6 +214,7 @@ for (const agent of manifest.agents) {
   const slackCreds = agentSlackCredentials[agent.role];
   const linearApiKey = agentLinearCredentials[agent.role];
   const braveSearchApiKey = agentBraveSearchCredentials[agent.role];
+  const githubToken = agentGithubCredentials[agent.role];
 
   const agentResource = new OpenClawAgent(agent.name, {
     anthropicApiKey,
@@ -240,6 +247,9 @@ for (const agent of manifest.agents) {
 
     // Brave Search API key (optional)
     braveSearchApiKey,
+
+    // GitHub token (optional)
+    githubToken,
 
     tags: {
       ...baseTags,

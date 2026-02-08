@@ -257,12 +257,23 @@ export async function initCommand(): Promise<void> {
     integrations.push("brave");
   }
 
+  // GitHub is optional
+  const addGithub = await p.confirm({
+    message: "Configure GitHub CLI? (optional)",
+    initialValue: false,
+  });
+  handleCancel(addGithub);
+  if (addGithub) {
+    integrations.push("github");
+  }
+
   // Per-agent integration credentials
   const integrationCredentials: Record<string, {
     slackBotToken?: string;
     slackAppToken?: string;
     linearApiKey?: string;
     braveSearchApiKey?: string;
+    githubToken?: string;
   }> = {};
 
   for (const agent of agents) {
@@ -348,6 +359,31 @@ export async function initCommand(): Promise<void> {
     }
   }
 
+  if (integrations.includes("github")) {
+    p.note(
+      KEY_INSTRUCTIONS.githubToken.steps.join("\n"),
+      KEY_INSTRUCTIONS.githubToken.title
+    );
+
+    for (const agent of agents) {
+      const githubKey = await p.text({
+        message: `GitHub token for ${agent.displayName} (${agent.role}) — press Enter to skip`,
+        placeholder: "ghp_... or github_pat_... (optional)",
+        defaultValue: "",
+        validate: (val) => {
+          if (val && !val.startsWith("ghp_") && !val.startsWith("github_pat_")) {
+            return "Must start with ghp_ or github_pat_ (or leave empty to skip)";
+          }
+        },
+      });
+      handleCancel(githubKey);
+
+      if (githubKey) {
+        integrationCredentials[agent.role].githubToken = githubKey as string;
+      }
+    }
+  }
+
   // Step 6: Show summary
   const costPerAgent = COST_ESTIMATES[basicConfig.instanceType as string] ?? 30;
   const totalCost = agents.reduce((sum, a) => {
@@ -358,7 +394,9 @@ export async function initCommand(): Promise<void> {
   const integrationNames = integrations.map(i => {
     if (i === "slack") return "Slack";
     if (i === "linear") return "Linear";
-    return "Brave Search";
+    if (i === "brave") return "Brave Search";
+    if (i === "github") return "GitHub CLI";
+    return i;
   });
 
   p.note(
@@ -417,6 +455,7 @@ export async function initCommand(): Promise<void> {
     if (creds.slackAppToken) setConfig(`${role}SlackAppToken`, creds.slackAppToken, true);
     if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true);
     if (creds.braveSearchApiKey) setConfig(`${role}BraveSearchApiKey`, creds.braveSearchApiKey, true);
+    if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true);
   }
   s.stop("Configuration saved");
 

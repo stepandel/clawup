@@ -31,6 +31,42 @@ function getClaudeCodeVersion(host: string, timeout: number = 5): string {
   return "—";
 }
 
+/**
+ * Fetch GitHub CLI version via SSH (best effort, returns "—" on failure)
+ */
+function getGhVersion(host: string, timeout: number = 5): string {
+  const result = capture("ssh", [
+    "-o", `ConnectTimeout=${timeout}`,
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "BatchMode=yes",
+    `${SSH_USER}@${host}`,
+    `"gh --version 2>/dev/null | head -n1 | awk '{print \\$3}' || echo ''"`,
+  ]);
+  if (result.exitCode === 0 && result.stdout?.trim()) {
+    return result.stdout.trim();
+  }
+  return "—";
+}
+
+/**
+ * Fetch GitHub CLI auth status via SSH (best effort, returns "✓" or "—")
+ */
+function getGhAuthStatus(host: string, timeout: number = 5): string {
+  const result = capture("ssh", [
+    "-o", `ConnectTimeout=${timeout}`,
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "BatchMode=yes",
+    `${SSH_USER}@${host}`,
+    `"gh auth status 2>&1 >/dev/null && echo 'OK' || echo 'no'"`,
+  ]);
+  if (result.exitCode === 0 && result.stdout?.trim() === "OK") {
+    return "✓";
+  }
+  return "—";
+}
+
 export async function statusCommand(opts: StatusOptions): Promise<void> {
   if (!opts.json) showBanner();
 
@@ -56,13 +92,19 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
   // Get tailnet DNS name for SSH connections
   const tailnetDnsName = getConfig("tailnetDnsName");
 
-  // Build status data with Claude Code version (fetched via SSH)
+  // Build status data with Claude Code and GitHub CLI versions (fetched via SSH)
   const statusData = manifest.agents.map((agent) => {
     let claudeCodeVersion = "—";
+    let ghVersion = "—";
+    let ghAuth = "—";
     if (tailnetDnsName) {
       const tsHost = tailscaleHostname(manifest.stackName, agent.name);
       const host = `${tsHost}.${tailnetDnsName}`;
       claudeCodeVersion = getClaudeCodeVersion(host);
+      ghVersion = getGhVersion(host);
+      if (ghVersion !== "—") {
+        ghAuth = getGhAuthStatus(host);
+      }
     }
     return {
       name: agent.displayName,
@@ -71,6 +113,8 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       publicIp: (outputs[`${agent.role}PublicIp`] as string) ?? "—",
       tailscaleUrl: (outputs[`${agent.role}TailscaleUrl`] as string) ?? "—",
       claudeCodeVersion,
+      ghVersion,
+      ghAuth,
     };
   });
 
@@ -90,6 +134,8 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
   const idW = 22;
   const ipW = 16;
   const claudeW = 16;
+  const ghW = 8;
+  const authW = 6;
 
   const header = [
     "Agent".padEnd(nameW),
@@ -97,6 +143,8 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     "Instance ID".padEnd(idW),
     "Public IP".padEnd(ipW),
     "Claude Code".padEnd(claudeW),
+    "gh".padEnd(ghW),
+    "Auth".padEnd(authW),
   ].join("  ");
 
   const separator = [
@@ -105,6 +153,8 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     "─".repeat(idW),
     "─".repeat(ipW),
     "─".repeat(claudeW),
+    "─".repeat(ghW),
+    "─".repeat(authW),
   ].join("  ");
 
   console.log(`  ${header}`);
@@ -117,6 +167,8 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       s.instanceId.padEnd(idW),
       s.publicIp.padEnd(ipW),
       s.claudeCodeVersion.padEnd(claudeW),
+      s.ghVersion.padEnd(ghW),
+      s.ghAuth.padEnd(authW),
     ].join("  ");
     console.log(`  ${row}`);
   }
