@@ -123,9 +123,9 @@ export const KEY_INSTRUCTIONS = {
       "Create a Slack app for each agent using the manifest shown below:",
       "1. Go to https://api.slack.com/apps → \"Create New App\" → \"From a manifest\"",
       "2. Select your workspace, paste the JSON manifest, and create the app",
-      "3. Under \"Basic Information\" → \"App-Level Tokens\", generate a token",
+      "3. Go to \"OAuth & Permissions\" — copy the Bot Token (xoxb-...)",
+      "4. Under \"Basic Information\" → \"App-Level Tokens\", generate a token",
       "   with the connections:write scope — copy it (xapp-...)",
-      "4. Go to \"OAuth & Permissions\" — copy the Bot Token (xoxb-...)",
     ],
   },
   linearApiKey: {
