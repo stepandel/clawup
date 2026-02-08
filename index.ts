@@ -52,6 +52,32 @@ const tailnetDnsName = config.require("tailnetDnsName");
 const instanceType = config.get("instanceType") ?? "t3.medium";
 const ownerName = config.get("ownerName") ?? "Boss";
 
+// Per-agent Slack credentials from config/ESC
+// Pattern: <role>SlackBotToken, <role>SlackAppToken
+const agentSlackCredentials: Record<string, { botToken?: pulumi.Output<string>; appToken?: pulumi.Output<string> }> = {};
+const agentLinearCredentials: Record<string, pulumi.Output<string> | undefined> = {};
+const agentBraveSearchCredentials: Record<string, pulumi.Output<string> | undefined> = {};
+
+// Common roles to check for credentials
+const commonRoles = ["pm", "eng", "tester"];
+for (const role of commonRoles) {
+  const botToken = config.getSecret(`${role}SlackBotToken`);
+  const appToken = config.getSecret(`${role}SlackAppToken`);
+  if (botToken || appToken) {
+    agentSlackCredentials[role] = { botToken, appToken };
+  }
+  
+  const linearToken = config.getSecret(`${role}LinearApiKey`);
+  if (linearToken) {
+    agentLinearCredentials[role] = linearToken;
+  }
+  
+  const braveKey = config.getSecret(`${role}BraveSearchApiKey`);
+  if (braveKey) {
+    agentBraveSearchCredentials[role] = braveKey;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Helper: Load preset workspace files from disk
 // -----------------------------------------------------------------------------
@@ -178,6 +204,11 @@ for (const agent of manifest.agents) {
     if (agent.identityContent) workspaceFiles["IDENTITY.md"] = agent.identityContent;
   }
 
+  // Get per-agent credentials if available
+  const slackCreds = agentSlackCredentials[agent.role];
+  const linearApiKey = agentLinearCredentials[agent.role];
+  const braveSearchApiKey = agentBraveSearchCredentials[agent.role];
+
   const agentResource = new OpenClawAgent(agent.name, {
     anthropicApiKey,
     tailscaleAuthKey,
@@ -199,6 +230,16 @@ for (const agent of manifest.agents) {
       AGENT_NAME: agent.displayName,
       ...agent.envVars,
     },
+
+    // Slack credentials (optional)
+    slackBotToken: slackCreds?.botToken,
+    slackAppToken: slackCreds?.appToken,
+
+    // Linear API key (optional)
+    linearApiKey,
+
+    // Brave Search API key (optional)
+    braveSearchApiKey,
 
     tags: {
       ...baseTags,

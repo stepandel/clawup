@@ -3,7 +3,7 @@
  * Generates the user-data script for EC2 instance provisioning
  */
 
-import { generateConfigPatchScript } from "./config-generator";
+import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions } from "./config-generator";
 
 export interface CloudInitConfig {
   /** Anthropic API key */
@@ -40,6 +40,12 @@ export interface CloudInitConfig {
   skipTailscale?: boolean;
   /** Create ubuntu user (for Hetzner which uses root) */
   createUbuntuUser?: boolean;
+  /** Slack configuration */
+  slack?: SlackConfigOptions;
+  /** Linear configuration */
+  linear?: LinearConfigOptions;
+  /** Brave Search API key */
+  braveSearchApiKey?: string;
 }
 
 /**
@@ -58,7 +64,35 @@ export function generateCloudInit(config: CloudInitConfig): string {
     gatewayToken: config.gatewayToken,
     trustedProxies,
     enableControlUi: true,
+    slack: config.slack,
+    linear: config.linear,
+    braveSearchApiKey: config.braveSearchApiKey,
   });
+
+  // Deno + Linear CLI installation (only if Linear is configured)
+  const denoInstallScript = config.linear
+    ? `
+# Install Deno and Linear CLI for ubuntu user
+echo "Installing Deno and Linear CLI..."
+sudo -u ubuntu bash << 'DENO_INSTALL_SCRIPT'
+set -e
+cd ~
+
+# Install Deno
+curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/home/ubuntu/.deno sh
+
+# Install Linear CLI
+/home/ubuntu/.deno/bin/deno install --allow-all --no-config -n linear jsr:@schpet/linear-cli
+
+# Add Deno to PATH in .bashrc if not already there
+if ! grep -q 'DENO_INSTALL' ~/.bashrc; then
+  echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.bashrc
+  echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
+fi
+DENO_INSTALL_SCRIPT
+echo "Deno and Linear CLI installed successfully"
+`
+    : "";
 
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
@@ -166,8 +200,12 @@ UBUNTU_SCRIPT
 
 # Set environment variables for ubuntu user
 echo 'export ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}"' >> /home/ubuntu/.bashrc
+\${SLACK_BOT_TOKEN:+echo 'export SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN}"' >> /home/ubuntu/.bashrc}
+\${SLACK_APP_TOKEN:+echo 'export SLACK_APP_TOKEN="\${SLACK_APP_TOKEN}"' >> /home/ubuntu/.bashrc}
+\${LINEAR_API_KEY:+echo 'export LINEAR_API_KEY="\${LINEAR_API_KEY}"' >> /home/ubuntu/.bashrc}
+\${BRAVE_SEARCH_API_KEY:+echo 'export BRAVE_SEARCH_API_KEY="\${BRAVE_SEARCH_API_KEY}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
-${tailscaleSection}
+${tailscaleSection}${denoInstallScript}
 # Enable systemd linger for ubuntu user (required for user services to run at boot)
 loginctl enable-linger ubuntu
 
@@ -202,7 +240,13 @@ openclaw daemon install || echo "WARNING: Daemon install failed. Run openclaw da
 
 # Configure gateway for Tailscale Serve
 echo "Configuring OpenClaw gateway..."
-sudo -H -u ubuntu GATEWAY_TOKEN="\${GATEWAY_TOKEN}" python3 << 'PYTHON_SCRIPT'
+sudo -H -u ubuntu \\
+  GATEWAY_TOKEN="\${GATEWAY_TOKEN}" \\
+  SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN:-}" \\
+  SLACK_APP_TOKEN="\${SLACK_APP_TOKEN:-}" \\
+  LINEAR_API_KEY="\${LINEAR_API_KEY:-}" \\
+  BRAVE_SEARCH_API_KEY="\${BRAVE_SEARCH_API_KEY:-}" \\
+  python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
 ${workspaceFilesScript}
@@ -259,10 +303,26 @@ export function interpolateCloudInit(
     anthropicApiKey: string;
     tailscaleAuthKey: string;
     gatewayToken: string;
+    slackBotToken?: string;
+    slackAppToken?: string;
+    linearApiKey?: string;
+    braveSearchApiKey?: string;
   }
 ): string {
-  return script
+  let result = script
     .replace(/\${ANTHROPIC_API_KEY}/g, values.anthropicApiKey)
     .replace(/\${TAILSCALE_AUTH_KEY}/g, values.tailscaleAuthKey)
     .replace(/\${GATEWAY_TOKEN}/g, values.gatewayToken);
+
+  // Optional tokens - replace with empty string if not provided
+  result = result.replace(/\${SLACK_BOT_TOKEN:-}/g, values.slackBotToken ?? "");
+  result = result.replace(/\${SLACK_BOT_TOKEN}/g, values.slackBotToken ?? "");
+  result = result.replace(/\${SLACK_APP_TOKEN:-}/g, values.slackAppToken ?? "");
+  result = result.replace(/\${SLACK_APP_TOKEN}/g, values.slackAppToken ?? "");
+  result = result.replace(/\${LINEAR_API_KEY:-}/g, values.linearApiKey ?? "");
+  result = result.replace(/\${LINEAR_API_KEY}/g, values.linearApiKey ?? "");
+  result = result.replace(/\${BRAVE_SEARCH_API_KEY:-}/g, values.braveSearchApiKey ?? "");
+  result = result.replace(/\${BRAVE_SEARCH_API_KEY}/g, values.braveSearchApiKey ?? "");
+
+  return result;
 }

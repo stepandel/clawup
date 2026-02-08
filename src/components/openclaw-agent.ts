@@ -100,6 +100,26 @@ export interface OpenClawAgentArgs {
    * AWS region (uses default provider region if not specified)
    */
   region?: pulumi.Input<string>;
+
+  /**
+   * Slack bot token (xoxb-...) for Socket Mode
+   */
+  slackBotToken?: pulumi.Input<string>;
+
+  /**
+   * Slack app token (xapp-...) for Socket Mode
+   */
+  slackAppToken?: pulumi.Input<string>;
+
+  /**
+   * Linear API key for issue tracking
+   */
+  linearApiKey?: pulumi.Input<string>;
+
+  /**
+   * Brave Search API key for web search
+   */
+  braveSearchApiKey?: pulumi.Input<string>;
 }
 
 /**
@@ -369,38 +389,60 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     );
 
     // Generate cloud-init user data
+    // Resolve optional tokens to outputs
+    const slackBotTokenOutput = args.slackBotToken 
+      ? pulumi.output(args.slackBotToken) 
+      : pulumi.output("");
+    const slackAppTokenOutput = args.slackAppToken 
+      ? pulumi.output(args.slackAppToken) 
+      : pulumi.output("");
+    const linearApiKeyOutput = args.linearApiKey 
+      ? pulumi.output(args.linearApiKey) 
+      : pulumi.output("");
+    const braveSearchApiKeyOutput = args.braveSearchApiKey 
+      ? pulumi.output(args.braveSearchApiKey) 
+      : pulumi.output("");
+
     const userData = pulumi
       .all([
         args.tailscaleAuthKey,
         args.anthropicApiKey,
         gatewayTokenValue,
-        pulumi.output(gatewayPort),
-        pulumi.output(browserPort),
-        pulumi.output(model),
-        pulumi.output(enableSandbox),
+        slackBotTokenOutput,
+        slackAppTokenOutput,
+        linearApiKeyOutput,
+        braveSearchApiKeyOutput,
       ])
       .apply(
         ([
           tsAuthKey,
           apiKey,
           gwToken,
-          gwPort,
-          brPort,
-          mdl,
-          sandbox,
+          slackBotToken,
+          slackAppToken,
+          linearApiKey,
+          braveSearchApiKey,
         ]) => {
           const cloudInitConfig: CloudInitConfig = {
             anthropicApiKey: apiKey,
             tailscaleAuthKey: tsAuthKey,
             gatewayToken: gwToken,
-            gatewayPort: gwPort,
-            browserPort: brPort,
-            model: mdl,
-            enableSandbox: sandbox,
+            gatewayPort: gatewayPort as number,
+            browserPort: browserPort as number,
+            model: model as string,
+            enableSandbox: enableSandbox as boolean,
             tailscaleHostname: name,
             workspaceFiles: args.workspaceFiles,
             envVars: args.envVars,
             postSetupCommands: args.postSetupCommands,
+            // Slack config (only if both tokens provided)
+            slack: slackBotToken && slackAppToken
+              ? { botToken: slackBotToken, appToken: slackAppToken }
+              : undefined,
+            // Linear config (only if API key provided)
+            linear: linearApiKey ? { apiKey: linearApiKey } : undefined,
+            // Brave Search API key
+            braveSearchApiKey: braveSearchApiKey || undefined,
           };
 
           const script = generateCloudInit(cloudInitConfig);
@@ -408,6 +450,10 @@ export class OpenClawAgent extends pulumi.ComponentResource {
             anthropicApiKey: apiKey,
             tailscaleAuthKey: tsAuthKey,
             gatewayToken: gwToken,
+            slackBotToken: slackBotToken || undefined,
+            slackAppToken: slackAppToken || undefined,
+            linearApiKey: linearApiKey || undefined,
+            braveSearchApiKey: braveSearchApiKey || undefined,
           });
         }
       );

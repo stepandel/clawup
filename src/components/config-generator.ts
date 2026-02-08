@@ -3,6 +3,18 @@
  * Builds the openclaw.json configuration file content
  */
 
+export interface SlackConfigOptions {
+  /** Slack bot token (xoxb-...) */
+  botToken: string;
+  /** Slack app token for Socket Mode (xapp-...) */
+  appToken: string;
+}
+
+export interface LinearConfigOptions {
+  /** Linear API key */
+  apiKey: string;
+}
+
 export interface OpenClawConfigOptions {
   /** Gateway port (default: 18789) */
   gatewayPort?: number;
@@ -22,6 +34,12 @@ export interface OpenClawConfigOptions {
   workspaceFiles?: Record<string, string>;
   /** Custom configuration overrides */
   customConfig?: Record<string, unknown>;
+  /** Slack configuration */
+  slack?: SlackConfigOptions;
+  /** Linear configuration */
+  linear?: LinearConfigOptions;
+  /** Brave Search API key */
+  braveSearchApiKey?: string;
 }
 
 export interface OpenClawConfig {
@@ -109,6 +127,61 @@ export function generateConfigPatchScript(options: OpenClawConfigOptions): strin
     enableControlUi: options.enableControlUi ?? true,
   };
 
+  // Build Slack channel config section if credentials provided
+  const slackChannelConfig = options.slack
+    ? `
+# Configure Slack channel (Socket Mode)
+config.setdefault("channels", {})
+config["channels"]["slack"] = {
+    "mode": "socket",
+    "enabled": True,
+    "botToken": os.environ.get("SLACK_BOT_TOKEN", ""),
+    "appToken": os.environ.get("SLACK_APP_TOKEN", ""),
+    "userTokenReadOnly": True,
+    "groupPolicy": "open",
+    "dm": {
+        "enabled": True,
+        "policy": "open",
+        "allowFrom": ["*"]
+    }
+}
+
+# Enable Slack plugin
+config.setdefault("plugins", {})
+config["plugins"].setdefault("entries", {})
+config["plugins"]["entries"]["slack"] = {"enabled": True}
+print("Configured Slack channel with Socket Mode")
+`
+    : "";
+
+  // Build Linear skill config section if credentials provided
+  const linearSkillConfig = options.linear
+    ? `
+# Configure Linear skill
+config.setdefault("skills", {})
+config["skills"].setdefault("entries", {})
+config["skills"]["entries"]["linear"] = {
+    "enabled": True,
+    "apiKey": os.environ.get("LINEAR_API_KEY", "")
+}
+print("Configured Linear skill")
+`
+    : "";
+
+  // Build Brave Search skill config section if API key provided
+  const braveSearchConfig = options.braveSearchApiKey
+    ? `
+# Configure Brave Search skill
+config.setdefault("skills", {})
+config["skills"].setdefault("entries", {})
+config["skills"]["entries"]["brave-search"] = {
+    "enabled": True,
+    "apiKey": os.environ.get("BRAVE_SEARCH_API_KEY", "")
+}
+print("Configured Brave Search skill")
+`
+    : "";
+
   return `
 import json
 import os
@@ -128,7 +201,7 @@ config["gateway"]["auth"] = {
     "mode": "token",
     "token": os.environ["GATEWAY_TOKEN"]
 }
-
+${slackChannelConfig}${linearSkillConfig}${braveSearchConfig}
 with open(config_path, "w") as f:
     json.dump(config, f, indent=2)
 

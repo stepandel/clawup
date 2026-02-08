@@ -32,24 +32,44 @@ config:
   agent-army:tailscaleAuthKey:
     fn::secret: ${esc:tailscaleAuthKey}
 
-  # Per-agent Slack credentials (optional, pulled from ESC)
-  agent-army:pmSlackToken:
-    fn::secret: ${esc:pmSlackToken}
-  agent-army:pmSlackSigningSecret:
-    fn::secret: ${esc:pmSlackSigningSecret}
-  agent-army:engSlackToken:
-    fn::secret: ${esc:engSlackToken}
-  agent-army:engSlackSigningSecret:
-    fn::secret: ${esc:engSlackSigningSecret}
-  agent-army:testerSlackToken:
-    fn::secret: ${esc:testerSlackToken}
-  agent-army:testerSlackSigningSecret:
-    fn::secret: ${esc:testerSlackSigningSecret}
+  # =========================================================================
+  # Per-agent Slack credentials (Socket Mode)
+  # =========================================================================
+  # Bot Token (xoxb-...) + App Token (xapp-...) for each agent
 
-  # Per-agent Linear credentials (optional, pulled from ESC)
-  agent-army:pmLinearToken:
-    fn::secret: ${esc:pmLinearToken}
-  agent-army:engLinearToken:
-    fn::secret: ${esc:engLinearToken}
-  agent-army:testerLinearToken:
-    fn::secret: ${esc:testerLinearToken}
+  agent-army:pmSlackBotToken:
+    fn::secret: ${esc:pmSlackBotToken}
+  agent-army:pmSlackAppToken:
+    fn::secret: ${esc:pmSlackAppToken}
+
+  agent-army:engSlackBotToken:
+    fn::secret: ${esc:engSlackBotToken}
+  agent-army:engSlackAppToken:
+    fn::secret: ${esc:engSlackAppToken}
+
+  agent-army:testerSlackBotToken:
+    fn::secret: ${esc:testerSlackBotToken}
+  agent-army:testerSlackAppToken:
+    fn::secret: ${esc:testerSlackAppToken}
+
+  # =========================================================================
+  # Per-agent Linear credentials
+  # =========================================================================
+
+  agent-army:pmLinearApiKey:
+    fn::secret: ${esc:pmLinearApiKey}
+  agent-army:engLinearApiKey:
+    fn::secret: ${esc:engLinearApiKey}
+  agent-army:testerLinearApiKey:
+    fn::secret: ${esc:testerLinearApiKey}
+
+  # =========================================================================
+  # Per-agent Brave Search API keys (optional)
+  # =========================================================================
+
+  agent-army:pmBraveSearchApiKey:
+    fn::secret: ${esc:pmBraveSearchApiKey}
+  agent-army:engBraveSearchApiKey:
+    fn::secret: ${esc:engBraveSearchApiKey}
+  agent-army:testerBraveSearchApiKey:
+    fn::secret: ${esc:testerBraveSearchApiKey}
