@@ -17,8 +17,8 @@ claude-code --task "Implement feature X" --context "ticket-123.md"
 
 Ticket tracking.
 
-- CLI: `/home/stars/.deno/bin/linear`
-- Requires: `PATH="/home/stars/.deno/bin:$PATH"` prefix
+- CLI: `/home/ubuntu/.deno/bin/linear`
+- Requires: `PATH="/home/ubuntu/.deno/bin:$PATH"` prefix and `LINEAR_API_KEY` environment variable
 - Teams: (configure your team keys)
 
 ### Common Commands

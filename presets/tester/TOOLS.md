@@ -8,8 +8,8 @@
 
 Ticket tracking and verification.
 
-- CLI: `/home/stars/.deno/bin/linear`
-- Requires: `PATH="/home/stars/.deno/bin:$PATH"` prefix
+- CLI: `/home/ubuntu/.deno/bin/linear`
+- Requires: `PATH="/home/ubuntu/.deno/bin:$PATH"` prefix and `LINEAR_API_KEY` environment variable
 
 ### Common Commands
 
