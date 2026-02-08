@@ -239,21 +239,21 @@ export async function initCommand(): Promise<void> {
     exitWithError("No agents configured. At least one agent is required.");
   }
 
-  // Step 5: Configure integrations (optional)
-  p.log.step("Configure integrations (optional)");
+  // Step 5: Configure integrations
+  p.log.step("Configure integrations");
 
-  const selectedIntegrations = await p.multiselect({
-    message: "Select integrations to configure (press Enter to skip all)",
-    options: [
-      { value: "slack", label: "Slack", hint: "Bot + App tokens per agent" },
-      { value: "linear", label: "Linear", hint: "API key per agent" },
-      { value: "brave", label: "Brave Search", hint: "API key per agent" },
-    ],
-    required: false,
+  // Slack and Linear are always required
+  const integrations: string[] = ["slack", "linear"];
+
+  // Brave Search is optional
+  const addBrave = await p.confirm({
+    message: "Configure Brave Search? (optional)",
+    initialValue: false,
   });
-  handleCancel(selectedIntegrations);
-
-  const integrations = selectedIntegrations as string[];
+  handleCancel(addBrave);
+  if (addBrave) {
+    integrations.push("brave");
+  }
 
   // Per-agent integration credentials
   const integrationCredentials: Record<string, {
@@ -352,7 +352,7 @@ export async function initCommand(): Promise<void> {
       `Region:         ${basicConfig.region}`,
       `Instance type:  ${basicConfig.instanceType}`,
       `Owner:          ${basicConfig.ownerName}`,
-      `Integrations:   ${integrationNames.length > 0 ? integrationNames.join(", ") : "none"}`,
+      `Integrations:   ${integrationNames.join(", ")}`,
       ``,
       `Agents (${agents.length}):`,
       formatAgentList(agents),
