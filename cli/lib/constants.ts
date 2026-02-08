@@ -118,14 +118,14 @@ export const KEY_INSTRUCTIONS = {
     ],
   },
   slackCredentials: {
-    title: "Slack App Credentials",
+    title: "Slack App Setup",
     steps: [
-      "To get Slack Bot and App tokens:",
-      "1. Go to https://api.slack.com/apps and create a new app",
-      "2. Enable Socket Mode — copy the App-Level Token (xapp-...)",
-      "3. Under \"OAuth & Permissions\", add scopes: chat:write, channels:history, channels:read",
-      "4. Install the app to your workspace — copy the Bot Token (xoxb-...)",
-      "5. Create a separate Slack app for each agent",
+      "Create a Slack app for each agent using the manifest shown below:",
+      "1. Go to https://api.slack.com/apps → \"Create New App\" → \"From a manifest\"",
+      "2. Select your workspace, paste the JSON manifest, and create the app",
+      "3. Under \"Basic Information\" → \"App-Level Tokens\", generate a token",
+      "   with the connections:write scope — copy it (xapp-...)",
+      "4. Go to \"OAuth & Permissions\" — copy the Bot Token (xoxb-...)",
     ],
   },
   linearApiKey: {
@@ -148,3 +148,45 @@ export const KEY_INSTRUCTIONS = {
     ],
   },
 } as const;
+
+/** Generate a Slack app manifest JSON for a given agent */
+export function slackAppManifest(agentName: string): string {
+  return JSON.stringify({
+    display_information: {
+      name: agentName,
+      description: "Agent Army AI agent",
+    },
+    features: {
+      bot_user: {
+        display_name: agentName,
+        always_online: true,
+      },
+    },
+    oauth_config: {
+      scopes: {
+        bot: [
+          "app_mentions:read",
+          "channels:history",
+          "channels:read",
+          "chat:write",
+          "im:history",
+          "im:read",
+          "im:write",
+          "users:read",
+        ],
+      },
+    },
+    settings: {
+      event_subscriptions: {
+        bot_events: [
+          "app_mention",
+          "message.channels",
+          "message.im",
+        ],
+      },
+      org_deploy_enabled: false,
+      socket_mode_enabled: true,
+      token_rotation_enabled: false,
+    },
+  }, null, 2);
+}

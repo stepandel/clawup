@@ -2,6 +2,7 @@
  * agent-army init — Interactive setup wizard
  */
 
+import { execSync } from "child_process";
 import * as p from "@clack/prompts";
 import type { AgentDefinition, ArmyManifest } from "../types";
 import {
@@ -10,6 +11,7 @@ import {
   INSTANCE_TYPES,
   COST_ESTIMATES,
   KEY_INSTRUCTIONS,
+  slackAppManifest,
 } from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
@@ -274,6 +276,19 @@ export async function initCommand(): Promise<void> {
     );
 
     for (const agent of agents) {
+      // Copy manifest to clipboard for easy paste into Slack
+      const manifest = slackAppManifest(agent.displayName);
+      try {
+        execSync(
+          process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard",
+          { input: manifest },
+        );
+        p.log.success(`Slack manifest for ${agent.displayName} copied to clipboard — paste it into Slack`);
+      } catch {
+        p.log.warn(`Could not copy to clipboard. Manifest for ${agent.displayName}:`);
+        console.log(manifest);
+      }
+
       const botToken = await p.password({
         message: `Slack Bot Token for ${agent.displayName} (${agent.role})`,
         validate: (val) => {
