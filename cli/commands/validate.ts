@@ -12,7 +12,6 @@ import pc from "picocolors";
 
 interface ValidateOptions {
   timeout?: string;
-  testAuth?: boolean;
 }
 
 interface CheckResult {
@@ -128,10 +127,9 @@ export async function validateCommand(opts: ValidateOptions): Promise<void> {
         const credIsConfigured = credCheck.ok && (hasApiKey || hasOAuthToken);
         const credType = hasOAuthToken ? "OAuth token" : "API key";
 
-        // If --test-auth flag is set, actually test the authentication
-        if (opts.testAuth && credIsConfigured) {
+        if (credIsConfigured) {
+          // Always test authentication with a live API call
           const envVar = hasOAuthToken ? "CLAUDE_CODE_OAUTH_TOKEN" : "ANTHROPIC_API_KEY";
-          // Create a test script that exports the variable and runs claude
           const testScript = `
 export ${envVar}=$(jq -r '.env.${envVar}' /home/${SSH_USER}/.openclaw/openclaw.json)
 timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
@@ -145,13 +143,13 @@ timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
           checks.push({
             name: "Claude Code auth",
             passed: authWorks,
-            detail: authWorks ? `${credType} verified (live test)` : `${credType} test failed: ${authTest.output.substring(0, 50)}`,
+            detail: authWorks ? `${credType} verified` : `${credType} test failed: ${authTest.output.substring(0, 50)}`,
           });
         } else {
           checks.push({
             name: "Claude Code auth",
-            passed: credIsConfigured,
-            detail: credIsConfigured ? `${credType} configured (use --test-auth to verify)` : "No credentials configured",
+            passed: false,
+            detail: "No credentials configured",
           });
         }
       }
