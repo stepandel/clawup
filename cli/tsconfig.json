@@ -9,10 +9,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "declarationMap": true,
     "sourceMap": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "rootDir": "."
   },
-  "include": ["src/**/*", "index.ts", "shared-vpc.ts"],
-  "exclude": ["node_modules", "dist", "examples"]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

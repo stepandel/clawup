@@ -4,9 +4,6 @@
   "description": "Reusable Pulumi components for deploying OpenClaw agents on AWS",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "bin": {
-    "agent-army": "dist/cli/bin.js"
-  },
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
@@ -23,12 +20,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@clack/prompts": "^0.9",
     "@pulumi/aws": "^6.0.0",
     "@pulumi/pulumi": "^3.0.0",
-    "@pulumi/tls": "^5.0.0",
-    "commander": "^13.0",
-    "picocolors": "^1.1"
+    "@pulumi/tls": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
