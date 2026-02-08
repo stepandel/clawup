@@ -132,7 +132,7 @@ export const KEY_INSTRUCTIONS = {
     title: "Linear API Key",
     steps: [
       "Create a separate Linear account for each agent:",
-      "1. Sign up at https://linear.app with you+agentname@domain.com",
+      "1. Invite you+agentname@domain.com to your Linear workspace",
       "   (plus-addressing forwards to your inbox — no new email needed)",
       "2. Go to Settings → API → \"Create key\"",
       "3. Copy the key (starts with lin_api_)",
