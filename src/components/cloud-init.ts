@@ -115,10 +115,13 @@ echo "GitHub CLI installed: $(gh --version | head -n1)"
 # Authenticate GitHub CLI for ubuntu user
 echo "Authenticating GitHub CLI..."
 sudo -u ubuntu bash << 'GH_AUTH_SCRIPT'
-set -e
-echo "\${GITHUB_TOKEN}" | gh auth login --with-token
-gh auth setup-git
-echo "GitHub CLI authenticated successfully"
+if echo "\${GITHUB_TOKEN}" | gh auth login --with-token 2>&1; then
+  gh auth setup-git
+  echo "✅ GitHub CLI authenticated successfully"
+else
+  echo "⚠️  GitHub CLI authentication failed (token may need additional scopes like 'read:org')"
+  echo "   You can authenticate manually later with: gh auth login"
+fi
 GH_AUTH_SCRIPT
 `
     : "";
