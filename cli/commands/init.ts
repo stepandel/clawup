@@ -19,7 +19,12 @@ import { saveManifest } from "../lib/config";
 import { showBanner, handleCancel, exitWithError, formatCost, formatAgentList } from "../lib/ui";
 import { capture } from "../lib/exec";
 
-export async function initCommand(): Promise<void> {
+interface InitOptions {
+  deploy?: boolean;
+  yes?: boolean;
+}
+
+export async function initCommand(opts: InitOptions = {}): Promise<void> {
   showBanner();
 
   // Step 1: Check prerequisites
@@ -485,5 +490,11 @@ export async function initCommand(): Promise<void> {
     }
   }
 
-  p.outro("Setup complete! Run `agent-army deploy` to deploy your agents.");
+  if (opts.deploy) {
+    p.log.success("Config saved! Starting deployment...\n");
+    const { deployCommand } = await import("./deploy.js");
+    await deployCommand({ config: configName, yes: opts.yes });
+  } else {
+    p.outro("Setup complete! Run `agent-army deploy` to deploy your agents.");
+  }
 }

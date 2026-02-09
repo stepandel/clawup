@@ -26,8 +26,10 @@ program
 program
   .command("init")
   .description("Interactive setup wizard — configure stack, secrets, and agents")
-  .action(async () => {
-    await initCommand();
+  .option("--deploy", "Deploy immediately after init")
+  .option("-y, --yes", "Skip confirmation prompt (for deploy)")
+  .action(async (opts) => {
+    await initCommand(opts);
   });
 
 program
