@@ -35,6 +35,7 @@ interface ManifestAgent {
 
 interface Manifest {
   stackName: string;
+  provider?: "aws" | "hetzner";
   region: string;
   instanceType: string;
   ownerName: string;
@@ -158,6 +159,21 @@ if (!fs.existsSync(manifestPath)) {
 }
 
 const manifest: Manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+
+// Default provider to AWS for backwards compatibility with existing manifests
+const provider = manifest.provider ?? "aws";
+
+// Validate provider
+if (provider !== "aws" && provider !== "hetzner") {
+  throw new Error(`Unsupported provider: ${provider}. Supported providers are: aws, hetzner`);
+}
+
+// Hetzner support is not yet implemented
+if (provider === "hetzner") {
+  throw new Error(
+    "Hetzner provider is not yet implemented. Please use AWS for now."
+  );
+}
 
 // -----------------------------------------------------------------------------
 // Resource Tags
