@@ -139,7 +139,8 @@ class CLIUIAdapter implements UIAdapter {
   async select<T>(options: SelectOptions<T>): Promise<T> {
     const result = await p.select({
       message: options.message,
-      options: options.options,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      options: options.options as any,
       initialValue: options.initialValue,
     });
 
@@ -153,7 +154,8 @@ class CLIUIAdapter implements UIAdapter {
   async multiSelect<T>(options: MultiSelectOptions<T>): Promise<T[]> {
     const result = await p.multiselect({
       message: options.message,
-      options: options.options,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      options: options.options as any,
       initialValues: options.initialValues,
       required: options.required,
     });
