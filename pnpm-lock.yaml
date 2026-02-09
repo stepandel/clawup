@@ -14,6 +14,9 @@ importers:
       '@pulumi/aws':
         specifier: ^6.0.0
         version: 6.83.2(typescript@5.9.3)
+      '@pulumi/hcloud':
+        specifier: ^1.0.0
+        version: 1.32.0(typescript@5.9.3)
       '@pulumi/pulumi':
         specifier: ^3.0.0
         version: 3.219.0(typescript@5.9.3)
@@ -239,6 +242,9 @@ packages:
 
   '@pulumi/aws@6.83.2':
     resolution: {integrity: sha512-FggAx+LxANUwD9KPlKy4U8uvVjhR8B6vw+doDq7zP3bRWz7CCCd4sXZT2k/ou0erZN78MTzOXYa1nsN0TBEDJg==}
+
+  '@pulumi/hcloud@1.32.0':
+    resolution: {integrity: sha512-XarPd3Yez6+HxHx8BwX7eRKxqmGWLPvA9W+fvXs4XTZBgslwJqky9fxVat06xzKrYJQUp4AwithCM5TuO+gwCw==}
 
   '@pulumi/pulumi@3.219.0':
     resolution: {integrity: sha512-0AO1ZBJooKALToZYvPj/93PpToGA2rEKvIGQi95zNHevTTC3ibQrKXJDLwQzjHy6HZrON2jbxzakKrU4C2w+hA==}
@@ -1314,6 +1320,14 @@ snapshots:
     dependencies:
       '@pulumi/pulumi': 3.219.0(typescript@5.9.3)
       mime: 2.6.0
+    transitivePeerDependencies:
+      - supports-color
+      - ts-node
+      - typescript
+
+  '@pulumi/hcloud@1.32.0(typescript@5.9.3)':
+    dependencies:
+      '@pulumi/pulumi': 3.219.0(typescript@5.9.3)
     transitivePeerDependencies:
       - supports-color
       - ts-node
