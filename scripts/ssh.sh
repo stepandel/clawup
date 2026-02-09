@@ -21,7 +21,7 @@ declare -A AGENTS=(
     ["tester"]="agent-tester"
     # Aliases
     ["sage"]="agent-pm"
-    ["atlas"]="agent-eng"
+    ["titus"]="agent-eng"
     ["scout"]="agent-tester"
 )
 
@@ -32,7 +32,7 @@ Usage: $(basename "$0") [OPTIONS] AGENT [COMMAND...]
 SSH to an agent via Tailscale.
 
 Arguments:
-    AGENT       Agent name: pm|eng|tester (or alias: sage|atlas|scout)
+    AGENT       Agent name: pm|eng|tester (or alias: sage|titus|scout)
     COMMAND     Optional command to run on the agent
 
 Options:
@@ -45,7 +45,7 @@ Examples:
     $(basename "$0") eng                         # Interactive shell on Eng agent
     $(basename "$0") tester                      # Interactive shell on Tester agent
     
-    $(basename "$0") atlas                       # Using agent alias
+    $(basename "$0") titus                       # Using agent alias
     
     $(basename "$0") pm 'openclaw gateway status'   # Run command
     $(basename "$0") eng 'cat ~/.openclaw/workspace/SOUL.md'
@@ -54,7 +54,7 @@ Examples:
 
 Agent Names:
     pm      → Sage    (Project Manager)
-    eng     → Atlas   (Lead Engineer)
+    eng     → Titus   (Lead Engineer)
     tester  → Scout   (QA Tester)
 EOF
     exit 0
@@ -114,7 +114,7 @@ AGENT=$(echo "$AGENT" | tr '[:upper:]' '[:lower:]')
 if [[ ! -v AGENTS[$AGENT] ]]; then
     log_error "Unknown agent: $AGENT"
     echo ""
-    echo "Valid agents: pm, eng, tester (or aliases: sage, atlas, scout)"
+    echo "Valid agents: pm, eng, tester (or aliases: sage, titus, scout)"
     exit 1
 fi
 

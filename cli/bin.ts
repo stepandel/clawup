@@ -47,7 +47,7 @@ program
 
 program
   .command("ssh <agent>")
-  .description("SSH to an agent by name or alias (sage, atlas, scout)")
+  .description("SSH to an agent by name or alias (sage, titus, scout)")
   .option("-u, --user <user>", "SSH user")
   .argument("[command...]", "Command to run on the agent")
   .action(async (agent: string, commandArgs: string[], opts) => {

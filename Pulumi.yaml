@@ -7,7 +7,7 @@ runtime:
 
 # This project deploys 3 specialized AI agents on AWS:
 #   - Sage (PM): Project management, coordination, stakeholder communication
-#   - Atlas (Eng): Lead engineering, coding, feature development
+#   - Titus (Eng): Lead engineering, coding, feature development
 #   - Scout (Tester): Quality assurance, verification, bug hunting
 #
 # All agents share a single VPC for cost optimization.

@@ -128,7 +128,7 @@ export async function initCommand(): Promise<void> {
   const agentMode = await p.select({
     message: "How would you like to configure agents?",
     options: [
-      { value: "presets", label: "Presets only", hint: "PM (Sage), Eng (Atlas), Tester (Scout)" },
+      { value: "presets", label: "Presets only", hint: "PM (Sage), Eng (Titus), Tester (Scout)" },
       { value: "custom", label: "Custom only", hint: "Define your own agents" },
       { value: "mix", label: "Mix of both", hint: "Pick presets + add custom agents" },
     ],

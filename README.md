@@ -12,7 +12,7 @@ Based on the [Pulumi blog post: Deploy OpenClaw on AWS or Hetzner Securely with 
 │                                                                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐          │
 │  │   EC2: agent-pm │  │  EC2: agent-eng │  │ EC2: agent-tester│          │
-│  │   (Sage)        │  │   (Atlas)       │  │    (Scout)       │          │
+│  │   (Sage)        │  │   (Titus)       │  │    (Scout)       │          │
 │  │                 │  │                 │  │                  │          │
 │  │  • OpenClaw     │  │  • OpenClaw     │  │  • OpenClaw      │          │
 │  │  • Docker       │  │  • Docker       │  │  • Docker        │          │
@@ -147,7 +147,7 @@ Via SSH:
 
 ```bash
 ./scripts/ssh.sh pm      # SSH to PM agent (Sage)
-./scripts/ssh.sh eng     # SSH to Eng agent (Atlas)
+./scripts/ssh.sh eng     # SSH to Eng agent (Titus)
 ./scripts/ssh.sh tester  # SSH to Tester agent (Scout)
 ```
 

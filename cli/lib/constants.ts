@@ -14,7 +14,7 @@ export const PRESETS = {
   },
   eng: {
     name: "agent-eng",
-    displayName: "Atlas",
+    displayName: "Titus",
     role: "eng",
     preset: "eng" as const,
     volumeSize: 50,
@@ -33,7 +33,7 @@ export const PRESETS = {
 /** Map agent aliases to role keys */
 export const AGENT_ALIASES: Record<string, string> = {
   sage: "pm",
-  atlas: "eng",
+  titus: "eng",
   scout: "tester",
 };
 

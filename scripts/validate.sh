@@ -23,7 +23,7 @@ declare -A AGENTS=(
 
 declare -A AGENT_NAMES=(
     ["pm"]="Sage (PM)"
-    ["eng"]="Atlas (Eng)"
+    ["eng"]="Titus (Eng)"
     ["tester"]="Scout (Tester)"
 )
 

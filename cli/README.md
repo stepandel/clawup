@@ -103,7 +103,7 @@ The CLI ships with three preset agent configurations:
 | Alias | Role | Name | Description |
 |-------|------|------|-------------|
 | **Sage** | PM | `agent-pm` | Project management, coordination, communication |
-| **Atlas** | Engineer | `agent-eng` | Lead engineering, coding, shipping |
+| **Titus** | Engineer | `agent-eng` | Lead engineering, coding, shipping |
 | **Scout** | Tester | `agent-tester` | Quality assurance, verification, bug hunting |
 
 You can also define fully custom agents during `init`.
