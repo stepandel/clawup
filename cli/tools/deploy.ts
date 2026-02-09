@@ -5,7 +5,7 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
-import { loadManifest } from "../lib/config";
+import { loadManifest, resolveConfigName } from "../lib/config";
 import { COST_ESTIMATES } from "../lib/constants";
 import pc from "picocolors";
 
@@ -46,10 +46,18 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
 
   ui.intro("Agent Army");
 
-  // Load manifest
-  const manifest = loadManifest();
+  // Resolve config name and load manifest
+  let configName: string;
+  try {
+    configName = resolveConfigName();
+  } catch (err) {
+    ui.log.error((err as Error).message);
+    process.exit(1);
+  }
+
+  const manifest = loadManifest(configName);
   if (!manifest) {
-    ui.log.error("No agent-army.json found. Run `agent-army init` first.");
+    ui.log.error(`Config '${configName}' could not be loaded.`);
     process.exit(1);
   }
 

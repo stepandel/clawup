@@ -460,16 +460,17 @@ export async function initCommand(): Promise<void> {
   s.stop("Configuration saved");
 
   // Write manifest
-  s.start("Writing agent-army.json manifest...");
+  const configName = basicConfig.stackName as string;
+  s.start(`Writing config to ~/.agent-army/configs/${configName}.json...`);
   const manifest: ArmyManifest = {
-    stackName: basicConfig.stackName as string,
+    stackName: configName,
     region: basicConfig.region as string,
     instanceType: basicConfig.instanceType as string,
     ownerName: basicConfig.ownerName as string,
     agents,
   };
-  saveManifest(manifest);
-  s.stop("Manifest written");
+  saveManifest(configName, manifest);
+  s.stop("Config saved");
 
   // Install dependencies if needed
   const result = capture("ls", ["node_modules"]);
