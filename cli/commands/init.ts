@@ -15,9 +15,11 @@ import {
   COST_ESTIMATES,
   HETZNER_COST_ESTIMATES,
   KEY_INSTRUCTIONS,
+  MODEL_PROVIDERS,
   slackAppManifest,
   CODING_CLIS,
 } from "../lib/constants";
+import type { ModelProviderKey } from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
 import { saveManifest } from "../lib/config";
@@ -108,22 +110,84 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     ownerName: ownerName as string,
   };
 
-  // Step 3: Collect secrets
-  p.log.step("Configure secrets");
+  // Step 3: Collect model providers and secrets
+  p.log.step("Configure model providers");
 
-  p.note(
-    KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.anthropicApiKey.title
+  // Select model providers
+  const selectedProviders = await p.multiselect({
+    message: "Select model providers to configure",
+    options: Object.entries(MODEL_PROVIDERS).map(([key, provider]) => ({
+      value: key as ModelProviderKey,
+      label: provider.name,
+      hint: key === "anthropic" ? "Required for backward compatibility" : undefined,
+    })),
+    required: true,
+    initialValues: ["anthropic" as ModelProviderKey],
+  });
+  handleCancel(selectedProviders);
+
+  // Ensure Anthropic is always included for backward compatibility
+  const providers = selectedProviders as ModelProviderKey[];
+  if (!providers.includes("anthropic")) {
+    providers.unshift("anthropic");
+    p.log.info("Added Anthropic provider (required for backward compatibility)");
+  }
+
+  // Collect API keys for each provider
+  const modelApiKeys: Record<string, string> = {};
+  let anthropicApiKey = "";
+
+  for (const providerKey of providers) {
+    const provider = MODEL_PROVIDERS[providerKey];
+    const keyInstructions = providerKey === "anthropic"
+      ? KEY_INSTRUCTIONS.anthropicApiKey
+      : providerKey === "openai"
+      ? KEY_INSTRUCTIONS.openaiApiKey
+      : providerKey === "opencodezen"
+      ? KEY_INSTRUCTIONS.opencodeZenApiKey
+      : KEY_INSTRUCTIONS.googleApiKey;
+
+    p.note(keyInstructions.steps.join("\n"), keyInstructions.title);
+
+    const apiKey = await p.text({
+      message: `${provider.name} API key`,
+      placeholder: provider.keyPrefix ? `${provider.keyPrefix}...` : "your-api-key",
+      validate: (val) => {
+        if (!val) return "API key is required";
+        if (provider.keyPrefix && !val.startsWith(provider.keyPrefix)) {
+          return `Must start with ${provider.keyPrefix}`;
+        }
+      },
+    });
+    handleCancel(apiKey);
+
+    modelApiKeys[provider.envVar] = apiKey as string;
+
+    // Keep anthropicApiKey for backward compatibility
+    if (providerKey === "anthropic") {
+      anthropicApiKey = apiKey as string;
+    }
+  }
+
+  // Select default model
+  const allModels = providers.flatMap((providerKey) =>
+    MODEL_PROVIDERS[providerKey].models.map((m) => ({
+      ...m,
+      provider: providerKey,
+    }))
   );
 
-  const anthropicApiKey = await p.text({
-    message: "Anthropic API key",
-    placeholder: "sk-ant-...",
-    validate: (val) => {
-      if (!val.startsWith("sk-ant-")) return "Must start with sk-ant-";
-    },
+  const defaultModel = await p.select({
+    message: "Select default model for agents",
+    options: allModels.map((m) => ({
+      value: m.value,
+      label: `${m.label} (${MODEL_PROVIDERS[m.provider].name})`,
+    })),
+    initialValue: allModels[0]?.value ?? "anthropic/claude-sonnet-4",
   });
-  handleCancel(anthropicApiKey);
+  handleCancel(defaultModel);
+
+  p.log.step("Configure infrastructure secrets");
 
   p.note(
     KEY_INSTRUCTIONS.tailscaleAuthKey.steps.join("\n"),
@@ -483,6 +547,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   const providerLabel = basicConfig.provider === "aws" ? "AWS" : "Hetzner";
   const regionLabel = basicConfig.provider === "aws" ? "Region" : "Location";
   const codingCliNames = codingClis.map(cli => CODING_CLIS[cli as keyof typeof CODING_CLIS]?.displayName ?? cli);
+  const providerNames = providers.map((p) => MODEL_PROVIDERS[p].name);
 
   p.note(
     [
@@ -492,6 +557,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       `Instance type:  ${basicConfig.instanceType}`,
       `Owner:          ${basicConfig.ownerName}`,
       `Coding CLIs:    ${codingCliNames.join(", ")}`,
+      `Model providers: ${providerNames.join(", ")}`,
+      `Default model:  ${String(defaultModel)}`,
       `Integrations:   ${integrationNames.join(", ")}`,
       ``,
       `Agents (${agents.length}):`,
@@ -539,8 +606,13 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   if (tailscaleApiKey) {
     setConfig("tailscaleApiKey", tailscaleApiKey as string, true);
   }
-  setConfig("instanceType", basicConfig.instanceType);
-  setConfig("ownerName", basicConfig.ownerName);
+  setConfig("instanceType", basicConfig.instanceType as string);
+  setConfig("ownerName", basicConfig.ownerName as string);
+  setConfig("defaultModel", defaultModel as string);
+  // Set model API keys for each provider
+  for (const [envVar, apiKey] of Object.entries(modelApiKeys)) {
+    setConfig(envVar, apiKey, true);
+  }
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
     if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true);

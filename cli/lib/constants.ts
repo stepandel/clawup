@@ -135,6 +135,52 @@ export const MANIFEST_FILE = "agent-army.json";
 export const CONFIG_DIR = ".agent-army/configs";
 
 /**
+ * Supported model providers with their API key prefixes and available models
+ */
+export const MODEL_PROVIDERS = {
+  anthropic: {
+    name: "Anthropic",
+    envVar: "ANTHROPIC_API_KEY",
+    keyPrefix: "sk-ant-",
+    models: [
+      { value: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4 (Recommended)" },
+      { value: "anthropic/claude-opus-4", label: "Claude Opus 4" },
+      { value: "anthropic/claude-haiku-3.5", label: "Claude Haiku 3.5" },
+    ],
+  },
+  openai: {
+    name: "OpenAI",
+    envVar: "OPENAI_API_KEY",
+    keyPrefix: "sk-",
+    models: [
+      { value: "openai/gpt-4o", label: "GPT-4o (Recommended)" },
+      { value: "openai/gpt-4-turbo", label: "GPT-4 Turbo" },
+      { value: "openai/o1", label: "o1" },
+      { value: "openai/o3-mini", label: "o3-mini" },
+    ],
+  },
+  opencodezen: {
+    name: "OpenCode Zen",
+    envVar: "OPENCODE_ZEN_API_KEY",
+    keyPrefix: "",
+    models: [
+      { value: "opencodezen/zen-1", label: "Zen-1 (Recommended)" },
+    ],
+  },
+  google: {
+    name: "Google Gemini",
+    envVar: "GOOGLE_API_KEY",
+    keyPrefix: "",
+    models: [
+      { value: "google/gemini-2.0-flash", label: "Gemini 2.0 Flash (Recommended)" },
+      { value: "google/gemini-2.0-pro", label: "Gemini 2.0 Pro" },
+    ],
+  },
+} as const;
+
+export type ModelProviderKey = keyof typeof MODEL_PROVIDERS;
+
+/**
  * Build the Tailscale hostname for an agent.
  * Includes the stack name to avoid conflicts across deployments.
  * Example: "dev-agent-pm", "prod-agent-eng"
@@ -223,6 +269,33 @@ export const KEY_INSTRUCTIONS = {
       "3. Select repositories, set expiration, and permissions (e.g., repo, read:org)",
       "4. Copy the token (starts with github_pat_ or ghp_)",
       "5. Press Enter to skip if not needed",
+    ],
+  },
+  openaiApiKey: {
+    title: "OpenAI API Key",
+    steps: [
+      "To get your OpenAI API key:",
+      "1. Go to https://platform.openai.com/api-keys",
+      "2. Click \"Create new secret key\"",
+      "3. Copy the key (starts with sk-)",
+    ],
+  },
+  opencodeZenApiKey: {
+    title: "OpenCode Zen API Key",
+    steps: [
+      "To get your OpenCode Zen API key:",
+      "1. Go to https://opencodezen.com/account",
+      "2. Navigate to API Keys section",
+      "3. Create and copy your API key",
+    ],
+  },
+  googleApiKey: {
+    title: "Google Gemini API Key",
+    steps: [
+      "To get your Google Gemini API key:",
+      "1. Go to https://aistudio.google.com/apikey",
+      "2. Click \"Create API key\"",
+      "3. Copy the generated key",
     ],
   },
 } as const;
