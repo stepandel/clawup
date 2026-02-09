@@ -44,7 +44,7 @@ export async function initCommand(): Promise<void> {
 
   const provider = await p.select({
     message: "Cloud provider",
-    options: PROVIDERS.map((p) => ({ value: p.value, label: p.label, hint: p.hint })),
+    options: PROVIDERS.map((prov) => ({ value: prov.value, label: prov.label, hint: prov.hint })),
     initialValue: "aws",
   });
   handleCancel(provider);
@@ -443,7 +443,7 @@ export async function initCommand(): Promise<void> {
     [
       `Stack:          ${basicConfig.stackName}`,
       `Provider:       ${providerLabel}`,
-      `${regionLabel}:         ${basicConfig.region}`,
+      `${regionLabel.padEnd(14, " ")} ${basicConfig.region}`,
       `Instance type:  ${basicConfig.instanceType}`,
       `Owner:          ${basicConfig.ownerName}`,
       `Integrations:   ${integrationNames.join(", ")}`,

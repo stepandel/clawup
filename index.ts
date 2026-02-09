@@ -35,7 +35,7 @@ interface ManifestAgent {
 
 interface Manifest {
   stackName: string;
-  provider: "aws" | "hetzner";
+  provider?: "aws" | "hetzner";
   region: string;
   instanceType: string;
   ownerName: string;
