@@ -12,6 +12,8 @@ import pc from "picocolors";
 export interface ValidateOptions {
   /** SSH timeout in seconds */
   timeout?: string;
+  /** Config name (auto-detected if only one) */
+  config?: string;
 }
 
 interface CheckResult {
@@ -69,7 +71,7 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   // Resolve config name and load manifest
   let configName: string;
   try {
-    configName = resolveConfigName();
+    configName = resolveConfigName(options.config);
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);

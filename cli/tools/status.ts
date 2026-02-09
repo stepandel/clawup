@@ -11,6 +11,8 @@ import { SSH_USER, tailscaleHostname } from "../lib/constants";
 export interface StatusOptions {
   /** Output as JSON */
   json?: boolean;
+  /** Config name (auto-detected if only one) */
+  config?: string;
 }
 
 /**
@@ -109,7 +111,7 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
   // Resolve config name and load manifest
   let configName: string;
   try {
-    configName = resolveConfigName();
+    configName = resolveConfigName(options.config);
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);

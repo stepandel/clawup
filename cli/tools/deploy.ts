@@ -12,6 +12,8 @@ import pc from "picocolors";
 export interface DeployOptions {
   /** Skip confirmation prompt */
   yes?: boolean;
+  /** Config name (auto-detected if only one) */
+  config?: string;
 }
 
 /**
@@ -49,7 +51,7 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
   // Resolve config name and load manifest
   let configName: string;
   try {
-    configName = resolveConfigName();
+    configName = resolveConfigName(options.config);
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);

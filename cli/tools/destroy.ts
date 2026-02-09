@@ -12,6 +12,8 @@ import pc from "picocolors";
 export interface DestroyOptions {
   /** Skip confirmation prompts (dangerous!) */
   yes?: boolean;
+  /** Config name (auto-detected if only one) */
+  config?: string;
 }
 
 interface TailscaleDevice {
@@ -100,7 +102,7 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
   // Resolve config name and load manifest
   let configName: string;
   try {
-    configName = resolveConfigName();
+    configName = resolveConfigName(options.config);
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);
