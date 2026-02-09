@@ -58,6 +58,13 @@ export interface HetznerOpenClawAgentArgs {
   gatewayPort?: pulumi.Input<number>;
 
   /**
+   * Allowed SSH source IPs (optional)
+   * If not provided, SSH rule is not added (Tailscale is primary access)
+   * Example: ["1.2.3.4/32", "10.0.0.0/8"]
+   */
+  allowedSshIps?: string[];
+
+  /**
    * Browser control port (default: 18791)
    */
   browserPort?: pulumi.Input<number>;
@@ -159,10 +166,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     // Defaults
     const serverType = args.serverType ?? "cx22";
     const location = args.location ?? "nbg1";
-    const gatewayPort = args.gatewayPort ?? 18789;
-    const browserPort = args.browserPort ?? 18791;
-    const model = args.model ?? "anthropic/claude-sonnet-4";
-    const enableSandbox = args.enableSandbox ?? true;
     const baseLabels = args.labels ?? {};
 
     // Generate SSH key pair
@@ -209,15 +212,19 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
           ...labels,
           name: name,
         })),
-        rules: [
-          {
-            direction: "in",
-            protocol: "tcp",
-            port: "22",
-            sourceIps: ["0.0.0.0/0", "::/0"],
-            description: "SSH access (fallback for Tailscale)",
-          },
-        ],
+        // Only add SSH rule if allowedSshIps is explicitly provided
+        // Tailscale is the primary access method; SSH is optional fallback
+        rules: args.allowedSshIps && args.allowedSshIps.length > 0
+          ? [
+              {
+                direction: "in",
+                protocol: "tcp",
+                port: "22",
+                sourceIps: args.allowedSshIps,
+                description: "SSH access (restricted)",
+              },
+            ]
+          : [],
       },
       defaultResourceOptions
     );
@@ -238,6 +245,12 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
+
+    // Resolve Input<> values for cloud-init config
+    const gatewayPortResolved = pulumi.output(args.gatewayPort ?? 18789);
+    const browserPortResolved = pulumi.output(args.browserPort ?? 18791);
+    const modelResolved = pulumi.output(args.model ?? "anthropic/claude-sonnet-4");
+    const enableSandboxResolved = pulumi.output(args.enableSandbox ?? true);
 
     // Generate cloud-init user data
     const userData = pulumi
@@ -261,18 +274,21 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
           linearApiKey,
           braveSearchApiKey,
           githubToken,
-        ]) => {
-          // Include stack name in Tailscale hostname to avoid conflicts across deployments
-          const tsHostname = `${pulumi.getStack()}-${name}`;
+        ]) =>
+          pulumi
+            .all([gatewayPortResolved, browserPortResolved, modelResolved, enableSandboxResolved])
+            .apply(([gatewayPort, browserPort, model, enableSandbox]) => {
+              // Include stack name in Tailscale hostname to avoid conflicts across deployments
+              const tsHostname = `${pulumi.getStack()}-${name}`;
 
-          const cloudInitConfig: CloudInitConfig = {
-            anthropicApiKey: apiKey,
-            tailscaleAuthKey: tsAuthKey,
-            gatewayToken: gwToken,
-            gatewayPort: gatewayPort as number,
-            browserPort: browserPort as number,
-            model: model as string,
-            enableSandbox: enableSandbox as boolean,
+              const cloudInitConfig: CloudInitConfig = {
+                anthropicApiKey: apiKey,
+                tailscaleAuthKey: tsAuthKey,
+                gatewayToken: gwToken,
+                gatewayPort: gatewayPort,
+                browserPort: browserPort,
+                model: model,
+                enableSandbox: enableSandbox,
             tailscaleHostname: tsHostname,
             workspaceFiles: args.workspaceFiles,
             envVars: args.envVars,
@@ -291,18 +307,18 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
             githubToken: githubToken || undefined,
           };
 
-          const script = generateCloudInit(cloudInitConfig);
-          return interpolateCloudInit(script, {
-            anthropicApiKey: apiKey,
-            tailscaleAuthKey: tsAuthKey,
-            gatewayToken: gwToken,
-            slackBotToken: slackBotToken || undefined,
-            slackAppToken: slackAppToken || undefined,
-            linearApiKey: linearApiKey || undefined,
-            braveSearchApiKey: braveSearchApiKey || undefined,
-            githubToken: githubToken || undefined,
-          });
-        }
+              const script = generateCloudInit(cloudInitConfig);
+              return interpolateCloudInit(script, {
+                anthropicApiKey: apiKey,
+                tailscaleAuthKey: tsAuthKey,
+                gatewayToken: gwToken,
+                slackBotToken: slackBotToken || undefined,
+                slackAppToken: slackAppToken || undefined,
+                linearApiKey: linearApiKey || undefined,
+                braveSearchApiKey: braveSearchApiKey || undefined,
+                githubToken: githubToken || undefined,
+              });
+            })
       );
 
     // Create Hetzner server
