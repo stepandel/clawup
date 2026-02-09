@@ -202,7 +202,7 @@ config["gateway"]["auth"] = {
     "token": os.environ["GATEWAY_TOKEN"]
 }
 
-# Configure environment variables for child processes (including Claude Code)
+# Configure environment variables for child processes (including Claude Code, Linear CLI)
 # Auto-detect credential type: OAuth token (oat) vs API key (api)
 anthropic_cred = os.environ.get("ANTHROPIC_API_KEY", "")
 if anthropic_cred.startswith("sk-ant-oat"):
@@ -217,6 +217,12 @@ else:
         "ANTHROPIC_API_KEY": anthropic_cred
     }
     print("Configured environment variables: ANTHROPIC_API_KEY (API key)")
+
+# Add LINEAR_API_KEY to env if configured (required by Linear CLI)
+linear_api_key = os.environ.get("LINEAR_API_KEY", "")
+if linear_api_key:
+    config["env"]["LINEAR_API_KEY"] = linear_api_key
+    print("Added LINEAR_API_KEY to environment variables")
 ${slackChannelConfig}${linearSkillConfig}${braveSearchConfig}
 with open(config_path, "w") as f:
     json.dump(config, f, indent=2)
