@@ -202,49 +202,47 @@ All scripts support `-h` for help.
 
 ## Updating and Redeploying
 
-When you make changes to the codebase (cloud-init scripts, workspace files, environment variables, etc.), you can redeploy your agents to apply the changes.
+When you make changes to the codebase (cloud-init scripts, workspace files, environment variables, etc.), you need to redeploy your agents to apply the changes.
 
-### Using the CLI
+### Recommended Approach: Destroy Then Deploy
 
-```bash
-npx agent-army deploy
-```
-
-or with auto-confirm:
-
-```bash
-npx agent-army deploy -y
-```
-
-### How It Works
-
-Pulumi automatically detects changes that require instance replacement (like cloud-init script modifications) and will:
-1. Show you a preview of what will change
-2. Replace affected instances with new ones
-3. Preserve resources that haven't changed (VPC, security groups, etc.)
-
-**Note:** Instance replacement means your agents will get fresh EC2 instances. Any local data not in the workspace will be lost.
-
-### Preview Changes First
-
-To see what Pulumi will do without applying changes:
-
-```bash
-pulumi preview
-```
-
-This is useful to verify that instances will be replaced (not just updated) when you've modified cloud-init or other immutable properties.
-
-### Full Teardown and Rebuild
-
-If you prefer a complete teardown and rebuild:
+**Always use a full teardown and rebuild** to ensure clean state and avoid issues with orphaned Tailscale devices:
 
 ```bash
 npx agent-army destroy
 npx agent-army deploy
 ```
 
-This is equivalent to a regular deploy for cloud-init changes but gives you more control.
+or with auto-confirm:
+
+```bash
+npx agent-army destroy -y
+npx agent-army deploy -y
+```
+
+### Why Not Just `deploy`?
+
+While `pulumi up` (via `npx agent-army deploy`) can detect changes and replace instances, it has limitations:
+
+- **Tailscale cleanup**: Old Tailscale devices aren't automatically removed when instances are replaced, leading to hostname conflicts where new instances get `-1` suffixes
+- **Stale resources**: Replaced instances may leave behind orphaned resources
+- **Validation issues**: Health checks may connect to old offline devices instead of new ones
+
+The `destroy` → `deploy` workflow ensures:
+- ✅ Clean Tailscale device registration (no orphans)
+- ✅ Stable hostnames without suffixes
+- ✅ Complete resource cleanup
+- ✅ Fresh state for all components
+
+### Preview Changes Before Destroying
+
+To see what will be destroyed:
+
+```bash
+pulumi preview --target destroy
+```
+
+**Note:** Full redeployment means your agents will be completely rebuilt. Any local data not in workspace files will be lost.
 
 ## Per-Agent Customization
 
