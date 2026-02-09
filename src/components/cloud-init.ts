@@ -6,12 +6,14 @@
 import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions } from "./config-generator";
 
 export interface CloudInitConfig {
-  /** Anthropic API key */
+  /** Anthropic API key (for backward compatibility) */
   anthropicApiKey: string;
   /** Tailscale auth key */
   tailscaleAuthKey: string;
   /** Gateway authentication token */
   gatewayToken: string;
+  /** Model provider API keys (env var name -> key value) */
+  modelApiKeys?: Record<string, string>;
   /** Gateway port (default: 18789) */
   gatewayPort?: number;
   /** Browser control port (default: 18791) */
@@ -135,6 +137,14 @@ GH_AUTH_SCRIPT
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
 
+  // Generate model API key exports
+  const modelApiKeyExports = config.modelApiKeys
+    ? Object.entries(config.modelApiKeys)
+        .filter(([, value]) => value) // Only export non-empty values
+        .map(([envVar, _]) => `\${${envVar}:+echo 'export ${envVar}="\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
+        .join("\n")
+    : "";
+
   // Generate additional env vars
   const additionalEnvVars = config.envVars
     ? Object.entries(config.envVars)
@@ -254,6 +264,7 @@ fi
 \${LINEAR_API_KEY:+echo 'export LINEAR_API_KEY="\${LINEAR_API_KEY}"' >> /home/ubuntu/.bashrc}
 \${BRAVE_SEARCH_API_KEY:+echo 'export BRAVE_SEARCH_API_KEY="\${BRAVE_SEARCH_API_KEY}"' >> /home/ubuntu/.bashrc}
 \${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
+${modelApiKeyExports}
 ${additionalEnvVars}
 ${tailscaleSection}${denoInstallScript}${ghAuthScript}
 ${codingClisInstallScript}
@@ -361,6 +372,8 @@ export function interpolateCloudInit(
     linearApiKey?: string;
     braveSearchApiKey?: string;
     githubToken?: string;
+    /** Model provider API keys (env var name -> key value) */
+    modelApiKeys?: Record<string, string>;
   }
 ): string {
   let result = script
@@ -379,6 +392,19 @@ export function interpolateCloudInit(
   result = result.replace(/\${BRAVE_SEARCH_API_KEY}/g, values.braveSearchApiKey ?? "");
   result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
+
+  // Interpolate model API keys
+  if (values.modelApiKeys) {
+    for (const [envVar, apiKey] of Object.entries(values.modelApiKeys)) {
+      if (apiKey) {
+        result = result.replace(new RegExp(`\\$\\{${envVar}:-\\}`, "g"), apiKey);
+        result = result.replace(new RegExp(`\\$\\{${envVar}\\}`, "g"), apiKey);
+      } else {
+        result = result.replace(new RegExp(`\\$\\{${envVar}:-\\}`, "g"), "");
+        result = result.replace(new RegExp(`\\$\\{${envVar}\\}`, "g"), "");
+      }
+    }
+  }
 
   return result;
 }
