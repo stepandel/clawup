@@ -3,7 +3,7 @@
  */
 
 import * as p from "@clack/prompts";
-import { loadManifest } from "../lib/config";
+import { loadManifest, resolveConfigName, checkAndMigrateLegacy, deleteManifest, configPath } from "../lib/config";
 import { pulumiDestroy, selectOrCreateStack, getConfig } from "../lib/pulumi";
 import { capture } from "../lib/exec";
 import { SSH_USER, tailscaleHostname } from "../lib/constants";
@@ -12,6 +12,7 @@ import { deleteTailscaleDevice, listTailscaleDevices } from "../lib/tailscale";
 
 interface DestroyOptions {
   yes?: boolean;
+  config?: string;
 }
 
 /**
@@ -33,10 +34,21 @@ function deregisterTailscale(host: string): boolean {
 export async function destroyCommand(opts: DestroyOptions): Promise<void> {
   showBanner();
 
+  // Check for legacy config and offer migration
+  await checkAndMigrateLegacy();
+
+  // Resolve config name
+  let configName: string;
+  try {
+    configName = resolveConfigName(opts.config);
+  } catch (err) {
+    exitWithError((err as Error).message);
+  }
+
   // Load manifest
-  const manifest = loadManifest();
+  const manifest = loadManifest(configName);
   if (!manifest) {
-    exitWithError("No agent-army.json found. Run `agent-army init` first.");
+    exitWithError(`Config '${configName}' could not be loaded.`);
   }
 
   // Select stack

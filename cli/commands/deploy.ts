@@ -3,22 +3,34 @@
  */
 
 import * as p from "@clack/prompts";
-import { loadManifest } from "../lib/config";
+import { loadManifest, resolveConfigName, checkAndMigrateLegacy } from "../lib/config";
 import { pulumiUp, getStackOutputs, selectOrCreateStack } from "../lib/pulumi";
 import { showBanner, handleCancel, exitWithError, formatCost, formatAgentList } from "../lib/ui";
 import { COST_ESTIMATES } from "../lib/constants";
 
 interface DeployOptions {
   yes?: boolean;
+  config?: string;
 }
 
 export async function deployCommand(opts: DeployOptions): Promise<void> {
   showBanner();
 
+  // Check for legacy config and offer migration
+  await checkAndMigrateLegacy();
+
+  // Resolve config name
+  let configName: string;
+  try {
+    configName = resolveConfigName(opts.config);
+  } catch (err) {
+    exitWithError((err as Error).message);
+  }
+
   // Load manifest
-  const manifest = loadManifest();
+  const manifest = loadManifest(configName);
   if (!manifest) {
-    exitWithError("No agent-army.json found. Run `agent-army init` first.");
+    exitWithError(`Config '${configName}' could not be loaded.`);
   }
 
   // Select stack

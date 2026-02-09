@@ -68,6 +68,9 @@ export const COST_ESTIMATES: Record<string, number> = {
 /** Manifest filename */
 export const MANIFEST_FILE = "agent-army.json";
 
+/** Config directory under home (~/.agent-army/configs/) */
+export const CONFIG_DIR = ".agent-army/configs";
+
 /**
  * Build the Tailscale hostname for an agent.
  * Includes the stack name to avoid conflicts across deployments.
