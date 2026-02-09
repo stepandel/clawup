@@ -48,6 +48,8 @@ export interface CloudInitConfig {
   braveSearchApiKey?: string;
   /** GitHub personal access token for gh CLI auth */
   githubToken?: string;
+  /** Coding CLIs to install (default: ["claude-code"]) */
+  codingClis?: string[];
 }
 
 /**
@@ -126,31 +128,9 @@ GH_AUTH_SCRIPT
 `
     : "";
 
-  // Claude Code CLI installation (uses ANTHROPIC_API_KEY from .bashrc for auth)
-  const claudeCodeInstallScript = `
-# Install Claude Code CLI for ubuntu user
-echo "Installing Claude Code CLI..."
-sudo -u ubuntu bash << 'CLAUDE_CODE_INSTALL_SCRIPT' || echo "WARNING: Claude Code installation failed. Install manually with: curl -fsSL https://claude.ai/install.sh | bash"
-set -e
-cd ~
-
-# Install Claude Code via official installer
-curl -fsSL https://claude.ai/install.sh | bash
-
-# Add Claude Code to PATH in .bashrc if not already there
-if ! grep -q '.local/bin' ~/.bashrc; then
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-fi
-
-# Verify installation
-if [ -x "$HOME/.local/bin/claude" ]; then
-  echo "Claude Code installed successfully at $HOME/.local/bin/claude"
-else
-  echo "WARNING: Claude Code installation may have failed"
-  exit 1
-fi
-CLAUDE_CODE_INSTALL_SCRIPT
-`;
+  // Coding CLIs installation (default to claude-code for backward compatibility)
+  const codingClis = config.codingClis ?? ["claude-code"];
+  const codingClisInstallScript = generateCodingClisInstallScript(codingClis);
 
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
@@ -276,7 +256,7 @@ fi
 \${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
 ${tailscaleSection}${denoInstallScript}${ghAuthScript}
-${claudeCodeInstallScript}
+${codingClisInstallScript}
 
 # Enable systemd linger for ubuntu user (required for user services to run at boot)
 loginctl enable-linger ubuntu
@@ -401,4 +381,123 @@ export function interpolateCloudInit(
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
 
   return result;
+}
+
+/** Coding CLI definitions */
+interface CodingCliDef {
+  name: string;
+  displayName: string;
+  installMethod: "curl" | "npm";
+  installCommand: string;
+  binaryPath: string;
+}
+
+const CODING_CLI_DEFS: Record<string, CodingCliDef> = {
+  "claude-code": {
+    name: "claude-code",
+    displayName: "Claude Code",
+    installMethod: "curl",
+    installCommand: "curl -fsSL https://claude.ai/install.sh | bash",
+    binaryPath: "$HOME/.local/bin/claude",
+  },
+  codex: {
+    name: "codex",
+    displayName: "Codex",
+    installMethod: "npm",
+    installCommand: "npm install -g @openai/codex",
+    binaryPath: "codex",
+  },
+  opencode: {
+    name: "opencode",
+    displayName: "OpenCode",
+    installMethod: "curl",
+    installCommand: "curl -fsSL https://opencode.ai/install.sh | bash",
+    binaryPath: "$HOME/.local/bin/opencode",
+  },
+  amp: {
+    name: "amp",
+    displayName: "Amp",
+    installMethod: "npm",
+    installCommand: "npm install -g @anthropic/amp",
+    binaryPath: "amp",
+  },
+};
+
+/**
+ * Generates bash script to install coding CLIs
+ */
+function generateCodingClisInstallScript(clis: string[]): string {
+  if (clis.length === 0) {
+    return "";
+  }
+
+  const scripts: string[] = [];
+
+  for (const cliName of clis) {
+    const cli = CODING_CLI_DEFS[cliName];
+    if (!cli) {
+      scripts.push(`
+# Unknown coding CLI: ${cliName}
+echo "WARNING: Unknown coding CLI '${cliName}' — skipping"
+`);
+      continue;
+    }
+
+    if (cli.installMethod === "curl") {
+      // Curl-based installer (runs in user context)
+      scripts.push(`
+# Install ${cli.displayName} CLI for ubuntu user
+echo "Installing ${cli.displayName}..."
+sudo -u ubuntu bash << '${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT' || echo "WARNING: ${cli.displayName} installation failed. Install manually with: ${cli.installCommand}"
+set -e
+cd ~
+
+# Install ${cli.displayName} via official installer
+${cli.installCommand}
+
+# Add .local/bin to PATH in .bashrc if not already there
+if ! grep -q '.local/bin' ~/.bashrc; then
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+fi
+
+# Verify installation
+BINARY_PATH="${cli.binaryPath}"
+BINARY_PATH=\${BINARY_PATH//\\$HOME/$HOME}
+if [ -x "$BINARY_PATH" ] || command -v $(basename "${cli.binaryPath}") &>/dev/null; then
+  echo "${cli.displayName} installed successfully"
+else
+  echo "WARNING: ${cli.displayName} installation may have failed"
+  exit 1
+fi
+${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT
+`);
+    } else {
+      // NPM-based installer (runs in user context with NVM loaded)
+      scripts.push(`
+# Install ${cli.displayName} CLI for ubuntu user
+echo "Installing ${cli.displayName}..."
+sudo -u ubuntu bash << '${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT' || echo "WARNING: ${cli.displayName} installation failed. Install manually with: ${cli.installCommand}"
+set -e
+cd ~
+
+# Load NVM
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+# Install ${cli.displayName} via npm
+${cli.installCommand}
+
+# Verify installation
+if command -v ${cli.binaryPath} &>/dev/null; then
+  echo "${cli.displayName} installed successfully"
+else
+  echo "WARNING: ${cli.displayName} installation may have failed"
+  exit 1
+fi
+${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT
+`);
+    }
+  }
+
+  return scripts.join("\n");
 }

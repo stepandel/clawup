@@ -6,7 +6,7 @@ import * as p from "@clack/prompts";
 import { loadManifest } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import { capture } from "../lib/exec";
-import { SSH_USER, tailscaleHostname } from "../lib/constants";
+import { SSH_USER, tailscaleHostname, CODING_CLIS } from "../lib/constants";
 import { showBanner, exitWithError } from "../lib/ui";
 import pc from "picocolors";
 
@@ -100,57 +100,64 @@ export async function validateCommand(opts: ValidateOptions): Promise<void> {
         detail: workspace.ok ? "SOUL.md + HEARTBEAT.md present" : "missing files",
       });
 
-      // Check 4: Claude Code CLI installed
-      const claudeCode = runSshCheck(
-        host,
-        `/home/${SSH_USER}/.local/bin/claude --version 2>/dev/null || echo 'not installed'`,
-        timeout
-      );
-      const claudeVersion = claudeCode.output.trim();
-      const claudeInstalled = claudeCode.ok && !claudeVersion.includes("not installed");
-      checks.push({
-        name: "Claude Code CLI",
-        passed: claudeInstalled,
-        detail: claudeInstalled ? claudeVersion : "not installed",
-      });
+      // Check 4+: Coding CLIs installed (based on manifest)
+      const codingClis = manifest.codingClis ?? ["claude-code"];
+      for (const cliKey of codingClis) {
+        const cliDef = CODING_CLIS[cliKey as keyof typeof CODING_CLIS];
+        if (!cliDef) continue;
 
-      // Check 5: Claude Code auth (API key or OAuth token)
-      if (claudeInstalled) {
-        // Check for either ANTHROPIC_API_KEY (API) or CLAUDE_CODE_OAUTH_TOKEN (subscription)
-        const credCheck = runSshCheck(
-          host,
-          `grep -E '"(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)"' /home/${SSH_USER}/.openclaw/openclaw.json | head -1`,
-          timeout
-        );
-        const hasApiKey = credCheck.output.includes("ANTHROPIC_API_KEY");
-        const hasOAuthToken = credCheck.output.includes("CLAUDE_CODE_OAUTH_TOKEN");
-        const credIsConfigured = credCheck.ok && (hasApiKey || hasOAuthToken);
-        const credType = hasOAuthToken ? "OAuth token" : "API key";
+        const binaryPath = cliDef.binaryPath.replace("$HOME", `/home/${SSH_USER}`);
+        const versionCmd = cliDef.installMethod === "npm"
+          ? `${cliDef.binaryPath} --version 2>/dev/null || echo 'not installed'`
+          : `${binaryPath} --version 2>/dev/null || echo 'not installed'`;
 
-        if (credIsConfigured) {
-          // Always test authentication with a live API call
-          const envVar = hasOAuthToken ? "CLAUDE_CODE_OAUTH_TOKEN" : "ANTHROPIC_API_KEY";
-          const testScript = `
+        const cliCheck = runSshCheck(host, versionCmd, timeout);
+        const cliVersion = cliCheck.output.trim();
+        const cliInstalled = cliCheck.ok && !cliVersion.includes("not installed");
+        checks.push({
+          name: `${cliDef.displayName} CLI`,
+          passed: cliInstalled,
+          detail: cliInstalled ? cliVersion : "not installed",
+        });
+
+        // Check Claude Code auth specifically (since it needs API key)
+        if (cliKey === "claude-code" && cliInstalled) {
+          // Check for either ANTHROPIC_API_KEY (API) or CLAUDE_CODE_OAUTH_TOKEN (subscription)
+          const credCheck = runSshCheck(
+            host,
+            `grep -E '"(ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)"' /home/${SSH_USER}/.openclaw/openclaw.json | head -1`,
+            timeout
+          );
+          const hasApiKey = credCheck.output.includes("ANTHROPIC_API_KEY");
+          const hasOAuthToken = credCheck.output.includes("CLAUDE_CODE_OAUTH_TOKEN");
+          const credIsConfigured = credCheck.ok && (hasApiKey || hasOAuthToken);
+          const credType = hasOAuthToken ? "OAuth token" : "API key";
+
+          if (credIsConfigured) {
+            // Always test authentication with a live API call
+            const envVar = hasOAuthToken ? "CLAUDE_CODE_OAUTH_TOKEN" : "ANTHROPIC_API_KEY";
+            const testScript = `
 export ${envVar}=$(jq -r '.env.${envVar}' /home/${SSH_USER}/.openclaw/openclaw.json)
 timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
-          `.trim();
-          const authTest = runSshCheck(
-            host,
-            testScript,
-            timeout + 15
-          );
-          const authWorks = authTest.ok && !authTest.output.includes("Invalid API key") && !authTest.output.includes("not authenticated");
-          checks.push({
-            name: "Claude Code auth",
-            passed: authWorks,
-            detail: authWorks ? `${credType} verified` : `${credType} test failed: ${authTest.output.substring(0, 50)}`,
-          });
-        } else {
-          checks.push({
-            name: "Claude Code auth",
-            passed: false,
-            detail: "No credentials configured",
-          });
+            `.trim();
+            const authTest = runSshCheck(
+              host,
+              testScript,
+              timeout + 15
+            );
+            const authWorks = authTest.ok && !authTest.output.includes("Invalid API key") && !authTest.output.includes("not authenticated");
+            checks.push({
+              name: "Claude Code auth",
+              passed: authWorks,
+              detail: authWorks ? `${credType} verified` : `${credType} test failed: ${authTest.output.substring(0, 50)}`,
+            });
+          } else {
+            checks.push({
+              name: "Claude Code auth",
+              passed: false,
+              detail: "No credentials configured",
+            });
+          }
         }
       }
 
@@ -186,8 +193,15 @@ timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
     } else {
       checks.push({ name: "OpenClaw gateway", passed: false, detail: "skipped (no SSH)" });
       checks.push({ name: "Workspace files", passed: false, detail: "skipped (no SSH)" });
-      checks.push({ name: "Claude Code CLI", passed: false, detail: "skipped (no SSH)" });
-      checks.push({ name: "Claude Code auth", passed: false, detail: "skipped (no SSH)" });
+      const codingClis = manifest.codingClis ?? ["claude-code"];
+      for (const cliKey of codingClis) {
+        const cliDef = CODING_CLIS[cliKey as keyof typeof CODING_CLIS];
+        if (!cliDef) continue;
+        checks.push({ name: `${cliDef.displayName} CLI`, passed: false, detail: "skipped (no SSH)" });
+        if (cliKey === "claude-code") {
+          checks.push({ name: "Claude Code auth", passed: false, detail: "skipped (no SSH)" });
+        }
+      }
       checks.push({ name: "GitHub CLI", passed: false, detail: "skipped (no SSH)" });
       checks.push({ name: "GitHub CLI auth", passed: false, detail: "skipped (no SSH)" });
     }

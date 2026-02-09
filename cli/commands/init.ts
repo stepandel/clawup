@@ -12,6 +12,7 @@ import {
   COST_ESTIMATES,
   KEY_INSTRUCTIONS,
   slackAppManifest,
+  CODING_CLIS,
 } from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
@@ -241,7 +242,26 @@ export async function initCommand(): Promise<void> {
     exitWithError("No agents configured. At least one agent is required.");
   }
 
-  // Step 5: Configure integrations
+  // Step 5: Select coding CLIs
+  p.log.step("Configure coding CLIs");
+
+  const selectedCodingClis = await p.multiselect({
+    message: "Select coding CLIs to install",
+    options: Object.entries(CODING_CLIS).map(([key, cli]) => ({
+      value: key,
+      label: cli.displayName,
+      hint: cli.description,
+    })),
+    initialValues: ["claude-code"],
+    required: false,
+  });
+  handleCancel(selectedCodingClis);
+
+  const codingClis = (selectedCodingClis as string[]).length > 0
+    ? (selectedCodingClis as string[])
+    : ["claude-code"]; // Default to claude-code if none selected
+
+  // Step 6: Configure integrations
   p.log.step("Configure integrations");
 
   // Slack and Linear are always required
@@ -384,7 +404,7 @@ export async function initCommand(): Promise<void> {
     }
   }
 
-  // Step 6: Show summary
+  // Step 7: Show summary
   const costPerAgent = COST_ESTIMATES[basicConfig.instanceType as string] ?? 30;
   const totalCost = agents.reduce((sum, a) => {
     const agentCost = COST_ESTIMATES[a.instanceType ?? (basicConfig.instanceType as string)] ?? costPerAgent;
@@ -399,12 +419,15 @@ export async function initCommand(): Promise<void> {
     return i;
   });
 
+  const codingCliNames = codingClis.map(cli => CODING_CLIS[cli as keyof typeof CODING_CLIS]?.displayName ?? cli);
+
   p.note(
     [
       `Stack:          ${basicConfig.stackName}`,
       `Region:         ${basicConfig.region}`,
       `Instance type:  ${basicConfig.instanceType}`,
       `Owner:          ${basicConfig.ownerName}`,
+      `Coding CLIs:    ${codingCliNames.join(", ")}`,
       `Integrations:   ${integrationNames.join(", ")}`,
       ``,
       `Agents (${agents.length}):`,
@@ -415,7 +438,7 @@ export async function initCommand(): Promise<void> {
     "Deployment Summary"
   );
 
-  // Step 7: Confirm
+  // Step 8: Confirm
   const confirmed = await p.confirm({
     message: "Proceed with setup?",
   });
@@ -425,7 +448,7 @@ export async function initCommand(): Promise<void> {
     process.exit(0);
   }
 
-  // Step 8: Execute setup
+  // Step 9: Execute setup
   const s = p.spinner();
 
   // Select/create stack
@@ -467,6 +490,7 @@ export async function initCommand(): Promise<void> {
     instanceType: basicConfig.instanceType as string,
     ownerName: basicConfig.ownerName as string,
     agents,
+    codingClis,
   };
   saveManifest(manifest);
   s.stop("Manifest written");

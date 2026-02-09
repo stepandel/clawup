@@ -68,6 +68,49 @@ export const COST_ESTIMATES: Record<string, number> = {
 /** Manifest filename */
 export const MANIFEST_FILE = "agent-army.json";
 
+/** Available coding CLIs */
+export const CODING_CLIS = {
+  "claude-code": {
+    name: "claude-code",
+    displayName: "Claude Code",
+    description: "Anthropic's AI coding assistant",
+    installMethod: "curl",
+    installCommand: "curl -fsSL https://claude.ai/install.sh | bash",
+    binaryPath: "$HOME/.local/bin/claude",
+    versionCommand: "claude --version",
+  },
+  codex: {
+    name: "codex",
+    displayName: "Codex",
+    description: "OpenAI's coding CLI",
+    installMethod: "npm",
+    installCommand: "npm install -g @openai/codex",
+    binaryPath: "codex",
+    versionCommand: "codex --version",
+  },
+  opencode: {
+    name: "opencode",
+    displayName: "OpenCode",
+    description: "Open-source AI coding assistant",
+    installMethod: "curl",
+    installCommand: "curl -fsSL https://opencode.ai/install.sh | bash",
+    binaryPath: "$HOME/.local/bin/opencode",
+    versionCommand: "opencode --version",
+  },
+  amp: {
+    name: "amp",
+    displayName: "Amp",
+    description: "Anthropic's Amp CLI",
+    installMethod: "npm",
+    installCommand: "npm install -g @anthropic/amp",
+    binaryPath: "amp",
+    versionCommand: "amp --version",
+  },
+} as const;
+
+/** Type for coding CLI keys */
+export type CodingCliKey = keyof typeof CODING_CLIS;
+
 /**
  * Build the Tailscale hostname for an agent.
  * Includes the stack name to avoid conflicts across deployments.

@@ -6,7 +6,7 @@ import * as p from "@clack/prompts";
 import { loadManifest } from "../lib/config";
 import { getConfig, getStackOutputs, selectOrCreateStack } from "../lib/pulumi";
 import { capture } from "../lib/exec";
-import { SSH_USER, tailscaleHostname } from "../lib/constants";
+import { SSH_USER, tailscaleHostname, CODING_CLIS } from "../lib/constants";
 import { showBanner, exitWithError } from "../lib/ui";
 
 interface StatusOptions {
@@ -14,16 +14,24 @@ interface StatusOptions {
 }
 
 /**
- * Fetch Claude Code version via SSH (best effort, returns "—" on failure)
+ * Fetch coding CLI version via SSH (best effort, returns "—" on failure)
  */
-function getClaudeCodeVersion(host: string, timeout: number = 5): string {
+function getCodingCliVersion(host: string, cliKey: string, timeout: number = 5): string {
+  const cliDef = CODING_CLIS[cliKey as keyof typeof CODING_CLIS];
+  if (!cliDef) return "—";
+
+  const binaryPath = cliDef.binaryPath.replace("$HOME", `/home/${SSH_USER}`);
+  const versionCmd = cliDef.installMethod === "npm"
+    ? `${cliDef.binaryPath} --version 2>/dev/null || echo ''`
+    : `${binaryPath} --version 2>/dev/null || echo ''`;
+
   const result = capture("ssh", [
     "-o", `ConnectTimeout=${timeout}`,
     "-o", "StrictHostKeyChecking=no",
     "-o", "UserKnownHostsFile=/dev/null",
     "-o", "BatchMode=yes",
     `${SSH_USER}@${host}`,
-    `"/home/${SSH_USER}/.local/bin/claude --version 2>/dev/null || echo ''"`,
+    `"${versionCmd}"`,
   ]);
   if (result.exitCode === 0 && result.stdout?.trim()) {
     return result.stdout.trim();
@@ -92,18 +100,27 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
   // Get tailnet DNS name for SSH connections
   const tailnetDnsName = getConfig("tailnetDnsName");
 
-  // Build status data with Claude Code and GitHub CLI versions (fetched via SSH)
+  // Get configured coding CLIs (default to claude-code for backward compat)
+  const codingClis = manifest.codingClis ?? ["claude-code"];
+
+  // Build status data with coding CLI and GitHub CLI versions (fetched via SSH)
   const statusData = manifest.agents.map((agent) => {
-    let claudeCodeVersion = "—";
+    const cliVersions: Record<string, string> = {};
     let ghVersion = "—";
     let ghAuth = "—";
     if (tailnetDnsName) {
       const tsHost = tailscaleHostname(manifest.stackName, agent.name);
       const host = `${tsHost}.${tailnetDnsName}`;
-      claudeCodeVersion = getClaudeCodeVersion(host);
+      for (const cliKey of codingClis) {
+        cliVersions[cliKey] = getCodingCliVersion(host, cliKey);
+      }
       ghVersion = getGhVersion(host);
       if (ghVersion !== "—") {
         ghAuth = getGhAuthStatus(host);
+      }
+    } else {
+      for (const cliKey of codingClis) {
+        cliVersions[cliKey] = "—";
       }
     }
     return {
@@ -112,7 +129,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
       instanceId: (outputs[`${agent.role}InstanceId`] as string) ?? "—",
       publicIp: (outputs[`${agent.role}PublicIp`] as string) ?? "—",
       tailscaleUrl: (outputs[`${agent.role}TailscaleUrl`] as string) ?? "—",
-      claudeCodeVersion,
+      cliVersions,
       ghVersion,
       ghAuth,
     };
@@ -133,16 +150,22 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
   const roleW = 10;
   const idW = 22;
   const ipW = 16;
-  const claudeW = 16;
+  const cliW = 16;
   const ghW = 8;
   const authW = 6;
+
+  // Build dynamic header based on configured coding CLIs
+  const cliHeaders = codingClis.map(cliKey => {
+    const cliDef = CODING_CLIS[cliKey as keyof typeof CODING_CLIS];
+    return (cliDef?.displayName ?? cliKey).padEnd(cliW);
+  });
 
   const header = [
     "Agent".padEnd(nameW),
     "Role".padEnd(roleW),
     "Instance ID".padEnd(idW),
     "Public IP".padEnd(ipW),
-    "Claude Code".padEnd(claudeW),
+    ...cliHeaders,
     "gh".padEnd(ghW),
     "Auth".padEnd(authW),
   ].join("  ");
@@ -152,7 +175,7 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
     "─".repeat(roleW),
     "─".repeat(idW),
     "─".repeat(ipW),
-    "─".repeat(claudeW),
+    ...codingClis.map(() => "─".repeat(cliW)),
     "─".repeat(ghW),
     "─".repeat(authW),
   ].join("  ");
@@ -161,12 +184,13 @@ export async function statusCommand(opts: StatusOptions): Promise<void> {
   console.log(`  ${separator}`);
 
   for (const s of statusData) {
+    const cliVersionCols = codingClis.map(cliKey => (s.cliVersions[cliKey] ?? "—").padEnd(cliW));
     const row = [
       s.name.padEnd(nameW),
       s.role.padEnd(roleW),
       s.instanceId.padEnd(idW),
       s.publicIp.padEnd(ipW),
-      s.claudeCodeVersion.padEnd(claudeW),
+      ...cliVersionCols,
       s.ghVersion.padEnd(ghW),
       s.ghAuth.padEnd(authW),
     ].join("  ");
