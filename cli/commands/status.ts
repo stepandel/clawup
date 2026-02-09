@@ -3,7 +3,7 @@
  */
 
 import * as p from "@clack/prompts";
-import { loadManifest } from "../lib/config";
+import { loadManifest, resolveConfigName, checkAndMigrateLegacy } from "../lib/config";
 import { getConfig, getStackOutputs, selectOrCreateStack } from "../lib/pulumi";
 import { capture } from "../lib/exec";
 import { SSH_USER, tailscaleHostname } from "../lib/constants";
@@ -11,6 +11,7 @@ import { showBanner, exitWithError } from "../lib/ui";
 
 interface StatusOptions {
   json?: boolean;
+  config?: string;
 }
 
 /**
@@ -70,10 +71,21 @@ function getGhAuthStatus(host: string, timeout: number = 5): string {
 export async function statusCommand(opts: StatusOptions): Promise<void> {
   if (!opts.json) showBanner();
 
+  // Check for legacy config and offer migration
+  await checkAndMigrateLegacy();
+
+  // Resolve config name
+  let configName: string;
+  try {
+    configName = resolveConfigName(opts.config);
+  } catch (err) {
+    exitWithError((err as Error).message);
+  }
+
   // Load manifest
-  const manifest = loadManifest();
+  const manifest = loadManifest(configName);
   if (!manifest) {
-    exitWithError("No agent-army.json found. Run `agent-army init` first.");
+    exitWithError(`Config '${configName}' could not be loaded.`);
   }
 
   // Select stack
