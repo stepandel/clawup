@@ -37,6 +37,12 @@ export const AGENT_ALIASES: Record<string, string> = {
   scout: "tester",
 };
 
+/** Available cloud providers */
+export const PROVIDERS = [
+  { value: "aws", label: "AWS", hint: "Amazon Web Services EC2 instances" },
+  { value: "hetzner", label: "Hetzner", hint: "Hetzner Cloud servers (EU/US)" },
+] as const;
+
 /** Common AWS regions for selection */
 export const AWS_REGIONS = [
   { value: "us-east-1", label: "US East (N. Virginia)" },
@@ -48,21 +54,43 @@ export const AWS_REGIONS = [
   { value: "ap-northeast-1", label: "Asia Pacific (Tokyo)" },
 ];
 
-/** Instance type options */
+/** Hetzner Cloud locations */
+export const HETZNER_LOCATIONS = [
+  { value: "fsn1", label: "Falkenstein, DE (fsn1)" },
+  { value: "nbg1", label: "Nuremberg, DE (nbg1)" },
+  { value: "hel1", label: "Helsinki, FI (hel1)" },
+  { value: "ash", label: "Ashburn, US (ash)" },
+];
+
+/** Instance type options (AWS) */
 export const INSTANCE_TYPES = [
   { value: "t3.small", label: "t3.small — 2 vCPU, 2 GB (~$15/mo)" },
   { value: "t3.medium", label: "t3.medium — 2 vCPU, 4 GB (~$30/mo)" },
   { value: "t3.large", label: "t3.large — 2 vCPU, 8 GB (~$60/mo)" },
 ];
 
+/** Hetzner server types */
+export const HETZNER_SERVER_TYPES = [
+  { value: "cx22", label: "cx22 — 2 vCPU, 4 GB (~$4/mo)" },
+  { value: "cx32", label: "cx32 — 4 vCPU, 8 GB (~$7/mo)" },
+  { value: "cx42", label: "cx42 — 8 vCPU, 16 GB (~$14/mo)" },
+];
+
 /** Default SSH user for agent instances (Ubuntu 24.04 AMI default) */
 export const SSH_USER = "ubuntu";
 
-/** Estimated monthly cost per instance type */
+/** Estimated monthly cost per instance type (AWS) */
 export const COST_ESTIMATES: Record<string, number> = {
   "t3.small": 15,
   "t3.medium": 30,
   "t3.large": 60,
+};
+
+/** Estimated monthly cost per server type (Hetzner) */
+export const HETZNER_COST_ESTIMATES: Record<string, number> = {
+  cx22: 4,
+  cx32: 7,
+  cx42: 14,
 };
 
 /** Manifest filename */

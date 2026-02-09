@@ -27,6 +27,7 @@ export interface AgentDefinition {
 /** The agent-army.json manifest */
 export interface ArmyManifest {
   stackName: string;
+  provider: "aws" | "hetzner";
   region: string;
   instanceType: string;
   ownerName: string;

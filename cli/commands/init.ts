@@ -7,9 +7,13 @@ import * as p from "@clack/prompts";
 import type { AgentDefinition, ArmyManifest } from "../types";
 import {
   PRESETS,
+  PROVIDERS,
   AWS_REGIONS,
+  HETZNER_LOCATIONS,
   INSTANCE_TYPES,
+  HETZNER_SERVER_TYPES,
   COST_ESTIMATES,
+  HETZNER_COST_ESTIMATES,
   KEY_INSTRUCTIONS,
   slackAppManifest,
 } from "../lib/constants";
@@ -31,40 +35,72 @@ export async function initCommand(): Promise<void> {
   p.log.success("All prerequisites satisfied!");
 
   // Step 2: Collect basic config
-  const basicConfig = await p.group(
-    {
-      stackName: () =>
-        p.text({
-          message: "Pulumi stack name",
-          placeholder: "dev",
-          defaultValue: "dev",
-        }),
-      region: () =>
-        p.select({
-          message: "AWS region",
-          options: AWS_REGIONS,
-          initialValue: "us-east-1",
-        }),
-      instanceType: () =>
-        p.select({
-          message: "Default instance type",
-          options: INSTANCE_TYPES,
-          initialValue: "t3.medium",
-        }),
-      ownerName: () =>
-        p.text({
-          message: "Owner name (for workspace templates)",
-          placeholder: "Boss",
-          defaultValue: "Boss",
-        }),
-    },
-    {
-      onCancel: () => {
-        p.cancel("Setup cancelled.");
-        process.exit(0);
-      },
-    }
-  );
+  const stackName = await p.text({
+    message: "Pulumi stack name",
+    placeholder: "dev",
+    defaultValue: "dev",
+  });
+  handleCancel(stackName);
+
+  const provider = await p.select({
+    message: "Cloud provider",
+    options: PROVIDERS.map((p) => ({ value: p.value, label: p.label, hint: p.hint })),
+    initialValue: "aws",
+  });
+  handleCancel(provider);
+
+  // Provider-specific region/location and instance type selection
+  let region: string;
+  let instanceType: string;
+
+  if (provider === "aws") {
+    const awsRegion = await p.select({
+      message: "AWS region",
+      options: AWS_REGIONS,
+      initialValue: "us-east-1",
+    });
+    handleCancel(awsRegion);
+    region = awsRegion as string;
+
+    const awsInstanceType = await p.select({
+      message: "Default instance type",
+      options: INSTANCE_TYPES,
+      initialValue: "t3.medium",
+    });
+    handleCancel(awsInstanceType);
+    instanceType = awsInstanceType as string;
+  } else {
+    const hetznerLocation = await p.select({
+      message: "Hetzner location",
+      options: HETZNER_LOCATIONS,
+      initialValue: "fsn1",
+    });
+    handleCancel(hetznerLocation);
+    region = hetznerLocation as string;
+
+    const hetznerServerType = await p.select({
+      message: "Default server type",
+      options: HETZNER_SERVER_TYPES,
+      initialValue: "cx22",
+    });
+    handleCancel(hetznerServerType);
+    instanceType = hetznerServerType as string;
+  }
+
+  const ownerName = await p.text({
+    message: "Owner name (for workspace templates)",
+    placeholder: "Boss",
+    defaultValue: "Boss",
+  });
+  handleCancel(ownerName);
+
+  const basicConfig = {
+    stackName: stackName as string,
+    provider: provider as "aws" | "hetzner",
+    region,
+    instanceType,
+    ownerName: ownerName as string,
+  };
 
   // Step 3: Collect secrets
   p.log.step("Configure secrets");
@@ -385,9 +421,10 @@ export async function initCommand(): Promise<void> {
   }
 
   // Step 6: Show summary
-  const costPerAgent = COST_ESTIMATES[basicConfig.instanceType as string] ?? 30;
+  const costEstimates = basicConfig.provider === "aws" ? COST_ESTIMATES : HETZNER_COST_ESTIMATES;
+  const costPerAgent = costEstimates[basicConfig.instanceType] ?? 30;
   const totalCost = agents.reduce((sum, a) => {
-    const agentCost = COST_ESTIMATES[a.instanceType ?? (basicConfig.instanceType as string)] ?? costPerAgent;
+    const agentCost = costEstimates[a.instanceType ?? basicConfig.instanceType] ?? costPerAgent;
     return sum + agentCost;
   }, 0);
 
@@ -399,10 +436,14 @@ export async function initCommand(): Promise<void> {
     return i;
   });
 
+  const providerLabel = basicConfig.provider === "aws" ? "AWS" : "Hetzner";
+  const regionLabel = basicConfig.provider === "aws" ? "Region" : "Location";
+
   p.note(
     [
       `Stack:          ${basicConfig.stackName}`,
-      `Region:         ${basicConfig.region}`,
+      `Provider:       ${providerLabel}`,
+      `${regionLabel}:         ${basicConfig.region}`,
       `Instance type:  ${basicConfig.instanceType}`,
       `Owner:          ${basicConfig.ownerName}`,
       `Integrations:   ${integrationNames.join(", ")}`,
@@ -440,15 +481,20 @@ export async function initCommand(): Promise<void> {
 
   // Set Pulumi config
   s.start("Setting Pulumi configuration...");
-  setConfig("aws:region", basicConfig.region as string);
+  setConfig("provider", basicConfig.provider);
+  if (basicConfig.provider === "aws") {
+    setConfig("aws:region", basicConfig.region);
+  } else {
+    setConfig("hetzner:location", basicConfig.region);
+  }
   setConfig("anthropicApiKey", anthropicApiKey as string, true);
   setConfig("tailscaleAuthKey", tailscaleAuthKey as string, true);
   setConfig("tailnetDnsName", tailnetDnsName as string);
   if (tailscaleApiKey) {
     setConfig("tailscaleApiKey", tailscaleApiKey as string, true);
   }
-  setConfig("instanceType", basicConfig.instanceType as string);
-  setConfig("ownerName", basicConfig.ownerName as string);
+  setConfig("instanceType", basicConfig.instanceType);
+  setConfig("ownerName", basicConfig.ownerName);
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
     if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true);
@@ -462,10 +508,11 @@ export async function initCommand(): Promise<void> {
   // Write manifest
   s.start("Writing agent-army.json manifest...");
   const manifest: ArmyManifest = {
-    stackName: basicConfig.stackName as string,
-    region: basicConfig.region as string,
-    instanceType: basicConfig.instanceType as string,
-    ownerName: basicConfig.ownerName as string,
+    stackName: basicConfig.stackName,
+    provider: basicConfig.provider,
+    region: basicConfig.region,
+    instanceType: basicConfig.instanceType,
+    ownerName: basicConfig.ownerName,
     agents,
   };
   saveManifest(manifest);
