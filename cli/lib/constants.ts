@@ -93,6 +93,41 @@ export const HETZNER_COST_ESTIMATES: Record<string, number> = {
   cx42: 14,
 };
 
+/** Coding CLI definitions */
+export interface CodingCliDef {
+  displayName: string;
+  description: string;
+  binaryPath: string;
+  installMethod: "pip" | "npm" | "binary";
+}
+
+export const CODING_CLIS: Record<string, CodingCliDef> = {
+  "claude-code": {
+    displayName: "Claude Code",
+    description: "Anthropic's official CLI for Claude",
+    binaryPath: "$HOME/.local/bin/claude",
+    installMethod: "pip",
+  },
+  codex: {
+    displayName: "Codex",
+    description: "OpenAI's Codex CLI",
+    binaryPath: "codex",
+    installMethod: "npm",
+  },
+  amp: {
+    displayName: "Amp",
+    description: "Sourcegraph's Amp CLI",
+    binaryPath: "amp",
+    installMethod: "npm",
+  },
+  opencode: {
+    displayName: "OpenCode",
+    description: "Open-source coding assistant CLI",
+    binaryPath: "opencode",
+    installMethod: "npm",
+  },
+};
+
 /** Manifest filename */
 export const MANIFEST_FILE = "agent-army.json";
 

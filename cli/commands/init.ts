@@ -16,6 +16,7 @@ import {
   HETZNER_COST_ESTIMATES,
   KEY_INSTRUCTIONS,
   slackAppManifest,
+  CODING_CLIS,
 } from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
@@ -282,7 +283,45 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     exitWithError("No agents configured. At least one agent is required.");
   }
 
-  // Step 5: Configure integrations
+  // Step 5: Select coding CLIs
+  p.log.step("Configure coding CLIs");
+
+  const selectedCodingClis = await p.multiselect({
+    message: "Select coding CLIs to install",
+    options: Object.entries(CODING_CLIS).map(([key, cli]) => ({
+      value: key,
+      label: cli.displayName,
+      hint: cli.description,
+    })),
+    initialValues: ["claude-code"],
+    required: false,
+  });
+  handleCancel(selectedCodingClis);
+
+  const codingClis = (selectedCodingClis as string[]).length > 0
+    ? (selectedCodingClis as string[])
+    : ["claude-code"]; // Default to claude-code if none selected
+
+  // Note about API keys for non-Anthropic CLIs
+  const nonAnthropicClis = codingClis.filter(cli => cli !== "claude-code");
+  if (nonAnthropicClis.length > 0) {
+    p.note(
+      [
+        "The following CLIs require API keys configured post-deployment:",
+        ...nonAnthropicClis.map(cli => {
+          if (cli === "codex") return "• Codex: Set OPENAI_API_KEY in agent's environment";
+          if (cli === "amp") return "• Amp: Set AMP_API_KEY in agent's environment";
+          if (cli === "opencode") return "• OpenCode: Set OPENCODE_API_KEY in agent's environment";
+          return `• ${cli}: Configure API key in agent's environment`;
+        }),
+        "",
+        "Add these to ~/.openclaw/openclaw.json under 'env' after deployment.",
+      ].join("\n"),
+      "API Keys Required"
+    );
+  }
+
+  // Step 6: Configure integrations
   p.log.step("Configure integrations");
 
   // Slack and Linear are always required
@@ -425,11 +464,11 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     }
   }
 
-  // Step 6: Show summary
+  // Step 7: Show summary
   const costEstimates = basicConfig.provider === "aws" ? COST_ESTIMATES : HETZNER_COST_ESTIMATES;
-  const costPerAgent = costEstimates[basicConfig.instanceType] ?? 30;
+  const costPerAgent = costEstimates[basicConfig.instanceType as string] ?? 30;
   const totalCost = agents.reduce((sum, a) => {
-    const agentCost = costEstimates[a.instanceType ?? basicConfig.instanceType] ?? costPerAgent;
+    const agentCost = costEstimates[a.instanceType ?? (basicConfig.instanceType as string)] ?? costPerAgent;
     return sum + agentCost;
   }, 0);
 
@@ -443,6 +482,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   const providerLabel = basicConfig.provider === "aws" ? "AWS" : "Hetzner";
   const regionLabel = basicConfig.provider === "aws" ? "Region" : "Location";
+  const codingCliNames = codingClis.map(cli => CODING_CLIS[cli as keyof typeof CODING_CLIS]?.displayName ?? cli);
 
   p.note(
     [
@@ -451,6 +491,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       `${regionLabel.padEnd(14, " ")} ${basicConfig.region}`,
       `Instance type:  ${basicConfig.instanceType}`,
       `Owner:          ${basicConfig.ownerName}`,
+      `Coding CLIs:    ${codingCliNames.join(", ")}`,
       `Integrations:   ${integrationNames.join(", ")}`,
       ``,
       `Agents (${agents.length}):`,
@@ -461,7 +502,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     "Deployment Summary"
   );
 
-  // Step 7: Confirm
+  // Step 8: Confirm
   const confirmed = await p.confirm({
     message: "Proceed with setup?",
   });
@@ -471,7 +512,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     process.exit(0);
   }
 
-  // Step 8: Execute setup
+  // Step 9: Execute setup
   const s = p.spinner();
 
   // Select/create stack
@@ -520,6 +561,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     instanceType: basicConfig.instanceType as string,
     ownerName: basicConfig.ownerName as string,
     agents,
+    codingClis,
   };
   saveManifest(configName, manifest);
   s.stop("Config saved");

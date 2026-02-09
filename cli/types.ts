@@ -32,6 +32,8 @@ export interface ArmyManifest {
   instanceType: string;
   ownerName: string;
   agents: AgentDefinition[];
+  /** Coding CLIs to install (default: ["claude-code"]) */
+  codingClis?: string[];
 }
 
 /** Result of a single prerequisite check */
