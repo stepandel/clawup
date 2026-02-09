@@ -127,6 +127,12 @@ export interface OpenClawAgentArgs {
    * Must start with ghp_ or github_pat_
    */
   githubToken?: pulumi.Input<string>;
+
+  /**
+   * Coding CLIs to install (default: ["claude-code"])
+   * Options: "claude-code", "codex", "opencode", "amp"
+   */
+  codingClis?: string[];
 }
 
 /**
@@ -460,6 +466,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
             braveSearchApiKey: braveSearchApiKey || undefined,
             // GitHub token for gh CLI auth
             githubToken: githubToken || undefined,
+            // Coding CLIs to install (default to claude-code for backward compat)
+            codingClis: args.codingClis ?? ["claude-code"],
           };
 
           const script = generateCloudInit(cloudInitConfig);

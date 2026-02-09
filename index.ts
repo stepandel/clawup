@@ -39,6 +39,8 @@ interface Manifest {
   instanceType: string;
   ownerName: string;
   agents: ManifestAgent[];
+  /** Coding CLIs to install (default: ["claude-code"]) */
+  codingClis?: string[];
 }
 
 // -----------------------------------------------------------------------------
@@ -307,6 +309,9 @@ for (const agent of manifest.agents) {
 
     // GitHub token (optional)
     githubToken,
+
+    // Coding CLIs (default to claude-code for backward compat)
+    codingClis: manifest.codingClis ?? ["claude-code"],
 
     tags: {
       ...baseTags,
