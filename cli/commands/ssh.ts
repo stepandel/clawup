@@ -3,7 +3,7 @@
  */
 
 import * as p from "@clack/prompts";
-import { loadManifest } from "../lib/config";
+import { loadManifest, resolveConfigName, checkAndMigrateLegacy } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
 import { showBanner, exitWithError } from "../lib/ui";
@@ -11,13 +11,25 @@ import { spawn } from "child_process";
 
 interface SshOptions {
   user?: string;
+  config?: string;
 }
 
 export async function sshCommand(agentNameOrAlias: string, commandArgs: string[], opts: SshOptions): Promise<void> {
+  // Check for legacy config and offer migration
+  await checkAndMigrateLegacy();
+
+  // Resolve config name
+  let configName: string;
+  try {
+    configName = resolveConfigName(opts.config);
+  } catch (err) {
+    exitWithError((err as Error).message);
+  }
+
   // Load manifest
-  const manifest = loadManifest();
+  const manifest = loadManifest(configName);
   if (!manifest) {
-    exitWithError("No agent-army.json found. Run `agent-army init` first.");
+    exitWithError(`Config '${configName}' could not be loaded.`);
   }
 
   // Select stack
