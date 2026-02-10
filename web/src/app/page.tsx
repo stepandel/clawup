@@ -143,11 +143,20 @@ export default function Home() {
           </Badge>
         </div>
 
-        <h1 className="animate-fade-in-up-1 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[1.1] tracking-tighter mb-6 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
+        <h1 className="animate-fade-in-up-1 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[1.1] tracking-tighter mb-4 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
           Your AI dev team,
           <br />
           deployed in minutes
         </h1>
+
+        <a
+          href="https://openclaw.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="animate-fade-in-up-1 inline-block text-sm text-muted-foreground/60 hover:text-muted-foreground transition-colors mb-8"
+        >
+          Powered by OpenClaw 🦞
+        </a>
 
         <p className="animate-fade-in-up-2 text-[clamp(1rem,2vw,1.25rem)] text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
           A PM, an engineer, and a QA tester — each running on their own cloud
