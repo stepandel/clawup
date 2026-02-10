@@ -1,54 +1,63 @@
 ---
 title: "What is Agent Army?"
-description: "Deploy and manage a fleet of AI agents on your own cloud infrastructure"
+description: "Deploy a team of AI agents that persistently work through your Linear tickets"
 ---
 
 # Agent Army
 
-Agent Army lets you deploy a fleet of [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner — with a single command.
+Agent Army deploys a team of [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner — that persistently work through your Linear tickets. A product manager, an engineer, and a QA tester, running 24/7 on dedicated servers, coordinating through Linear and GitHub to ship real work.
 
 ## Why Agent Army?
 
-Running AI agents in production requires infrastructure: servers, networking, persistent storage, secure credential management, and orchestration. Agent Army handles all of this so you can focus on what your agents do, not where they run.
+You have a Linear backlog full of tickets. Agent Army gives you a dedicated team that picks them up, breaks them down, writes the code, opens PRs, reviews them, and files bugs — without you babysitting the process.
+
+Each agent has a specific role, persistent memory, and the tools to do its job: Linear for ticket tracking, GitHub for code, Claude Code for engineering, and Slack for communication.
+
+## The Team
+
+<CardGroup cols={3}>
+  <Card title="Marcus" icon="compass">
+    **Product Manager** — Breaks down Linear tickets into actionable sub-tasks, researches requirements, sequences work, and keeps the team unblocked.
+  </Card>
+  <Card title="Titus" icon="code">
+    **Engineer** — Picks up tickets, writes code with Claude Code, opens PRs on GitHub, and responds to review feedback.
+  </Card>
+  <Card title="Scout" icon="magnifying-glass">
+    **QA Tester** — Reviews PRs, tests changes against acceptance criteria, files bugs back to Linear, and verifies fixes.
+  </Card>
+</CardGroup>
+
+Each agent runs on its own dedicated server with persistent storage, pre-configured with OpenClaw, Claude Code, and all necessary integrations (Linear, GitHub, Slack).
+
+## How It Works
+
+1. **Configure** — Run `agent-army init` to set up your cloud provider, select agents, and connect Linear/GitHub
+2. **Deploy** — Run `agent-army deploy` to provision your team on dedicated servers
+3. **Assign work** — Point your agents at Linear tickets and they coordinate the rest
+4. **Monitor** — Use `agent-army status`, `ssh`, and `validate` to check on your team
 
 ## Key Features
 
 <CardGroup cols={2}>
   <Card title="One-Command Deploy" icon="rocket">
-    Interactive wizard configures everything. Deploy your entire fleet with `agent-army deploy`.
+    Interactive wizard configures everything. Deploy your entire team with `agent-army deploy`.
   </Card>
-  <Card title="Multi-Cloud" icon="cloud">
-    Deploy to AWS EC2 or Hetzner Cloud. Same agent config, different providers.
+  <Card title="Linear-Native Workflow" icon="ticket">
+    Agents pick up Linear tickets, update status, create sub-issues, and track progress automatically.
   </Card>
-  <Card title="Built-in Presets" icon="users">
-    Pre-configured agent roles: PM (Marcus), Engineer (Titus), and Tester (Scout).
+  <Card title="Fully Customizable" icon="sliders">
+    Use the built-in presets, tweak them, or define completely custom agents with your own roles and personalities.
   </Card>
-  <Card title="Secure Networking" icon="shield">
-    Tailscale mesh VPN connects all agents. SSH access without exposing ports.
+  <Card title="Persistent & Autonomous" icon="clock">
+    Agents run on dedicated servers with persistent storage. They keep working through your backlog around the clock.
   </Card>
 </CardGroup>
-
-## How It Works
-
-1. **Configure** — Run `agent-army init` to set up your stack, choose a provider, select agents
-2. **Deploy** — Run `agent-army deploy` to provision infrastructure with Pulumi
-3. **Manage** — Use `agent-army status`, `ssh`, and `validate` to monitor your fleet
-
-## Agent Presets
-
-| Preset | Name | Role | Description |
-|--------|------|------|-------------|
-| `pm` | Marcus | Project Manager | Break down tickets, research, plan and sequence work |
-| `eng` | Titus | Engineer | Lead engineering, coding, shipping |
-| `tester` | Scout | Tester | Quality assurance, verification, bug hunting |
-
-Each agent runs on its own server with persistent EBS/volume storage, pre-configured with OpenClaw and all necessary tools.
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Quick Start" icon="play" href="/quickstart">
-    Get your first fleet running in 5 minutes.
+    Get your team running in 5 minutes.
   </Card>
   <Card title="Prerequisites" icon="list-check" href="/prerequisites">
     Check what you need before deploying.

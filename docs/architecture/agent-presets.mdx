@@ -1,34 +1,34 @@
 ---
 title: "Agent Presets"
-description: "Pre-configured agent roles and customization options"
+description: "Pre-configured agent roles that work through your Linear tickets"
 ---
 
 # Agent Presets
 
-Agent Army ships with pre-configured agent presets, each optimized for a specific role.
+Agent Army ships with three agent presets that form a complete team for tackling your Linear backlog.
 
 ## Available Presets
 
-### Marcus — Project Manager (`pm`)
+### Marcus — Product Manager (`pm`)
 
 - **Volume:** 30 GB
-- **Focus:** Break down tickets, research, plan and sequence work, track progress, unblock teams
-- **Tools:** Linear, GitHub, web search
-- **Best for:** Coordinating work across agents, managing backlogs, stakeholder communication
+- **What he does:** Picks up Linear tickets and breaks them into actionable sub-tasks. Researches requirements, sequences work across the team, updates ticket status, and keeps Titus and Scout unblocked. Communicates progress via Slack.
+- **Tools:** Linear, GitHub, Slack, web search
+- **Best for:** Ticket breakdown, backlog management, research, cross-agent coordination
 
 ### Titus — Engineer (`eng`)
 
 - **Volume:** 50 GB
-- **Focus:** Lead engineering, coding, shipping
-- **Tools:** Claude Code, GitHub, build tools, testing frameworks
-- **Best for:** Writing code, reviewing PRs, fixing bugs, implementing features
+- **What he does:** Picks up engineering tickets from Linear, writes code using Claude Code, creates branches and opens PRs on GitHub. Responds to review comments and iterates until the PR is approved. Updates Linear ticket status as work progresses.
+- **Tools:** Claude Code, GitHub, Linear, build tools, testing frameworks
+- **Best for:** Implementing features, fixing bugs, writing tests, shipping PRs
 
-### Scout — Tester (`tester`)
+### Scout — QA Tester (`tester`)
 
 - **Volume:** 30 GB
-- **Focus:** Quality assurance, verification, bug hunting
-- **Tools:** GitHub, testing frameworks, browser automation
-- **Best for:** PR review, test writing, deployment verification, bug reproduction
+- **What she does:** Reviews PRs on GitHub, tests changes against the ticket's acceptance criteria (happy path, sad path, edge cases). Files bugs back to Linear with reproduction steps. Verifies fixes after they land.
+- **Tools:** GitHub, Linear, testing frameworks, browser automation
+- **Best for:** PR review, manual and automated testing, bug filing, fix verification
 
 ## Configuration
 

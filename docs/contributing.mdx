@@ -19,17 +19,13 @@ pnpm install
 
 # Build the CLI
 pnpm --filter @agent-army/cli build
-
-# Run the web app
-pnpm --filter agent-army-web dev
 ```
 
 ## Project Structure
 
-- `cli/` — CLI package (commands, adapters, types, constants)
-- `web/` — Next.js web app
+- `cli/` — CLI package (commands, config, types, constants)
 - `src/` — Pulumi infrastructure components
-- `presets/` — Agent preset configurations
+- `presets/` — Agent role definitions and skills
 - `docs/` — Mintlify documentation
 
 ## Development Workflow
