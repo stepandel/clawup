@@ -1,3 +1,5 @@
+import { Providers } from "@/components/providers";
+
 export const metadata = {
   title: "Agent Army",
   description: "Deploy and manage AI agents",
@@ -6,7 +8,9 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
