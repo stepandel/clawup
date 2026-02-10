@@ -2,7 +2,7 @@
  * Child process helpers for CLI commands
  */
 
-import { execSync, spawn, type SpawnOptions } from "child_process";
+import { execSync, spawn, spawnSync, type SpawnOptions } from "child_process";
 import { trackChild } from "./process";
 
 /** Result of a captured command execution */
@@ -58,10 +58,7 @@ export function stream(command: string, args: string[] = [], cwd?: string): Prom
  * Check if a command exists on the system
  */
 export function commandExists(command: string): boolean {
-  try {
-    execSync(`command -v ${command}`, { stdio: "pipe" });
-    return true;
-  } catch {
-    return false;
-  }
+  const bin = process.platform === "win32" ? "where" : "which";
+  const result = spawnSync(bin, [command], { shell: false, stdio: "ignore" });
+  return result.status === 0;
 }

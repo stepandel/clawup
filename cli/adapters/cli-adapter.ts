@@ -7,7 +7,7 @@
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { execSync, spawn, type SpawnOptions } from "child_process";
+import { execSync, spawn, spawnSync, type SpawnOptions } from "child_process";
 import { trackChild } from "../lib/process";
 import type {
   RuntimeAdapter,
@@ -63,12 +63,9 @@ class CLIExecAdapter implements ExecAdapter {
   }
 
   commandExists(command: string): boolean {
-    try {
-      execSync(`command -v ${command}`, { stdio: "pipe" });
-      return true;
-    } catch {
-      return false;
-    }
+    const bin = process.platform === "win32" ? "where" : "which";
+    const result = spawnSync(bin, [command], { shell: false, stdio: "ignore" });
+    return result.status === 0;
   }
 }
 
