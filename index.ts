@@ -57,6 +57,7 @@ const anthropicApiKey = config.requireSecret("anthropicApiKey");
 const tailscaleAuthKey = config.requireSecret("tailscaleAuthKey");
 const tailnetDnsName = config.require("tailnetDnsName");
 const instanceType = config.get("instanceType") ?? "t3.medium";
+const defaultModel = config.get("defaultModel") ?? "anthropic/claude-opus-4-6";
 const ownerName = config.get("ownerName") ?? "Boss";
 const timezone = config.get("timezone") ?? "PST (America/Los_Angeles)";
 const workingHours = config.get("workingHours") ?? "9am-6pm";
@@ -329,6 +330,7 @@ for (const agent of manifest.agents) {
       tailnetDnsName,
       instanceType: agent.instanceType ?? instanceType,
       volumeSize: agent.volumeSize ?? 30,
+      model: defaultModel,
 
       // Use shared VPC
       vpcId: sharedVpc!.vpcId,
@@ -377,6 +379,7 @@ for (const agent of manifest.agents) {
       tailnetDnsName,
       serverType: agent.instanceType ?? instanceType,
       location: manifest.region,
+      model: defaultModel,
 
       // Workspace files
       workspaceFiles,

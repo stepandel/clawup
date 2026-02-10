@@ -19,7 +19,7 @@ export interface CloudInitConfig {
   browserPort?: number;
   /** Enable Docker sandbox (default: true) */
   enableSandbox?: boolean;
-  /** AI model to use (default: anthropic/claude-sonnet-4-5) */
+  /** AI model to use (default: anthropic/claude-opus-4-6) */
   model?: string;
   /** Node.js version to install (default: 22) */
   nodeVersion?: number;
@@ -125,7 +125,7 @@ GH_AUTH_SCRIPT
     : "";
 
   // Claude Code CLI installation script
-  const codingClisInstallScript = generateClaudeCodeInstallScript();
+  const codingClisInstallScript = generateClaudeCodeInstallScript(config.model);
 
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
@@ -384,9 +384,12 @@ export function interpolateCloudInit(
 }
 
 /**
- * Generates bash script to install Claude Code CLI
+ * Generates bash script to install Claude Code CLI and configure the default model
  */
-function generateClaudeCodeInstallScript(): string {
+function generateClaudeCodeInstallScript(model?: string): string {
+  // Strip provider prefix (e.g. "anthropic/claude-opus-4-6" → "claude-opus-4-6")
+  const claudeModel = model?.replace(/^anthropic\//, "") ?? "claude-opus-4-6";
+
   return `
 # Install Claude Code CLI for ubuntu user
 echo "Installing Claude Code..."
@@ -410,6 +413,11 @@ else
   echo "WARNING: Claude Code installation may have failed"
   exit 1
 fi
+
+# Configure default model
+mkdir -p ~/.claude
+echo '{"model":"${claudeModel}"}' > ~/.claude/settings.json
+echo "Claude Code default model set to ${claudeModel}"
 CLAUDE_CODE_INSTALL_SCRIPT
 `;
 }

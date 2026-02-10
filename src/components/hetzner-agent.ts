@@ -43,7 +43,7 @@ export interface HetznerOpenClawAgentArgs {
   location?: pulumi.Input<string>;
 
   /**
-   * AI model to use (default: anthropic/claude-sonnet-4-5)
+   * AI model to use (default: anthropic/claude-opus-4-6)
    */
   model?: pulumi.Input<string>;
 
@@ -245,7 +245,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     // Resolve Input<> values for cloud-init config
     const gatewayPortResolved = pulumi.output(args.gatewayPort ?? 18789);
     const browserPortResolved = pulumi.output(args.browserPort ?? 18791);
-    const modelResolved = pulumi.output(args.model ?? "anthropic/claude-sonnet-4-5");
+    const modelResolved = pulumi.output(args.model ?? "anthropic/claude-opus-4-6");
     const enableSandboxResolved = pulumi.output(args.enableSandbox ?? true);
 
     // Generate cloud-init user data

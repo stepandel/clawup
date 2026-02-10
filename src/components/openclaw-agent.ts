@@ -53,7 +53,7 @@ export interface OpenClawAgentArgs {
   securityGroupId?: pulumi.Input<string>;
 
   /**
-   * AI model to use (default: anthropic/claude-sonnet-4-5)
+   * AI model to use (default: anthropic/claude-opus-4-6)
    */
   model?: pulumi.Input<string>;
 
@@ -214,7 +214,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     const gatewayPort = args.gatewayPort ?? 18789;
     const browserPort = args.browserPort ?? 18791;
     const volumeSize = args.volumeSize ?? 30;
-    const model = args.model ?? "anthropic/claude-sonnet-4-5";
+    const model = args.model ?? "anthropic/claude-opus-4-6";
     const enableSandbox = args.enableSandbox ?? true;
     const baseTags = args.tags ?? {};
 
