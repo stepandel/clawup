@@ -4,7 +4,7 @@ Deploy a fleet of specialized [OpenClaw](https://openclaw.bot/) AI agents on **A
 
 ## What Is This?
 
-Agent Army provisions a team of autonomous AI agents that handle software engineering tasks — project management, development, and QA — with persistent memory and role-specific behavior. Agents communicate over a secure Tailscale mesh VPN with no public port exposure.
+Agent Army provisions a team of autonomous AI agents that handle software engineering tasks — product management & research, development, and QA — with persistent memory and role-specific behavior. Agents communicate over a secure Tailscale mesh VPN with no public port exposure.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
