@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@agent-army/cli':
+        specifier: workspace:*
+        version: link:cli
       '@pulumi/aws':
         specifier: ^6.0.0
         version: 6.83.2(typescript@5.9.3)
