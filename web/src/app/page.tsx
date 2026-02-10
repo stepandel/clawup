@@ -171,9 +171,6 @@ export default function Home() {
 
         <div className="animate-fade-in-up-3 flex justify-center gap-4 flex-wrap">
           <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
-            <a href="https://agent-army.dev/quickstart">Get Started</a>
-          </Button>
-          <Button asChild variant="outline" size="lg">
             <a
               href="https://github.com/stepandel/agent-army"
               target="_blank"
@@ -181,6 +178,9 @@ export default function Home() {
             >
               View on GitHub
             </a>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <a href="https://agent-army.dev">Read the Docs</a>
           </Button>
         </div>
       </section>
@@ -361,7 +361,13 @@ export default function Home() {
           </p>
           <div className="flex justify-center gap-4 flex-wrap">
             <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
-              <a href="https://agent-army.dev/quickstart">Get Started</a>
+              <a
+                href="https://github.com/stepandel/agent-army"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View on GitHub
+              </a>
             </Button>
             <Button asChild variant="outline" size="lg">
               <a href="https://agent-army.dev">Read the Docs</a>
