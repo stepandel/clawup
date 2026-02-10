@@ -35,8 +35,16 @@ Run each check in order. If any step fails, stop and report the failure — do n
    - Claude Code: ✅ (PR #number opened and closed)
    - All integrations verified at HH:MM
    ```
-2. Delete this file (`BOOTSTRAP.md`)
-3. Begin normal operation per `AGENTS.md`
+2. Send a Slack message to the user:
+   ```
+   ✅ Bootstrap complete — all integrations verified.
+   • Linear: working (ticket created and closed)
+   • GitHub: working (repo cloned)
+   • Claude Code: working (PR opened and closed)
+   Ready for normal operation.
+   ```
+3. Delete this file (`BOOTSTRAP.md`)
+4. Begin normal operation per `AGENTS.md`
 
 ## If Any Check Fails
 Do **not** delete this file. Log the failure to `memory/YYYY-MM-DD.md` and report to the user immediately. Include the error message and which step failed.
