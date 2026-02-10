@@ -12,6 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     select: {
       id: true,
       stackName: true,
+      manifest: true,
       status: true,
       logs: true,
       errorMessage: true,
@@ -29,4 +30,37 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   return NextResponse.json({ deployment });
+}
+
+/** Destroy a deployment */
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const deployment = await prisma.deployment.findFirst({
+    where: { id: params.id, userId: token.id as string },
+  });
+
+  if (!deployment) {
+    return NextResponse.json({ error: "Deployment not found" }, { status: 404 });
+  }
+
+  // If there's a Pulumi stack, attempt to destroy it
+  if (deployment.pulumiStack) {
+    try {
+      const { LocalWorkspace } = await import("@pulumi/pulumi/automation");
+      const stack = await LocalWorkspace.selectStack({
+        stackName: deployment.pulumiStack,
+        workDir: process.cwd(),
+      });
+      await stack.destroy({ onOutput: console.log });
+      await stack.workspace.removeStack(deployment.pulumiStack);
+    } catch (err) {
+      console.error("Pulumi destroy error:", err);
+      // Continue with DB cleanup even if Pulumi destroy fails
+    }
+  }
+
+  await prisma.deployment.delete({ where: { id: params.id } });
+  return NextResponse.json({ ok: true });
 }
