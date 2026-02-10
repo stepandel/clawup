@@ -89,6 +89,10 @@
       ]
     }
   ],
+  "metadata": {
+    "og:site_name": "Agent Army Docs",
+    "twitter:site": "@stepanarsent"
+  },
   "footerSocials": {
     "github": "https://github.com/stepandel/agent-army"
   }

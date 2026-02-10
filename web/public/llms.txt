@@ -1,0 +1,22 @@
+# Agent Army
+
+> Deploy and manage autonomous AI coding agents on your own cloud infrastructure.
+
+Agent Army is an open-source CLI tool that provisions, orchestrates, and monitors AI dev teams. Deploy AI coding agents (Claude, GPT, etc.) to your own AWS infrastructure with a single command.
+
+## Key Features
+
+- One-command deployment of AI coding agents to your cloud
+- Support for multiple agent types: Juno (Claude Code), Titus (Aider), Scout (Codex)
+- Built-in integrations with Linear, GitHub, and Slack
+- Secure cloud infrastructure provisioned via Pulumi (VPC, EC2, networking)
+- Real-time agent monitoring and SSH access
+- Cost estimation and resource management
+
+## Links
+
+- [Documentation](https://docs.agent-army.ai)
+- [Quickstart Guide](https://docs.agent-army.ai/quickstart)
+- [GitHub Repository](https://github.com/stepandel/agent-army)
+- [CLI Reference](https://docs.agent-army.ai/cli/overview)
+- [Architecture Overview](https://docs.agent-army.ai/architecture/overview)
