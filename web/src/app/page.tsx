@@ -107,7 +107,7 @@ export default function Home() {
     <div className="min-h-screen overflow-hidden">
       {/* Beta Banner */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center px-4 py-2 text-sm font-semibold">
-        This is a beta product — use at your own risk.
+        ⚠️ This is a beta product — use at your own risk.
       </div>
 
       {/* Nav */}
