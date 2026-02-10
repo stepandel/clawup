@@ -95,12 +95,7 @@ Add the prompt to the ticket description (not as a comment).
 
 ## Phase 5: Assign to Coding Agent
 
-After the ticket is fully prepped (has research, context, DoD, test cases, and Claude Code prompt), assign it to **Titus** (the lead engineer coding agent).
-
-Use the Linear API to assign:
-```graphql
-mutation { issueUpdate(id: "TICKET-ID", input: { assigneeId: "2a03fa1b-5322-4ca9-9073-76fade211a95" }) { success } }
-```
+After the ticket is fully prepped (has research, context, DoD, test cases, and Claude Code prompt), assign it to **Titus** (the lead engineer coding agent) using the Linear skill.
 
 When assigning sub-tickets, assign them all but note in the parent ticket which sub-ticket should be started first.
 
