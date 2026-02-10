@@ -35,14 +35,7 @@ Run each check in order. If any step fails, stop and report the failure — do n
    - Claude Code: ✅ (PR #number opened and closed)
    - All integrations verified at HH:MM
    ```
-2. Send a Slack message to the user:
-   ```
-   ✅ Bootstrap complete — all integrations verified.
-   • Linear: working (ticket created and closed)
-   • GitHub: working (repo cloned)
-   • Claude Code: working (PR opened and closed)
-   Ready for normal operation.
-   ```
+2. Send a friendly welcoming note to the human on Slack and inlude well formatted bootstrap results.
 3. Delete this file (`BOOTSTRAP.md`)
 4. Begin normal operation per `AGENTS.md`
 
