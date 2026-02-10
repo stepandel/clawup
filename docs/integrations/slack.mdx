@@ -25,75 +25,205 @@ Repeat this for each agent (Juno, Titus, Scout).
 1. Go to [api.slack.com/apps](https://api.slack.com/apps)
 2. Click **"Create New App"** > **"From a manifest"**
 3. Select your workspace
-4. Paste the manifest below (update the `name` and `display_name` for each agent)
+4. Paste the manifest for the agent you're setting up (expand below)
 
 <Tip>
-The `agent-army init` wizard copies the manifest to your clipboard automatically when you reach the Slack setup step.
+The `agent-army init` wizard copies the correct manifest to your clipboard automatically when you reach the Slack setup step.
 </Tip>
 
-### Slack App Manifest
+### Slack App Manifests
 
-```json
-{
-  "display_information": {
-    "name": "Juno (PM)",
-    "description": "Agent Army — Product Manager agent"
-  },
-  "features": {
-    "bot_user": {
-      "display_name": "Juno",
-      "always_online": true
+<AccordionGroup>
+  <Accordion title="Juno — Product Manager">
+    ```json
+    {
+      "display_information": {
+        "name": "Juno (PM)",
+        "description": "Agent Army — Product Manager agent"
+      },
+      "features": {
+        "bot_user": {
+          "display_name": "Juno",
+          "always_online": true
+        }
+      },
+      "oauth_config": {
+        "scopes": {
+          "bot": [
+            "chat:write",
+            "channels:history",
+            "channels:read",
+            "groups:history",
+            "groups:read",
+            "groups:write",
+            "im:history",
+            "im:read",
+            "im:write",
+            "mpim:history",
+            "mpim:read",
+            "mpim:write",
+            "users:read",
+            "app_mentions:read",
+            "reactions:read",
+            "reactions:write",
+            "pins:read",
+            "pins:write",
+            "emoji:read",
+            "commands",
+            "files:read",
+            "files:write"
+          ]
+        }
+      },
+      "settings": {
+        "event_subscriptions": {
+          "bot_events": [
+            "app_mention",
+            "message.channels",
+            "message.groups",
+            "message.im",
+            "message.mpim",
+            "reaction_added",
+            "reaction_removed",
+            "member_joined_channel",
+            "member_left_channel",
+            "channel_rename",
+            "pin_added",
+            "pin_removed"
+          ]
+        },
+        "socket_mode_enabled": true
+      }
     }
-  },
-  "oauth_config": {
-    "scopes": {
-      "bot": [
-        "chat:write",
-        "channels:history",
-        "channels:read",
-        "groups:history",
-        "groups:read",
-        "groups:write",
-        "im:history",
-        "im:read",
-        "im:write",
-        "mpim:history",
-        "mpim:read",
-        "mpim:write",
-        "users:read",
-        "app_mentions:read",
-        "reactions:read",
-        "reactions:write",
-        "pins:read",
-        "pins:write",
-        "emoji:read",
-        "commands",
-        "files:read",
-        "files:write"
-      ]
+    ```
+  </Accordion>
+  <Accordion title="Titus — Engineer">
+    ```json
+    {
+      "display_information": {
+        "name": "Titus (Engineer)",
+        "description": "Agent Army — Engineer agent"
+      },
+      "features": {
+        "bot_user": {
+          "display_name": "Titus",
+          "always_online": true
+        }
+      },
+      "oauth_config": {
+        "scopes": {
+          "bot": [
+            "chat:write",
+            "channels:history",
+            "channels:read",
+            "groups:history",
+            "groups:read",
+            "groups:write",
+            "im:history",
+            "im:read",
+            "im:write",
+            "mpim:history",
+            "mpim:read",
+            "mpim:write",
+            "users:read",
+            "app_mentions:read",
+            "reactions:read",
+            "reactions:write",
+            "pins:read",
+            "pins:write",
+            "emoji:read",
+            "commands",
+            "files:read",
+            "files:write"
+          ]
+        }
+      },
+      "settings": {
+        "event_subscriptions": {
+          "bot_events": [
+            "app_mention",
+            "message.channels",
+            "message.groups",
+            "message.im",
+            "message.mpim",
+            "reaction_added",
+            "reaction_removed",
+            "member_joined_channel",
+            "member_left_channel",
+            "channel_rename",
+            "pin_added",
+            "pin_removed"
+          ]
+        },
+        "socket_mode_enabled": true
+      }
     }
-  },
-  "settings": {
-    "event_subscriptions": {
-      "bot_events": [
-        "app_mention",
-        "message.channels",
-        "message.groups",
-        "message.im",
-        "message.mpim",
-        "reaction_added",
-        "reaction_removed",
-        "member_joined_channel",
-        "member_left_channel",
-        "channel_rename",
-        "pin_added",
-        "pin_removed"
-      ]
-    },
-    "socket_mode_enabled": true
-  }
-}
-```
+    ```
+  </Accordion>
+  <Accordion title="Scout — QA Tester">
+    ```json
+    {
+      "display_information": {
+        "name": "Scout (QA)",
+        "description": "Agent Army — QA Tester agent"
+      },
+      "features": {
+        "bot_user": {
+          "display_name": "Scout",
+          "always_online": true
+        }
+      },
+      "oauth_config": {
+        "scopes": {
+          "bot": [
+            "chat:write",
+            "channels:history",
+            "channels:read",
+            "groups:history",
+            "groups:read",
+            "groups:write",
+            "im:history",
+            "im:read",
+            "im:write",
+            "mpim:history",
+            "mpim:read",
+            "mpim:write",
+            "users:read",
+            "app_mentions:read",
+            "reactions:read",
+            "reactions:write",
+            "pins:read",
+            "pins:write",
+            "emoji:read",
+            "commands",
+            "files:read",
+            "files:write"
+          ]
+        }
+      },
+      "settings": {
+        "event_subscriptions": {
+          "bot_events": [
+            "app_mention",
+            "message.channels",
+            "message.groups",
+            "message.im",
+            "message.mpim",
+            "reaction_added",
+            "reaction_removed",
+            "member_joined_channel",
+            "member_left_channel",
+            "channel_rename",
+            "pin_added",
+            "pin_removed"
+          ]
+        },
+        "socket_mode_enabled": true
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
 
 5. Click **"Create"**
 
