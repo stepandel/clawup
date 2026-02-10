@@ -90,7 +90,7 @@ export default function Home() {
         <div className="flex items-center gap-6">
           <a
             href="https://docs.agent-army.ai"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-primary hover:text-primary/80 transition-colors"
           >
             Docs
           </a>
@@ -98,7 +98,7 @@ export default function Home() {
             href="https://github.com/stepandel/agent-army"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="text-sm text-primary hover:text-primary/80 transition-colors"
           >
             GitHub
           </a>
@@ -328,7 +328,7 @@ export default function Home() {
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+                  className="text-xs text-primary hover:text-primary/80 transition-colors"
                 >
                   {link.label}
                 </a>
