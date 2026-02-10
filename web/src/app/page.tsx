@@ -11,7 +11,7 @@ const agents = [
     colorClass: "text-accent-purple",
     bgClass: "bg-accent-purple-faded",
     borderClass: "hover:border-accent-purple-border",
-    docsUrl: "https://agent-army.dev/architecture/agent-presets#juno-pm",
+    docsUrl: "https://docs.agent-army.ai/architecture/agent-presets#juno-pm",
     description:
       "Breaks down tickets, researches APIs and requirements, sizes work into sub-issues, enriches context, and assigns tasks to the engineering agent.",
     tags: ["Linear", "Ticket Prep", "Planning"],
@@ -23,7 +23,7 @@ const agents = [
     colorClass: "text-accent-blue",
     bgClass: "bg-accent-blue-faded",
     borderClass: "hover:border-accent-blue-border",
-    docsUrl: "https://agent-army.dev/architecture/agent-presets#titus-eng",
+    docsUrl: "https://docs.agent-army.ai/architecture/agent-presets#titus-eng",
     description:
       "Picks up assigned tickets, writes production code via Claude Code, runs builds and tests, creates pull requests, and responds to review feedback.",
     tags: ["Claude Code", "GitHub", "CI/CD"],
@@ -35,7 +35,7 @@ const agents = [
     colorClass: "text-accent-green",
     bgClass: "bg-accent-green-faded",
     borderClass: "hover:border-accent-green-border",
-    docsUrl: "https://agent-army.dev/architecture/agent-presets#scout-qa",
+    docsUrl: "https://docs.agent-army.ai/architecture/agent-presets#scout-qa",
     description:
       "Reviews pull requests against acceptance criteria, runs tests, auto-fixes failures with Claude Code, and labels PRs as approved or needs-work.",
     tags: ["Code Review", "Testing", "QA"],
@@ -113,7 +113,7 @@ export default function Home() {
         </a>
         <div className="flex items-center gap-6">
           <a
-            href="https://agent-army.dev"
+            href="https://docs.agent-army.ai"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Docs
@@ -189,7 +189,7 @@ export default function Home() {
             </a>
           </Button>
           <Button asChild variant="outline" size="lg">
-            <a href="https://agent-army.dev">Read the Docs</a>
+            <a href="https://docs.agent-army.ai">Read the Docs</a>
           </Button>
         </div>
       </section>
@@ -379,7 +379,7 @@ export default function Home() {
               </a>
             </Button>
             <Button asChild variant="outline" size="lg">
-              <a href="https://agent-army.dev">Read the Docs</a>
+              <a href="https://docs.agent-army.ai">Read the Docs</a>
             </Button>
           </div>
         </div>
@@ -401,7 +401,7 @@ export default function Home() {
                   label: "GitHub",
                   href: "https://github.com/stepandel/agent-army",
                 },
-                { label: "Documentation", href: "https://agent-army.dev" },
+                { label: "Documentation", href: "https://docs.agent-army.ai" },
               ].map((link) => (
                 <a
                   key={link.label}
