@@ -8,6 +8,7 @@
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { execSync, spawn, type SpawnOptions } from "child_process";
+import { trackChild } from "../lib/process";
 import type {
   RuntimeAdapter,
   UIAdapter,
@@ -52,8 +53,12 @@ class CLIExecAdapter implements ExecAdapter {
         shell: true,
       };
       const child = spawn(command, args, opts);
+      trackChild(child);
       child.on("close", (code) => resolve(code ?? 1));
-      child.on("error", () => resolve(1));
+      child.on("error", (err) => {
+        console.warn(`[exec] Child process error: ${err.message}`);
+        resolve(1);
+      });
     });
   }
 

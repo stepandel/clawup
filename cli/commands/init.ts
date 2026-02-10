@@ -48,12 +48,21 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(stackName);
 
-  const provider = await p.select({
-    message: "Cloud provider",
-    options: PROVIDERS.map((prov) => ({ value: prov.value, label: prov.label, hint: prov.hint })),
-    initialValue: "aws",
-  });
-  handleCancel(provider);
+  // Only AWS is currently supported (Hetzner coming soon)
+  const implementedProviders = PROVIDERS.filter((prov) => prov.value === "aws");
+  let provider: string;
+  if (implementedProviders.length === 1) {
+    provider = implementedProviders[0].value;
+    p.log.info("Cloud provider: AWS (Hetzner coming soon)");
+  } else {
+    const selected = await p.select({
+      message: "Cloud provider",
+      options: implementedProviders.map((prov) => ({ value: prov.value, label: prov.label, hint: prov.hint })),
+      initialValue: "aws",
+    });
+    handleCancel(selected);
+    provider = selected as string;
+  }
 
   // Provider-specific region/location and instance type selection
   let region: string;

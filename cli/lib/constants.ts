@@ -40,7 +40,7 @@ export const AGENT_ALIASES: Record<string, string> = {
 /** Available cloud providers */
 export const PROVIDERS = [
   { value: "aws", label: "AWS", hint: "Amazon Web Services EC2 instances" },
-  { value: "hetzner", label: "Hetzner", hint: "Hetzner Cloud servers (EU/US)" },
+  { value: "hetzner", label: "Hetzner (coming soon)", hint: "Not yet implemented — use AWS for now" },
 ] as const;
 
 /** Common AWS regions for selection */

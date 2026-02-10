@@ -128,6 +128,12 @@ export interface OpenClawAgentArgs {
    */
   githubToken?: pulumi.Input<string>;
 
+  /**
+   * CIDR blocks allowed SSH access (default: none — use Tailscale).
+   * Only applies when creating a new security group (no securityGroupId provided).
+   * Example: ["1.2.3.4/32"] to restrict to your IP only.
+   */
+  allowedSshCidrs?: pulumi.Input<pulumi.Input<string>[]>;
 }
 
 /**
@@ -338,15 +344,23 @@ export class OpenClawAgent extends pulumi.ComponentResource {
         {
           vpcId: vpcId,
           description: `Security group for OpenClaw agent ${name}`,
-          ingress: [
-            {
-              description: "SSH access (fallback for Tailscale)",
-              fromPort: 22,
-              toPort: 22,
-              protocol: "tcp",
-              cidrBlocks: ["0.0.0.0/0"],
-            },
-          ],
+          // SSH is disabled by default — Tailscale is the primary access method.
+          // Pass allowedSshCidrs to enable SSH from specific IPs as a fallback.
+          ingress: pulumi
+            .output(args.allowedSshCidrs ?? [])
+            .apply((cidrs) =>
+              cidrs.length > 0
+                ? [
+                    {
+                      description: "SSH access (restricted)",
+                      fromPort: 22,
+                      toPort: 22,
+                      protocol: "tcp",
+                      cidrBlocks: cidrs,
+                    },
+                  ]
+                : []
+            ),
           egress: [
             {
               fromPort: 0,
@@ -488,6 +502,12 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           return gzipped.toString("base64");
         }),
         userDataReplaceOnChange: true,
+        // Enforce IMDSv2 to prevent unauthenticated metadata access
+        metadataOptions: {
+          httpTokens: "required",
+          httpEndpoint: "enabled",
+          httpPutResponseHopLimit: 2,
+        },
         rootBlockDevice: {
           volumeSize: volumeSize,
           volumeType: "gp3",

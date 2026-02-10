@@ -140,8 +140,8 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
       }
 
       ui.note(lines.join("\n"), "Agent Details");
-    } catch {
-      // Ignore parse errors
+    } catch (err) {
+      ui.log.warn(`Could not parse stack outputs: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

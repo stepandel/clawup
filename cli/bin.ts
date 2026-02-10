@@ -8,6 +8,7 @@
  */
 
 import { Command } from "commander";
+import { setupGracefulShutdown } from "./lib/process";
 import { initCommand } from "./commands/init";
 import { deployCommand } from "./commands/deploy";
 import { statusCommand } from "./commands/status";
@@ -15,6 +16,9 @@ import { sshCommand } from "./commands/ssh";
 import { validateCommand } from "./commands/validate";
 import { destroyCommand } from "./commands/destroy";
 import { listCommand } from "./commands/list";
+
+// Forward SIGINT/SIGTERM to child processes before exiting
+setupGracefulShutdown();
 
 const program = new Command();
 

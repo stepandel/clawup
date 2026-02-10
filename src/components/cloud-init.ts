@@ -326,6 +326,18 @@ function generateWorkspaceFilesScript(
   ];
 
   for (const [filePath, content] of Object.entries(workspaceFiles)) {
+    // Validate path to prevent directory traversal
+    const normalized = filePath.replace(/\\/g, "/");
+    if (
+      normalized.includes("..") ||
+      normalized.startsWith("/") ||
+      normalized.includes("\0")
+    ) {
+      throw new Error(
+        `Invalid workspace file path: "${filePath}". Paths must be relative and cannot contain "..".`
+      );
+    }
+
     // Escape content for heredoc
     const escapedContent = content.replace(/\\/g, "\\\\").replace(/\$/g, "\\$");
     const fullPath = `/home/ubuntu/.openclaw/workspace/${filePath}`;

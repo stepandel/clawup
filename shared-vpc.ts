@@ -25,6 +25,12 @@ export interface SharedVpcArgs {
   availabilityZone?: pulumi.Input<string>;
 
   /**
+   * CIDR blocks allowed SSH access (default: none — use Tailscale).
+   * Example: ["1.2.3.4/32"] to restrict to your IP only.
+   */
+  allowedSshCidrs?: pulumi.Input<pulumi.Input<string>[]>;
+
+  /**
    * Additional tags to apply to all resources
    */
   tags?: pulumi.Input<Record<string, pulumi.Input<string>>>;
@@ -142,15 +148,23 @@ export class SharedVpc extends pulumi.ComponentResource {
       {
         vpcId: vpc.id,
         description: `Shared security group for ${name} agent fleet`,
-        ingress: [
-          {
-            description: "SSH access (fallback for Tailscale)",
-            fromPort: 22,
-            toPort: 22,
-            protocol: "tcp",
-            cidrBlocks: ["0.0.0.0/0"],
-          },
-        ],
+        // SSH is disabled by default — Tailscale is the primary access method.
+        // Pass allowedSshCidrs to enable SSH from specific IPs as a fallback.
+        ingress: pulumi
+          .output(args.allowedSshCidrs ?? [])
+          .apply((cidrs) =>
+            cidrs.length > 0
+              ? [
+                  {
+                    description: "SSH access (restricted)",
+                    fromPort: 22,
+                    toPort: 22,
+                    protocol: "tcp",
+                    cidrBlocks: cidrs,
+                  },
+                ]
+              : []
+          ),
         egress: [
           {
             description: "All outbound traffic",

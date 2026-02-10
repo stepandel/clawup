@@ -3,6 +3,7 @@
  */
 
 import { execSync, spawn, type SpawnOptions } from "child_process";
+import { trackChild } from "./process";
 
 /** Result of a captured command execution */
 export interface ExecResult {
@@ -44,8 +45,12 @@ export function stream(command: string, args: string[] = [], cwd?: string): Prom
       shell: true,
     };
     const child = spawn(command, args, opts);
+    trackChild(child);
     child.on("close", (code) => resolve(code ?? 1));
-    child.on("error", () => resolve(1));
+    child.on("error", (err) => {
+      console.warn(`[exec] Child process error: ${err.message}`);
+      resolve(1);
+    });
   });
 }
 

@@ -57,7 +57,8 @@ export function loadLegacyManifest(): ArmyManifest | null {
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(raw) as ArmyManifest;
-  } catch {
+  } catch (err) {
+    console.warn(`[config] Failed to load legacy manifest at ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
@@ -134,7 +135,8 @@ export function loadManifest(name: string): ArmyManifest | null {
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(raw) as ArmyManifest;
-  } catch {
+  } catch (err) {
+    console.warn(`[config] Failed to load manifest '${name}' at ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }

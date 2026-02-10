@@ -66,7 +66,8 @@ function listTailscaleDevices(
       name: (d.name as string) ?? "",
       hostname: (d.hostname as string) ?? "",
     }));
-  } catch {
+  } catch (err) {
+    console.warn(`[destroy] Failed to parse Tailscale API response: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
