@@ -10,7 +10,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@agent-army/cli": "workspace:*",
+    "agent-army": "workspace:*",
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/client": "5.22.0",
     "@tailwindcss/postcss": "^4.1.18",

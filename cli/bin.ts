@@ -25,7 +25,7 @@ const program = new Command();
 program
   .name("agent-army")
   .description("Deploy and manage a fleet of OpenClaw AI agents on AWS")
-  .version("0.1.0");
+  .version("0.1.1");
 
 program
   .command("init")
@@ -56,7 +56,7 @@ program
 
 program
   .command("ssh <agent>")
-  .description("SSH to an agent by name or alias (sage, titus, scout)")
+  .description("SSH to an agent by name or alias (juno, titus, scout)")
   .option("-u, --user <user>", "SSH user")
   .option("-c, --config <name>", "Config name (auto-detected if only one)")
   .argument("[command...]", "Command to run on the agent")

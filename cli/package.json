@@ -1,6 +1,6 @@
 {
-  "name": "@agent-army/cli",
-  "version": "0.1.0",
+  "name": "agent-army",
+  "version": "0.1.1",
   "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS",
   "bin": { "agent-army": "dist/bin.js" },
   "files": ["dist"],
@@ -19,8 +19,14 @@
   },
   "engines": { "node": ">=18" },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stepandel/agent-army.git",
+    "directory": "cli"
+  },
+  "homepage": "https://agent-army.ai",
   "exports": {
-    "./lib/constants": "./lib/constants.ts",
-    "./types": "./types.ts"
+    "./lib/constants": "./dist/lib/constants.js",
+    "./types": "./dist/types.js"
   }
 }

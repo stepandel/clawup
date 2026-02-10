@@ -1,4 +1,7 @@
-# Agent Army
+# Agent Army 🪖
+
+[![npm](https://img.shields.io/npm/v/agent-army)](https://www.npmjs.com/package/agent-army)
+[![license](https://img.shields.io/npm/l/agent-army)](./LICENSE)
 
 Deploy a fleet of specialized [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud** — managed entirely from your terminal.
 
@@ -37,7 +40,7 @@ Everything is done through the CLI.
 ### 1. Install
 
 ```bash
-npm install -g @agent-army/cli
+npm install -g agent-army
 ```
 
 ### 2. Run the Setup Wizard

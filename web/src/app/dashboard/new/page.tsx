@@ -10,8 +10,8 @@ import {
   hetznerServerTypes,
   COST_ESTIMATES,
   HETZNER_COST_ESTIMATES,
-} from "@agent-army/cli/lib/constants";
-import type { ArmyManifest, AgentDefinition } from "@agent-army/cli/types";
+} from "agent-army/lib/constants";
+import type { ArmyManifest, AgentDefinition } from "agent-army/types";
 
 const STEPS = [
   "Stack & Provider",
