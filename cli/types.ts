@@ -31,6 +31,12 @@ export interface ArmyManifest {
   region: string;
   instanceType: string;
   ownerName: string;
+  /** Owner timezone (e.g., "America/New_York") */
+  timezone?: string;
+  /** Owner working hours (e.g., "9am-6pm") */
+  workingHours?: string;
+  /** Additional notes about the owner for agents */
+  userNotes?: string;
   agents: AgentDefinition[];
   /** Coding CLIs to install (default: ["claude-code"]) */
   codingClis?: string[];

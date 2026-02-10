@@ -4,17 +4,16 @@
 
 - **Name:** {{OWNER_NAME}}
 - **Role:** Your human, the one who set you up
-- **Contact:** (fill in preferred contact method)
+- **Contact:** Slack (always use Slack as the primary way to reach them)
 
 ## Preferences
 
-- Communication style: (direct/casual/formal)
-- Timezone: (e.g., UTC, America/New_York)
-- Working hours: (e.g., 9am-6pm)
+- Timezone: {{TIMEZONE}}
+- Working hours: {{WORKING_HOURS}}
 
 ## Notes
 
-(Add any context about your human that helps you serve them better)
+{{USER_NOTES}}
 
 ---
 

@@ -39,6 +39,9 @@ interface Manifest {
   region: string;
   instanceType: string;
   ownerName: string;
+  timezone?: string;
+  workingHours?: string;
+  userNotes?: string;
   agents: ManifestAgent[];
   /** Coding CLIs to install (default: ["claude-code"]) */
   codingClis?: string[];
@@ -55,6 +58,9 @@ const tailscaleAuthKey = config.requireSecret("tailscaleAuthKey");
 const tailnetDnsName = config.require("tailnetDnsName");
 const instanceType = config.get("instanceType") ?? "t3.medium";
 const ownerName = config.get("ownerName") ?? "Boss";
+const timezone = config.get("timezone") ?? "PST (America/Los_Angeles)";
+const workingHours = config.get("workingHours") ?? "9am-6pm";
+const userNotes = config.get("userNotes") ?? "No additional notes provided yet.";
 
 // Per-agent Slack credentials from config/ESC
 // Pattern: <role>SlackBotToken, <role>SlackAppToken
@@ -290,11 +296,17 @@ for (const agent of manifest.agents) {
     // Preset agent: load from presets directory
     workspaceFiles = processTemplates(loadPresetFiles(agent.preset), {
       OWNER_NAME: ownerName,
+      TIMEZONE: timezone,
+      WORKING_HOURS: workingHours,
+      USER_NOTES: userNotes,
     });
   } else {
     // Custom agent: load base files + inline content from manifest
     workspaceFiles = processTemplates(loadPresetFiles("base", "base"), {
       OWNER_NAME: ownerName,
+      TIMEZONE: timezone,
+      WORKING_HOURS: workingHours,
+      USER_NOTES: userNotes,
     });
     // Override base files with custom inline content if provided
     if (agent.soulContent) workspaceFiles["SOUL.md"] = agent.soulContent;

@@ -102,12 +102,36 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(ownerName);
 
+  const timezone = await p.text({
+    message: "Your timezone",
+    placeholder: "PST (America/Los_Angeles)",
+    defaultValue: "PST (America/Los_Angeles)",
+  });
+  handleCancel(timezone);
+
+  const workingHours = await p.text({
+    message: "Your working hours",
+    placeholder: "9am-6pm",
+    defaultValue: "9am-6pm",
+  });
+  handleCancel(workingHours);
+
+  const userNotes = await p.text({
+    message: "Any notes for your agents about you? (optional)",
+    placeholder: "e.g., Prefers concise updates, hates unnecessary meetings",
+    defaultValue: "",
+  });
+  handleCancel(userNotes);
+
   const basicConfig = {
     stackName: stackName as string,
     provider: provider as "aws" | "hetzner",
     region,
     instanceType,
     ownerName: ownerName as string,
+    timezone: timezone as string,
+    workingHours: workingHours as string,
+    userNotes: (userNotes as string) || "No additional notes provided yet.",
   };
 
   // Step 3: Collect model providers and secrets
@@ -556,6 +580,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       `${regionLabel.padEnd(14, " ")} ${basicConfig.region}`,
       `Instance type:  ${basicConfig.instanceType}`,
       `Owner:          ${basicConfig.ownerName}`,
+      `Timezone:       ${basicConfig.timezone}`,
+      `Working hours:  ${basicConfig.workingHours}`,
       `Coding CLIs:    ${codingCliNames.join(", ")}`,
       `Model providers: ${providerNames.join(", ")}`,
       `Default model:  ${String(defaultModel)}`,
@@ -608,6 +634,9 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   }
   setConfig("instanceType", basicConfig.instanceType as string);
   setConfig("ownerName", basicConfig.ownerName as string);
+  setConfig("timezone", basicConfig.timezone as string);
+  setConfig("workingHours", basicConfig.workingHours as string);
+  setConfig("userNotes", basicConfig.userNotes as string);
   setConfig("defaultModel", defaultModel as string);
   // Set model API keys for each provider
   for (const [envVar, apiKey] of Object.entries(modelApiKeys)) {
@@ -632,6 +661,9 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     region: basicConfig.region as string,
     instanceType: basicConfig.instanceType as string,
     ownerName: basicConfig.ownerName as string,
+    timezone: basicConfig.timezone as string,
+    workingHours: basicConfig.workingHours as string,
+    userNotes: basicConfig.userNotes as string,
     agents,
     codingClis,
   };
