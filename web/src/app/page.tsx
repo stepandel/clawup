@@ -1,378 +1,396 @@
 "use client";
+
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
+const agents = [
+  {
+    name: "Juno",
+    role: "Product Manager",
+    emoji: "📋",
+    colorClass: "text-accent-purple",
+    bgClass: "bg-accent-purple-faded",
+    borderClass: "hover:border-accent-purple-border",
+    description:
+      "Breaks down tickets, researches APIs and requirements, sizes work into sub-issues, enriches context, and assigns tasks to the engineering agent.",
+    tags: ["Linear", "Ticket Prep", "Planning"],
+  },
+  {
+    name: "Titus",
+    role: "Lead Engineer",
+    emoji: "⚡",
+    colorClass: "text-accent-blue",
+    bgClass: "bg-accent-blue-faded",
+    borderClass: "hover:border-accent-blue-border",
+    description:
+      "Picks up assigned tickets, writes production code via Claude Code, runs builds and tests, creates pull requests, and responds to review feedback.",
+    tags: ["Claude Code", "GitHub", "CI/CD"],
+  },
+  {
+    name: "Scout",
+    role: "QA Engineer",
+    emoji: "🔍",
+    colorClass: "text-accent-green",
+    bgClass: "bg-accent-green-faded",
+    borderClass: "hover:border-accent-green-border",
+    description:
+      "Reviews pull requests against acceptance criteria, runs tests, auto-fixes failures with Claude Code, and labels PRs as approved or needs-work.",
+    tags: ["Code Review", "Testing", "QA"],
+  },
+];
+
+const steps = [
+  {
+    number: "01",
+    title: "Install",
+    command: "npm install -g agent-army",
+    description: "One command to get the CLI on your machine.",
+  },
+  {
+    number: "02",
+    title: "Configure",
+    command: "agent-army init",
+    description: "Interactive wizard sets up your cloud, integrations, and team.",
+  },
+  {
+    number: "03",
+    title: "Deploy",
+    command: "agent-army deploy",
+    description: "Provisions your fleet in minutes. Agents start working immediately.",
+  },
+];
+
+const features = [
+  {
+    icon: "🏗️",
+    title: "Infrastructure as Code",
+    description:
+      "Pulumi-powered deployments on AWS EC2 or Hetzner Cloud. Reproducible, version-controlled, and tear-downable.",
+  },
+  {
+    icon: "🔒",
+    title: "Zero-Trust Access",
+    description:
+      "Every agent is accessible only through Tailscale. No public ports, no exposed APIs. SSH optional.",
+  },
+  {
+    icon: "🔄",
+    title: "Autonomous Heartbeat",
+    description:
+      "Agents run a 1-minute heartbeat loop — checking for new work, updating status, and coordinating with each other.",
+  },
+  {
+    icon: "🔌",
+    title: "Deep Integrations",
+    description:
+      "Native Linear, Slack, and GitHub integration. Agents read tickets, post updates, create PRs, and respond to messages.",
+  },
+  {
+    icon: "🎭",
+    title: "Role-Based Presets",
+    description:
+      "Each agent ships with a tuned personality, tools, and workflow. Customize or create your own roles from scratch.",
+  },
+  {
+    icon: "💰",
+    title: "Cost Effective",
+    description:
+      "Shared VPC, small instance types, and spot-instance ready. Run a full 3-agent team for under $30/month on Hetzner.",
+  },
+];
+
 export default function Home() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#0a0a0a",
-        color: "#e5e5e5",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      {/* Hero Section */}
-      <section
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "120px 40px 80px",
-          textAlign: "center",
-        }}
-      >
-        <h1
-          style={{
-            fontSize: "4rem",
-            fontWeight: "700",
-            marginBottom: "20px",
-            background: "linear-gradient(135deg, #ffffff 0%, #888888 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >
-          Agent Army
+    <div className="min-h-screen overflow-hidden">
+      {/* Nav */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 backdrop-blur-md bg-background/80 border-b border-border">
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="text-xl">🪖</span>
+          <span className="text-base font-bold tracking-tight">Agent Army</span>
+        </Link>
+        <div className="flex items-center gap-6">
+          <a
+            href="https://agent-army.dev"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Docs
+          </a>
+          <a
+            href="https://github.com/stepandel/agent-army"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            GitHub
+          </a>
+          <Link
+            href="/login"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Log in
+          </Link>
+          <Button asChild size="sm">
+            <Link href="/dashboard">Dashboard</Link>
+          </Button>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <section className="relative max-w-4xl mx-auto px-8 pt-44 pb-24 text-center">
+        {/* Background glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[60%] w-[600px] h-[400px] bg-[radial-gradient(ellipse,_rgba(59,130,246,0.12)_0%,_transparent_70%)] pointer-events-none" />
+
+        <div className="animate-fade-in-up">
+          <Badge
+            variant="outline"
+            className="mb-7 px-4 py-1.5 text-xs font-medium text-primary border-primary/30 bg-primary/8"
+          >
+            Open source &middot; Deploy in minutes
+          </Badge>
+        </div>
+
+        <h1 className="animate-fade-in-up-1 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[1.1] tracking-tighter mb-6 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
+          Your AI dev team,
+          <br />
+          deployed in minutes
         </h1>
-        <p
-          style={{
-            fontSize: "1.5rem",
-            color: "#a3a3a3",
-            maxWidth: "800px",
-            margin: "0 auto",
-            lineHeight: "1.6",
-          }}
-        >
-          Deploy a fleet of specialized AI agents on AWS or Hetzner Cloud — managed entirely from your terminal.
+
+        <p className="animate-fade-in-up-2 text-[clamp(1rem,2vw,1.25rem)] text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
+          A PM, an engineer, and a QA tester — each running on their own cloud
+          instance, coordinating through Linear, Slack, and GitHub.
         </p>
+
+        <div className="animate-fade-in-up-3 flex justify-center gap-4 flex-wrap">
+          <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
+            <Link href="/dashboard/new">Deploy Now</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <a
+              href="https://github.com/stepandel/agent-army"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View on GitHub
+            </a>
+          </Button>
+        </div>
       </section>
 
-      {/* Quick Start Section */}
-      <section
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "60px 40px",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "2.5rem",
-            fontWeight: "600",
-            marginBottom: "40px",
-            textAlign: "center",
-          }}
-        >
-          Quick Start
-        </h2>
-        <div
-          style={{
-            backgroundColor: "#1a1a1a",
-            border: "1px solid #333",
-            borderRadius: "12px",
-            padding: "40px",
-            maxWidth: "800px",
-            margin: "0 auto",
-          }}
-        >
-          <div style={{ marginBottom: "30px" }}>
-            <h3
-              style={{
-                fontSize: "1.2rem",
-                color: "#d4d4d4",
-                marginBottom: "12px",
-                fontWeight: "500",
-              }}
-            >
-              1. Install the CLI
-            </h3>
-            <code
-              style={{
-                display: "block",
-                backgroundColor: "#0a0a0a",
-                padding: "16px 20px",
-                borderRadius: "8px",
-                fontSize: "0.95rem",
-                color: "#10b981",
-                border: "1px solid #262626",
-                fontFamily: "monospace",
-              }}
-            >
-              npm install -g @agent-army/cli
-            </code>
+      {/* Terminal Preview */}
+      <section className="max-w-2xl mx-auto mb-24 px-8">
+        <div className="animate-fade-in-up-3 bg-[#0c0c0c] border border-border rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
+          {/* Title bar */}
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+            <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
+            <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
+            <div className="w-3 h-3 rounded-full bg-[#28c840]" />
+            <span className="ml-2 text-xs text-muted-foreground">Terminal</span>
           </div>
-
-          <div style={{ marginBottom: "30px" }}>
-            <h3
-              style={{
-                fontSize: "1.2rem",
-                color: "#d4d4d4",
-                marginBottom: "12px",
-                fontWeight: "500",
-              }}
-            >
-              2. Run the Setup Wizard
-            </h3>
-            <code
-              style={{
-                display: "block",
-                backgroundColor: "#0a0a0a",
-                padding: "16px 20px",
-                borderRadius: "8px",
-                fontSize: "0.95rem",
-                color: "#10b981",
-                border: "1px solid #262626",
-                fontFamily: "monospace",
-              }}
-            >
-              agent-army init
-            </code>
-          </div>
-
-          <div>
-            <h3
-              style={{
-                fontSize: "1.2rem",
-                color: "#d4d4d4",
-                marginBottom: "12px",
-                fontWeight: "500",
-              }}
-            >
-              3. Deploy Your Team
-            </h3>
-            <code
-              style={{
-                display: "block",
-                backgroundColor: "#0a0a0a",
-                padding: "16px 20px",
-                borderRadius: "8px",
-                fontSize: "0.95rem",
-                color: "#10b981",
-                border: "1px solid #262626",
-                fontFamily: "monospace",
-              }}
-            >
-              agent-army deploy
-            </code>
+          {/* Content */}
+          <div className="p-6 font-mono text-sm leading-8">
+            <div>
+              <span className="text-accent-emerald">$</span>{" "}
+              <span className="text-foreground">agent-army deploy</span>
+            </div>
+            <div className="text-muted-foreground">
+              Deploying 3 agents to Hetzner (nbg1)...
+            </div>
+            <div>
+              <span className="text-accent-purple">&#x2713;</span>{" "}
+              <span className="text-muted-foreground">Juno (PM) — </span>
+              <span className="text-accent-purple">ready</span>
+            </div>
+            <div>
+              <span className="text-accent-blue">&#x2713;</span>{" "}
+              <span className="text-muted-foreground">Titus (Eng) — </span>
+              <span className="text-accent-blue">ready</span>
+            </div>
+            <div>
+              <span className="text-accent-green">&#x2713;</span>{" "}
+              <span className="text-muted-foreground">Scout (QA) — </span>
+              <span className="text-accent-green">ready</span>
+            </div>
+            <div className="mt-1">
+              <span className="text-accent-emerald">$</span>{" "}
+              <span className="text-muted-foreground">
+                <span className="animate-pulse-glow">▊</span>
+              </span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Team Section */}
-      <section
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "60px 40px",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "2.5rem",
-            fontWeight: "600",
-            marginBottom: "40px",
-            textAlign: "center",
-          }}
-        >
-          Meet Your Team
-        </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "30px",
-          }}
-        >
-          {/* Juno - PM */}
-          <div
-            style={{
-              backgroundColor: "#1a1a1a",
-              border: "1px solid #333",
-              borderRadius: "12px",
-              padding: "30px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "1.8rem",
-                marginBottom: "10px",
-                color: "#ffffff",
-              }}
-            >
-              Juno
-            </h3>
-            <p
-              style={{
-                fontSize: "1rem",
-                color: "#6b7280",
-                marginBottom: "15px",
-                fontWeight: "500",
-              }}
-            >
-              Product Manager
-            </p>
-            <p
-              style={{
-                fontSize: "1rem",
-                color: "#a3a3a3",
-                lineHeight: "1.6",
-              }}
-            >
-              Breaks down tickets, researches requirements, plans and sequences work, tracks progress, and unblocks teams.
-            </p>
-          </div>
+      {/* Meet the Team */}
+      <section className="max-w-5xl mx-auto px-8 py-20">
+        <div className="text-center mb-14">
+          <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold tracking-tight mb-4">
+            Three agents. One workflow.
+          </h2>
+          <p className="text-base text-muted-foreground max-w-lg mx-auto">
+            Each agent has a specialized role, its own cloud instance, and a
+            heartbeat loop that runs every 60 seconds.
+          </p>
+        </div>
 
-          {/* Titus - Engineer */}
-          <div
-            style={{
-              backgroundColor: "#1a1a1a",
-              border: "1px solid #333",
-              borderRadius: "12px",
-              padding: "30px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "1.8rem",
-                marginBottom: "10px",
-                color: "#ffffff",
-              }}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {agents.map((agent) => (
+            <div
+              key={agent.name}
+              className={`group rounded-2xl border border-border bg-card/30 p-7 transition-all duration-250 hover:bg-card/60 ${agent.borderClass}`}
             >
-              Titus
-            </h3>
-            <p
-              style={{
-                fontSize: "1rem",
-                color: "#6b7280",
-                marginBottom: "15px",
-                fontWeight: "500",
-              }}
-            >
-              Engineer
-            </p>
-            <p
-              style={{
-                fontSize: "1rem",
-                color: "#a3a3a3",
-                lineHeight: "1.6",
-              }}
-            >
-              Picks up tickets, writes code via Claude Code, builds and tests, creates PRs, and responds to reviews.
-            </p>
-          </div>
+              <div className="flex items-center gap-3.5 mb-4">
+                <div
+                  className={`w-12 h-12 rounded-xl ${agent.bgClass} flex items-center justify-center text-[22px] transition-transform duration-250 group-hover:scale-110`}
+                >
+                  {agent.emoji}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {agent.name}
+                  </h3>
+                  <span className={`text-xs font-medium ${agent.colorClass}`}>
+                    {agent.role}
+                  </span>
+                </div>
+              </div>
 
-          {/* Scout - QA */}
-          <div
-            style={{
-              backgroundColor: "#1a1a1a",
-              border: "1px solid #333",
-              borderRadius: "12px",
-              padding: "30px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: "1.8rem",
-                marginBottom: "10px",
-                color: "#ffffff",
-              }}
+              <p className="text-sm text-muted-foreground leading-relaxed mb-5">
+                {agent.description}
+              </p>
+
+              <div className="flex flex-wrap gap-1.5">
+                {agent.tags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="text-[11px] font-medium text-muted-foreground bg-card/50 border-border"
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="max-w-3xl mx-auto px-8 py-20">
+        <div className="text-center mb-14">
+          <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold tracking-tight mb-4">
+            Up and running in 3 steps
+          </h2>
+          <p className="text-base text-muted-foreground max-w-md mx-auto">
+            From zero to a fully autonomous dev team in under 10 minutes.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {steps.map((step) => (
+            <div
+              key={step.number}
+              className="group flex items-center gap-7 px-8 py-7 rounded-xl border border-border bg-card/30 transition-all duration-200 hover:bg-card/60 hover:border-primary/30"
             >
-              Scout
-            </h3>
-            <p
-              style={{
-                fontSize: "1rem",
-                color: "#6b7280",
-                marginBottom: "15px",
-                fontWeight: "500",
-              }}
+              <span className="text-3xl font-extrabold text-border/80 tabular-nums shrink-0 w-13 transition-colors duration-200 group-hover:text-primary">
+                {step.number}
+              </span>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-foreground mb-1">
+                  {step.title}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {step.description}
+                </p>
+              </div>
+              <code className="text-xs font-mono text-accent-emerald bg-accent-emerald/6 border border-accent-emerald/12 px-4 py-2 rounded-lg whitespace-nowrap shrink-0">
+                {step.command}
+              </code>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="max-w-5xl mx-auto px-8 py-20">
+        <div className="text-center mb-14">
+          <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold tracking-tight mb-4">
+            Built for real workflows
+          </h2>
+          <p className="text-base text-muted-foreground max-w-md mx-auto">
+            Not a toy. Production-grade infrastructure for autonomous AI agents.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {features.map((feature) => (
+            <div
+              key={feature.title}
+              className="p-7 rounded-xl border border-border bg-card/30"
             >
-              QA Tester
-            </p>
-            <p
-              style={{
-                fontSize: "1rem",
-                color: "#a3a3a3",
-                lineHeight: "1.6",
-              }}
-            >
-              Reviews PRs, tests happy/sad/edge cases, files bugs, and verifies fixes.
-            </p>
+              <div className="text-3xl mb-3.5">{feature.icon}</div>
+              <h3 className="text-base font-semibold text-foreground mb-2">
+                {feature.title}
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {feature.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="max-w-2xl mx-auto px-8 pt-20 pb-28 text-center">
+        <div className="p-16 rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/6 to-accent-purple/4">
+          <h2 className="text-[clamp(1.5rem,3vw,2.2rem)] font-bold tracking-tight mb-4">
+            Ready to deploy your team?
+          </h2>
+          <p className="text-base text-muted-foreground max-w-md mx-auto mb-8">
+            Get a PM, engineer, and QA tester running on your cloud in under 10
+            minutes. Open source, always.
+          </p>
+          <div className="flex justify-center gap-4 flex-wrap">
+            <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
+              <Link href="/dashboard/new">Get Started</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <a href="https://agent-army.dev">Read the Docs</a>
+            </Button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer
-        style={{
-          borderTop: "1px solid `#262626`",
-          marginTop: "80px",
-          padding: "40px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
-            display: "flex",
-            justifyContent: "center",
-            gap: "40px",
-            flexWrap: "wrap",
-          }}
-        >
-          <a
-            href="https://github.com/stepandel/agent-army"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: "#a3a3a3",
-              textDecoration: "none",
-              fontSize: "1rem",
-              transition: "color 0.2s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#a3a3a3")}
-          >
-            GitHub
-          </a>
-          <a
-            href="https://github.com/stepandel/agent-army#readme"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: "#a3a3a3",
-              textDecoration: "none",
-              fontSize: "1rem",
-              transition: "color 0.2s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#a3a3a3")}
-          >
-            Documentation
-          </a>
-          <a
-            href="https://openclaw.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: "#a3a3a3",
-              textDecoration: "none",
-              fontSize: "1rem",
-              transition: "color 0.2s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#a3a3a3")}
-          >
-            OpenClaw
-          </a>
+      <footer className="border-t border-border px-8 py-10">
+        <div className="max-w-5xl mx-auto flex justify-between items-center flex-wrap gap-5">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base">🪖</span>
+            <span className="text-sm font-semibold text-muted-foreground">
+              Agent Army
+            </span>
+          </div>
+          <div className="flex gap-7 flex-wrap">
+            {[
+              {
+                label: "GitHub",
+                href: "https://github.com/stepandel/agent-army",
+              },
+              { label: "Documentation", href: "https://agent-army.dev" },
+              { label: "OpenClaw", href: "https://openclaw.ai" },
+            ].map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
         </div>
-        <p
-          style={{
-            textAlign: "center",
-            color: "#6b7280",
-            fontSize: "0.875rem",
-            marginTop: "30px",
-          }}
-        >
-          Powered by OpenClaw AI agents
-        </p>
       </footer>
     </div>
   );

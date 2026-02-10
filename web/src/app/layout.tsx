@@ -1,4 +1,5 @@
 import { Providers } from "@/components/providers";
+import "./globals.css";
 
 export const metadata = {
   title: "Agent Army",
