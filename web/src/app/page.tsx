@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -12,6 +11,7 @@ const agents = [
     colorClass: "text-accent-purple",
     bgClass: "bg-accent-purple-faded",
     borderClass: "hover:border-accent-purple-border",
+    docsUrl: "https://agent-army.dev/architecture/agent-presets#juno-pm",
     description:
       "Breaks down tickets, researches APIs and requirements, sizes work into sub-issues, enriches context, and assigns tasks to the engineering agent.",
     tags: ["Linear", "Ticket Prep", "Planning"],
@@ -23,6 +23,7 @@ const agents = [
     colorClass: "text-accent-blue",
     bgClass: "bg-accent-blue-faded",
     borderClass: "hover:border-accent-blue-border",
+    docsUrl: "https://agent-army.dev/architecture/agent-presets#titus-eng",
     description:
       "Picks up assigned tickets, writes production code via Claude Code, runs builds and tests, creates pull requests, and responds to review feedback.",
     tags: ["Claude Code", "GitHub", "CI/CD"],
@@ -34,6 +35,7 @@ const agents = [
     colorClass: "text-accent-green",
     bgClass: "bg-accent-green-faded",
     borderClass: "hover:border-accent-green-border",
+    docsUrl: "https://agent-army.dev/architecture/agent-presets#scout-qa",
     description:
       "Reviews pull requests against acceptance criteria, runs tests, auto-fixes failures with Claude Code, and labels PRs as approved or needs-work.",
     tags: ["Code Review", "Testing", "QA"],
@@ -105,10 +107,10 @@ export default function Home() {
     <div className="min-h-screen overflow-hidden">
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 backdrop-blur-md bg-background/80 border-b border-border">
-        <Link href="/" className="flex items-center gap-2.5">
+        <a href="/" className="flex items-center gap-2.5">
           <span className="text-xl">🪖</span>
           <span className="text-base font-bold tracking-tight">Agent Army</span>
-        </Link>
+        </a>
         <div className="flex items-center gap-6">
           <a
             href="https://agent-army.dev"
@@ -124,15 +126,6 @@ export default function Home() {
           >
             GitHub
           </a>
-          <Link
-            href="/login"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Log in
-          </Link>
-          <Button asChild size="sm">
-            <Link href="/dashboard">Dashboard</Link>
-          </Button>
         </div>
       </nav>
 
@@ -161,9 +154,24 @@ export default function Home() {
           instance, coordinating through Linear, Slack, and GitHub.
         </p>
 
+        {/* Install command */}
+        <div className="animate-fade-in-up-3 max-w-md mx-auto mb-10">
+          <div className="flex items-center gap-3 px-6 py-4 rounded-xl bg-[#0c0c0c] border border-border font-mono text-sm">
+            <span className="text-accent-emerald">$</span>
+            <code className="text-foreground flex-1 text-left">npm install -g agent-army</code>
+            <button
+              onClick={() => navigator.clipboard.writeText("npm install -g agent-army")}
+              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              title="Copy to clipboard"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            </button>
+          </div>
+        </div>
+
         <div className="animate-fade-in-up-3 flex justify-center gap-4 flex-wrap">
           <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
-            <Link href="/dashboard/new">Deploy Now</Link>
+            <a href="https://agent-army.dev/quickstart">Get Started</a>
           </Button>
           <Button asChild variant="outline" size="lg">
             <a
@@ -235,9 +243,10 @@ export default function Home() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {agents.map((agent) => (
-            <div
+            <a
               key={agent.name}
-              className={`group rounded-2xl border border-border bg-card/30 p-7 transition-all duration-250 hover:bg-card/60 ${agent.borderClass}`}
+              href={agent.docsUrl}
+              className={`group block rounded-2xl border border-border bg-card/30 p-7 transition-all duration-250 hover:bg-card/60 ${agent.borderClass}`}
             >
               <div className="flex items-center gap-3.5 mb-4">
                 <div
@@ -270,7 +279,7 @@ export default function Home() {
                   </Badge>
                 ))}
               </div>
-            </div>
+            </a>
           ))}
         </div>
       </section>
@@ -352,7 +361,7 @@ export default function Home() {
           </p>
           <div className="flex justify-center gap-4 flex-wrap">
             <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
-              <Link href="/dashboard/new">Get Started</Link>
+              <a href="https://agent-army.dev/quickstart">Get Started</a>
             </Button>
             <Button asChild variant="outline" size="lg">
               <a href="https://agent-army.dev">Read the Docs</a>
@@ -363,32 +372,43 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-border px-8 py-10">
-        <div className="max-w-5xl mx-auto flex justify-between items-center flex-wrap gap-5">
-          <div className="flex items-center gap-2.5">
-            <span className="text-base">🪖</span>
-            <span className="text-sm font-semibold text-muted-foreground">
-              Agent Army
-            </span>
+        <div className="max-w-5xl mx-auto flex flex-col gap-6">
+          <div className="flex justify-between items-center flex-wrap gap-5">
+            <div className="flex items-center gap-2.5">
+              <span className="text-base">🪖</span>
+              <span className="text-sm font-semibold text-muted-foreground">
+                Agent Army
+              </span>
+            </div>
+            <div className="flex gap-7 flex-wrap">
+              {[
+                {
+                  label: "GitHub",
+                  href: "https://github.com/stepandel/agent-army",
+                },
+                { label: "Documentation", href: "https://agent-army.dev" },
+              ].map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-7 flex-wrap">
-            {[
-              {
-                label: "GitHub",
-                href: "https://github.com/stepandel/agent-army",
-              },
-              { label: "Documentation", href: "https://agent-army.dev" },
-              { label: "OpenClaw", href: "https://openclaw.ai" },
-            ].map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
+          <div className="text-center">
+            <a
+              href="https://openclaw.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              Powered by OpenClaw 🦞
+            </a>
           </div>
         </div>
       </footer>
