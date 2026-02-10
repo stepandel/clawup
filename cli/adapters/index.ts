@@ -37,3 +37,12 @@ export type {
 
 // Export CLI adapter
 export { createCLIAdapter, cliAdapter } from "./cli-adapter";
+
+// Export API adapter
+export {
+  createAPIAdapter,
+  APIAdapterNeedsInputError,
+  APIAdapterValidationError,
+  APIAdapterCancelError,
+} from "./api-adapter";
+export type { FieldDescriptor, LogEntry, APIResponse } from "./api-adapter";
