@@ -123,6 +123,26 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(userNotes);
 
+  // Project-specific config for bootstrap
+  const linearTeam = await p.text({
+    message: "Linear team key (used in bootstrap integration check)",
+    placeholder: "e.g., ENG, AGE, PROJ",
+    validate: (val) => {
+      if (!val) return "Linear team key is required";
+    },
+  });
+  handleCancel(linearTeam);
+
+  const githubRepo = await p.text({
+    message: "GitHub repo URL (used in bootstrap integration check)",
+    placeholder: "https://github.com/org/repo",
+    validate: (val) => {
+      if (!val) return "GitHub repo URL is required";
+      if (!val.startsWith("https://github.com/")) return "Must be a GitHub HTTPS URL";
+    },
+  });
+  handleCancel(githubRepo);
+
   const basicConfig = {
     stackName: stackName as string,
     provider: provider as "aws" | "hetzner",
@@ -132,6 +152,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     timezone: timezone as string,
     workingHours: workingHours as string,
     userNotes: (userNotes as string) || "No additional notes provided yet.",
+    linearTeam: linearTeam as string,
+    githubRepo: githubRepo as string,
   };
 
   // Step 3: Collect model providers and secrets
@@ -582,6 +604,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       `Owner:          ${basicConfig.ownerName}`,
       `Timezone:       ${basicConfig.timezone}`,
       `Working hours:  ${basicConfig.workingHours}`,
+      `Linear team:    ${basicConfig.linearTeam}`,
+      `GitHub repo:    ${basicConfig.githubRepo}`,
       `Coding CLIs:    ${codingCliNames.join(", ")}`,
       `Model providers: ${providerNames.join(", ")}`,
       `Default model:  ${String(defaultModel)}`,
@@ -637,6 +661,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   setConfig("timezone", basicConfig.timezone as string);
   setConfig("workingHours", basicConfig.workingHours as string);
   setConfig("userNotes", basicConfig.userNotes as string);
+  setConfig("linearTeam", basicConfig.linearTeam as string);
+  setConfig("githubRepo", basicConfig.githubRepo as string);
   setConfig("defaultModel", defaultModel as string);
   // Set model API keys for each provider
   for (const [envVar, apiKey] of Object.entries(modelApiKeys)) {
@@ -664,6 +690,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     timezone: basicConfig.timezone as string,
     workingHours: basicConfig.workingHours as string,
     userNotes: basicConfig.userNotes as string,
+    linearTeam: basicConfig.linearTeam as string,
+    githubRepo: basicConfig.githubRepo as string,
     agents,
     codingClis,
   };

@@ -37,6 +37,10 @@ export interface ArmyManifest {
   workingHours?: string;
   /** Additional notes about the owner for agents */
   userNotes?: string;
+  /** Linear team key for bootstrap integration checks (e.g., "AGE") */
+  linearTeam?: string;
+  /** GitHub repo URL for bootstrap integration checks */
+  githubRepo?: string;
   agents: AgentDefinition[];
   /** Coding CLIs to install (default: ["claude-code"]) */
   codingClis?: string[];

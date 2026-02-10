@@ -42,6 +42,8 @@ interface Manifest {
   timezone?: string;
   workingHours?: string;
   userNotes?: string;
+  linearTeam?: string;
+  githubRepo?: string;
   agents: ManifestAgent[];
   /** Coding CLIs to install (default: ["claude-code"]) */
   codingClis?: string[];
@@ -61,6 +63,8 @@ const ownerName = config.get("ownerName") ?? "Boss";
 const timezone = config.get("timezone") ?? "PST (America/Los_Angeles)";
 const workingHours = config.get("workingHours") ?? "9am-6pm";
 const userNotes = config.get("userNotes") ?? "No additional notes provided yet.";
+const linearTeam = config.get("linearTeam") ?? "";
+const githubRepo = config.get("githubRepo") ?? "";
 
 // Per-agent Slack credentials from config/ESC
 // Pattern: <role>SlackBotToken, <role>SlackAppToken
@@ -299,6 +303,8 @@ for (const agent of manifest.agents) {
       TIMEZONE: timezone,
       WORKING_HOURS: workingHours,
       USER_NOTES: userNotes,
+      LINEAR_TEAM: linearTeam,
+      GITHUB_REPO: githubRepo,
     });
   } else {
     // Custom agent: load base files + inline content from manifest
@@ -307,6 +313,8 @@ for (const agent of manifest.agents) {
       TIMEZONE: timezone,
       WORKING_HOURS: workingHours,
       USER_NOTES: userNotes,
+      LINEAR_TEAM: linearTeam,
+      GITHUB_REPO: githubRepo,
     });
     // Override base files with custom inline content if provided
     if (agent.soulContent) workspaceFiles["SOUL.md"] = agent.soulContent;
