@@ -69,12 +69,29 @@ export const INSTANCE_TYPES = [
   { value: "t3.large", label: "t3.large — 2 vCPU, 8 GB (~$60/mo)" },
 ];
 
-/** Hetzner server types */
-export const HETZNER_SERVER_TYPES = [
+/** Hetzner server types — EU locations (cx shared vCPU) */
+export const HETZNER_SERVER_TYPES_EU = [
   { value: "cx22", label: "cx22 — 2 vCPU, 4 GB (~$4/mo)" },
   { value: "cx32", label: "cx32 — 4 vCPU, 8 GB (~$7/mo)" },
   { value: "cx42", label: "cx42 — 8 vCPU, 16 GB (~$14/mo)" },
 ];
+
+/** Hetzner server types — US locations (cpx shared vCPU, cx not available) */
+export const HETZNER_SERVER_TYPES_US = [
+  { value: "cpx21", label: "cpx21 — 3 vCPU, 4 GB (~$5/mo)" },
+  { value: "cpx31", label: "cpx31 — 4 vCPU, 8 GB (~$9/mo)" },
+  { value: "cpx41", label: "cpx41 — 8 vCPU, 16 GB (~$16/mo)" },
+];
+
+/** US Hetzner locations (cx types not available) */
+export const HETZNER_US_LOCATIONS = ["ash", "hil"];
+
+/** Get server type options for a Hetzner location */
+export function hetznerServerTypes(location: string) {
+  return HETZNER_US_LOCATIONS.includes(location)
+    ? HETZNER_SERVER_TYPES_US
+    : HETZNER_SERVER_TYPES_EU;
+}
 
 /** Default SSH user for agent instances (Ubuntu 24.04 AMI default) */
 export const SSH_USER = "ubuntu";
@@ -91,6 +108,9 @@ export const HETZNER_COST_ESTIMATES: Record<string, number> = {
   cx22: 4,
   cx32: 7,
   cx42: 14,
+  cpx21: 5,
+  cpx31: 9,
+  cpx41: 16,
 };
 
 /** Manifest filename */

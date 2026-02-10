@@ -11,7 +11,7 @@ import {
   AWS_REGIONS,
   HETZNER_LOCATIONS,
   INSTANCE_TYPES,
-  HETZNER_SERVER_TYPES,
+  hetznerServerTypes,
   COST_ESTIMATES,
   HETZNER_COST_ESTIMATES,
   KEY_INSTRUCTIONS,
@@ -84,10 +84,11 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     handleCancel(hetznerLocation);
     region = hetznerLocation as string;
 
+    const serverTypeOptions = hetznerServerTypes(region);
     const hetznerServerType = await p.select({
       message: "Default server type",
-      options: HETZNER_SERVER_TYPES,
-      initialValue: "cx22",
+      options: serverTypeOptions,
+      initialValue: serverTypeOptions[0].value,
     });
     handleCancel(hetznerServerType);
     instanceType = hetznerServerType as string;

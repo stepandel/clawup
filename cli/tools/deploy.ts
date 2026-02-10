@@ -5,8 +5,8 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
-import { loadManifest, resolveConfigName } from "../lib/config";
-import { COST_ESTIMATES } from "../lib/constants";
+import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
+import { COST_ESTIMATES, HETZNER_COST_ESTIMATES } from "../lib/constants";
 import pc from "picocolors";
 
 export interface DeployOptions {
@@ -76,7 +76,8 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
 
   // Calculate estimated cost
   const totalCost = manifest.agents.reduce((sum, a) => {
-    return sum + (COST_ESTIMATES[a.instanceType ?? manifest.instanceType] ?? 30);
+    const costs = manifest.provider === "hetzner" ? HETZNER_COST_ESTIMATES : COST_ESTIMATES;
+      return sum + (costs[a.instanceType ?? manifest.instanceType] ?? 30);
   }, 0);
 
   // Show deployment summary
@@ -102,6 +103,12 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
       ui.cancel("Deployment cancelled.");
     }
   }
+
+  // Sync manifest to project root so the Pulumi program can read it
+  syncManifestToProject(configName);
+
+  // Sync instanceType from manifest to Pulumi config
+  exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType]);
 
   // Deploy
   ui.log.step("Running pulumi up...");

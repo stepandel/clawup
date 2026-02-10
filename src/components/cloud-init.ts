@@ -3,6 +3,7 @@
  * Generates the user-data script for EC2 instance provisioning
  */
 
+import * as zlib from "zlib";
 import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions } from "./config-generator";
 
 export interface CloudInitConfig {
@@ -333,15 +334,13 @@ function generateWorkspaceFilesScript(
       );
     }
 
-    // Escape content for heredoc
-    const escapedContent = content.replace(/\\/g, "\\\\").replace(/\$/g, "\\$");
     const fullPath = `/home/ubuntu/.openclaw/workspace/${filePath}`;
     const dirPath = fullPath.substring(0, fullPath.lastIndexOf("/"));
 
+    // Gzip + base64 encode to stay within Hetzner's 32KB user_data limit
+    const compressed = zlib.gzipSync(Buffer.from(content, "utf-8")).toString("base64");
     lines.push(`mkdir -p "${dirPath}"`);
-    lines.push(`cat > "${fullPath}" << 'WORKSPACE_FILE_EOF'`);
-    lines.push(escapedContent);
-    lines.push("WORKSPACE_FILE_EOF");
+    lines.push(`echo "${compressed}" | base64 -d | gunzip > "${fullPath}"`);
   }
 
   lines.push('chown -R ubuntu:ubuntu /home/ubuntu/.openclaw/workspace');

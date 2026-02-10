@@ -5,7 +5,7 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
-import { loadManifest, resolveConfigName } from "../lib/config";
+import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
 import { tailscaleHostname } from "../lib/constants";
 import pc from "picocolors";
 
@@ -165,6 +165,9 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
       ui.cancel("Destruction cancelled.");
     }
   }
+
+  // Sync manifest to project root so the Pulumi program can read it
+  syncManifestToProject(configName);
 
   // Destroy infrastructure
   ui.log.step("Running pulumi destroy...");
