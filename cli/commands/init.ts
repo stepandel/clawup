@@ -366,18 +366,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // Step 5: Configure integrations
   p.log.step("Configure integrations");
 
-  // Slack and Linear are always required
-  const integrations: string[] = ["slack", "linear"];
-
-  // GitHub is optional
-  const addGithub = await p.confirm({
-    message: "Configure GitHub CLI? (optional)",
-    initialValue: false,
-  });
-  handleCancel(addGithub);
-  if (addGithub) {
-    integrations.push("github");
-  }
+  // Required integrations
+  const integrations: string[] = ["slack", "linear", "github"];
 
   // Per-agent integration credentials
   const integrationCredentials: Record<string, {
@@ -458,21 +448,17 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     );
 
     for (const agent of agents) {
-      const githubKey = await p.text({
-        message: `GitHub token for ${agent.displayName} (${agent.role}) — press Enter to skip`,
-        placeholder: "ghp_... or github_pat_... (optional)",
-        defaultValue: "",
+      const githubKey = await p.password({
+        message: `GitHub token for ${agent.displayName} (${agent.role})`,
         validate: (val) => {
-          if (val && !val.startsWith("ghp_") && !val.startsWith("github_pat_")) {
-            return "Must start with ghp_ or github_pat_ (or leave empty to skip)";
+          if (!val.startsWith("ghp_") && !val.startsWith("github_pat_")) {
+            return "Must start with ghp_ or github_pat_";
           }
         },
       });
       handleCancel(githubKey);
 
-      if (githubKey) {
-        integrationCredentials[agent.role].githubToken = githubKey as string;
-      }
+      integrationCredentials[agent.role].githubToken = githubKey as string;
     }
   }
 

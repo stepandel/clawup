@@ -187,14 +187,13 @@ export const KEY_INSTRUCTIONS = {
     ],
   },
   githubToken: {
-    title: "GitHub Token (optional)",
+    title: "GitHub Token",
     steps: [
       "To get a GitHub personal access token for gh CLI:",
       "1. Go to https://github.com/settings/tokens?type=beta",
       "2. Click \"Generate new token\" → Fine-grained token",
       "3. Select repositories, set expiration, and permissions (e.g., repo, read:org)",
       "4. Copy the token (starts with github_pat_ or ghp_)",
-      "5. Press Enter to skip if not needed",
     ],
   },
   hcloudToken: {
