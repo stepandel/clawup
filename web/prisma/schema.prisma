@@ -18,6 +18,8 @@ model User {
   updatedAt      DateTime  @updatedAt
   sessions       Session[]
   accounts       Account[]
+  credentials    Credential[]
+  deployments    Deployment[]
 }
 
 model Account {
@@ -53,4 +55,39 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Credential {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // "aws" | "hetzner" | "anthropic" | "tailscale"
+  label        String   // User-defined label
+  encryptedData String  // AES-256-GCM encrypted JSON blob
+  iv           String   // Initialization vector (hex)
+  authTag      String   // GCM auth tag (hex)
+  lastFour     String   // Last 4 chars of primary key for display
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deployments Deployment[]
+}
+
+model Deployment {
+  id           String   @id @default(cuid())
+  userId       String
+  credentialId String
+  stackName    String
+  manifest     String   // Full ArmyManifest JSON
+  status       String   @default("queued") // queued | running | success | failed
+  logs         String   @default("") // Deployment logs
+  errorMessage String?
+  pulumiStack  String?  // Pulumi stack identifier
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credential Credential @relation(fields: [credentialId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, stackName])
 }
