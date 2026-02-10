@@ -223,6 +223,15 @@ linear_api_key = os.environ.get("LINEAR_API_KEY", "")
 if linear_api_key:
     config["env"]["LINEAR_API_KEY"] = linear_api_key
     print("Added LINEAR_API_KEY to environment variables")
+
+# Configure heartbeat (proactive mode)
+config.setdefault("agents", {})
+config["agents"].setdefault("defaults", {})
+config["agents"]["defaults"]["heartbeat"] = {
+    "every": "1m",
+    "session": "main"
+}
+print("Configured heartbeat: every 1m")
 ${slackChannelConfig}${linearSkillConfig}${braveSearchConfig}
 with open(config_path, "w") as f:
     json.dump(config, f, indent=2)
