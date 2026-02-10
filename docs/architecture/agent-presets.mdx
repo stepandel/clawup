@@ -93,7 +93,9 @@ These are set during `agent-army init` and stored in the manifest.
 
 ## Customization
 
-You can customize preset agents in the manifest:
+All preset files live in the `presets/` directory. If you clone the repo locally, you can edit any `.md` file directly — change an agent's personality, tweak its heartbeat logic, or adjust its tool notes. Your changes will be picked up on the next deploy.
+
+You can also customize agents in the manifest:
 
 ```typescript
 interface AgentDefinition {

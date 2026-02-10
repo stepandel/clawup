@@ -78,26 +78,25 @@ Each agent gets a unique gateway token, auto-generated during provisioning from 
 
 ## End-to-End Access Flow
 
+```mermaid
+flowchart LR
+  subgraph You
+    Browser
+    SSH
+  end
+  subgraph Agent Server
+    TS["Tailscale Serve (:443)"] --> GW["OpenClaw Gateway (127.0.0.1:18789)"]
+    TSSH["Tailscale SSH"] --> Shell["Shell session (ubuntu)"]
+  end
+  Browser -- "WireGuard tunnel" --> TS
+  SSH -- "WireGuard tunnel" --> TSSH
 ```
-┌──────────┐    Tailscale     ┌──────────────────────────────────┐
-│  You     │    WireGuard     │        Agent Server              │
-│          │    tunnel        │                                  │
-│  Browser ├──────────────────▶  Tailscale Serve (HTTPS :443)   │
-│          │                  │       │                          │
-│          │                  │       ▼                          │
-│          │                  │  OpenClaw Gateway (127.0.0.1:18789)
-│          │                  │       │                          │
-│          │                  │       ▼                          │
-│  SSH     ├──────────────────▶  Tailscale SSH                  │
-│          │                  │       │                          │
-│          │                  │       ▼                          │
-│          │                  │  Shell session (ubuntu user)     │
-└──────────┘                  └──────────────────────────────────┘
 
-Inbound from public internet: ✗ blocked
-Inbound from tailnet:         ✓ SSH + HTTPS only
-Outbound from agent:          ✓ all (for GitHub, Linear, APIs)
-```
+| Direction | Allowed? | Detail |
+|-----------|----------|--------|
+| Inbound from public internet | Blocked | Firewall drops all inbound traffic |
+| Inbound from tailnet | SSH + HTTPS only | Tailscale Serve and Tailscale SSH |
+| Outbound from agent | All | GitHub, Linear, Anthropic API, etc. |
 
 ## Security Summary
 
