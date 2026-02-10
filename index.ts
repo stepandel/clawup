@@ -14,7 +14,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as fs from "fs";
 import * as path from "path";
-import { OpenClawAgent } from "./src";
+import { OpenClawAgent, HetznerOpenClawAgent } from "./src";
 import { SharedVpc } from "./shared-vpc";
 
 // -----------------------------------------------------------------------------
@@ -192,15 +192,8 @@ if (provider !== "aws" && provider !== "hetzner") {
   throw new Error(`Unsupported provider: ${provider}. Supported providers are: aws, hetzner`);
 }
 
-// Hetzner support is not yet implemented
-if (provider === "hetzner") {
-  throw new Error(
-    "Hetzner provider is not yet implemented. Please use AWS for now."
-  );
-}
-
 // -----------------------------------------------------------------------------
-// Resource Tags
+// Resource Tags (AWS) / Labels (Hetzner)
 // -----------------------------------------------------------------------------
 
 const baseTags = {
@@ -210,73 +203,83 @@ const baseTags = {
 };
 
 // -----------------------------------------------------------------------------
-// Dynamic AZ Selection - Find an AZ that supports all instance types
+// Provider-specific infrastructure
 // -----------------------------------------------------------------------------
 
-// Collect all instance types we'll need
-const instanceTypes = [
-  instanceType, // default from config
-  ...manifest.agents.map(a => a.instanceType).filter(Boolean) as string[]
-];
-const uniqueInstanceTypes = [...new Set(instanceTypes)];
+let sharedVpc: SharedVpc | undefined;
 
-// Query AWS to find which AZs support our instance types
-const availabilityZone = pulumi
-  .all(
-    uniqueInstanceTypes.map((instanceType) =>
-      aws.ec2.getInstanceTypeOfferings({
-        filters: [
-          {
-            name: "instance-type",
-            values: [instanceType],
-          },
-        ],
-        locationType: "availability-zone",
-      })
+if (provider === "aws") {
+  // -------------------------------------------------------------------------
+  // Dynamic AZ Selection - Find an AZ that supports all instance types
+  // -------------------------------------------------------------------------
+
+  // Collect all instance types we'll need
+  const instanceTypes = [
+    instanceType, // default from config
+    ...manifest.agents.map(a => a.instanceType).filter(Boolean) as string[]
+  ];
+  const uniqueInstanceTypes = [...new Set(instanceTypes)];
+
+  // Query AWS to find which AZs support our instance types
+  const availabilityZone = pulumi
+    .all(
+      uniqueInstanceTypes.map((instanceType) =>
+        aws.ec2.getInstanceTypeOfferings({
+          filters: [
+            {
+              name: "instance-type",
+              values: [instanceType],
+            },
+          ],
+          locationType: "availability-zone",
+        })
+      )
     )
-  )
-  .apply((offeringsResults) => {
-    // Build a set of AZs for each instance type
-    const azSets = offeringsResults.map((result) =>
-      new Set(result.locations)
-    );
+    .apply((offeringsResults) => {
+      // Build a set of AZs for each instance type
+      const azSets = offeringsResults.map((result) =>
+        new Set(result.locations)
+      );
 
-    // Find intersection - AZs that support ALL instance types
-    const intersection = azSets[0];
-    for (let i = 1; i < azSets.length; i++) {
-      for (const az of intersection) {
-        if (!azSets[i].has(az)) {
-          intersection.delete(az);
+      // Find intersection - AZs that support ALL instance types
+      const intersection = azSets[0];
+      for (let i = 1; i < azSets.length; i++) {
+        for (const az of intersection) {
+          if (!azSets[i].has(az)) {
+            intersection.delete(az);
+          }
         }
       }
-    }
 
-    // Pick the first available AZ alphabetically for consistency
-    const availableAzs = Array.from(intersection).sort();
+      // Pick the first available AZ alphabetically for consistency
+      const availableAzs = Array.from(intersection).sort();
 
-    if (availableAzs.length === 0) {
-      throw new Error(
-        `No availability zone found that supports all instance types: ${uniqueInstanceTypes.join(", ")}`
-      );
-    }
+      if (availableAzs.length === 0) {
+        throw new Error(
+          `No availability zone found that supports all instance types: ${uniqueInstanceTypes.join(", ")}`
+        );
+      }
 
-    return availableAzs[0];
+      return availableAzs[0];
+    });
+
+  // -------------------------------------------------------------------------
+  // Shared VPC (cost optimization - all agents share one VPC)
+  // -------------------------------------------------------------------------
+
+  sharedVpc = new SharedVpc("agent-army", {
+    availabilityZone: availabilityZone,
+    tags: baseTags,
   });
 
-// -----------------------------------------------------------------------------
-// Shared VPC (cost optimization - all agents share one VPC)
-// -----------------------------------------------------------------------------
+  // VPC outputs
+  module.exports["vpcId"] = sharedVpc.vpcId;
+  module.exports["subnetId"] = sharedVpc.subnetId;
+  module.exports["securityGroupId"] = sharedVpc.securityGroupId;
+  module.exports["selectedAvailabilityZone"] = availabilityZone;
+}
 
-const sharedVpc = new SharedVpc("agent-army", {
-  availabilityZone: availabilityZone,
-  tags: baseTags,
-});
-
-// VPC outputs
-export const vpcId = sharedVpc.vpcId;
-export const subnetId = sharedVpc.subnetId;
-export const securityGroupId = sharedVpc.securityGroupId;
-export const selectedAvailabilityZone = availabilityZone;
+// Hetzner reads hcloud:token automatically from Pulumi config — no explicit provider needed
 
 // -----------------------------------------------------------------------------
 // Dynamic Agent Deployments
@@ -325,55 +328,105 @@ for (const agent of manifest.agents) {
   const braveSearchApiKey = agentBraveSearchCredentials[agent.role];
   const githubToken = agentGithubCredentials[agent.role];
 
-  const agentResource = new OpenClawAgent(agent.name, {
-    anthropicApiKey,
-    tailscaleAuthKey,
-    tailnetDnsName,
-    instanceType: agent.instanceType ?? instanceType,
-    volumeSize: agent.volumeSize ?? 30,
+  if (provider === "aws") {
+    // AWS path: create OpenClawAgent with VPC args
+    const agentResource = new OpenClawAgent(agent.name, {
+      anthropicApiKey,
+      tailscaleAuthKey,
+      tailnetDnsName,
+      instanceType: agent.instanceType ?? instanceType,
+      volumeSize: agent.volumeSize ?? 30,
 
-    // Use shared VPC
-    vpcId: sharedVpc.vpcId,
-    subnetId: sharedVpc.subnetId,
-    securityGroupId: sharedVpc.securityGroupId,
+      // Use shared VPC
+      vpcId: sharedVpc!.vpcId,
+      subnetId: sharedVpc!.subnetId,
+      securityGroupId: sharedVpc!.securityGroupId,
 
-    // Workspace files
-    workspaceFiles,
+      // Workspace files
+      workspaceFiles,
 
-    // Environment variables
-    envVars: {
-      AGENT_ROLE: agent.role,
-      AGENT_NAME: agent.displayName,
-      ...agent.envVars,
-    },
+      // Environment variables
+      envVars: {
+        AGENT_ROLE: agent.role,
+        AGENT_NAME: agent.displayName,
+        ...agent.envVars,
+      },
 
-    // Slack credentials (optional)
-    slackBotToken: slackCreds?.botToken,
-    slackAppToken: slackCreds?.appToken,
+      // Slack credentials (optional)
+      slackBotToken: slackCreds?.botToken,
+      slackAppToken: slackCreds?.appToken,
 
-    // Linear API key (optional)
-    linearApiKey,
+      // Linear API key (optional)
+      linearApiKey,
 
-    // Brave Search API key (optional)
-    braveSearchApiKey,
+      // Brave Search API key (optional)
+      braveSearchApiKey,
 
-    // GitHub token (optional)
-    githubToken,
+      // GitHub token (optional)
+      githubToken,
 
-    tags: {
-      ...baseTags,
-      AgentRole: agent.role,
-      AgentName: agent.displayName,
-    },
-  });
+      tags: {
+        ...baseTags,
+        AgentRole: agent.role,
+        AgentName: agent.displayName,
+      },
+    });
 
-  agentOutputs[agent.role] = {
-    tailscaleUrl: agentResource.tailscaleUrl,
-    gatewayToken: agentResource.gatewayToken,
-    instanceId: agentResource.instanceId,
-    publicIp: agentResource.publicIp,
-    sshPrivateKey: agentResource.sshPrivateKey,
-  };
+    agentOutputs[agent.role] = {
+      tailscaleUrl: agentResource.tailscaleUrl,
+      gatewayToken: agentResource.gatewayToken,
+      instanceId: agentResource.instanceId,
+      publicIp: agentResource.publicIp,
+      sshPrivateKey: agentResource.sshPrivateKey,
+    };
+  } else {
+    // Hetzner path: create HetznerOpenClawAgent
+    const agentResource = new HetznerOpenClawAgent(agent.name, {
+      anthropicApiKey,
+      tailscaleAuthKey,
+      tailnetDnsName,
+      serverType: agent.instanceType ?? instanceType,
+      location: manifest.region,
+
+      // Workspace files
+      workspaceFiles,
+
+      // Environment variables
+      envVars: {
+        AGENT_ROLE: agent.role,
+        AGENT_NAME: agent.displayName,
+        ...agent.envVars,
+      },
+
+      // Slack credentials (optional)
+      slackBotToken: slackCreds?.botToken,
+      slackAppToken: slackCreds?.appToken,
+
+      // Linear API key (optional)
+      linearApiKey,
+
+      // Brave Search API key (optional)
+      braveSearchApiKey,
+
+      // GitHub token (optional)
+      githubToken,
+
+      labels: {
+        ...baseTags,
+        AgentRole: agent.role,
+        AgentName: agent.displayName,
+      },
+    });
+
+    // Map serverId → instanceId so CLI tools work unchanged
+    agentOutputs[agent.role] = {
+      tailscaleUrl: agentResource.tailscaleUrl,
+      gatewayToken: agentResource.gatewayToken,
+      instanceId: agentResource.serverId,
+      publicIp: agentResource.publicIp,
+      sshPrivateKey: agentResource.sshPrivateKey,
+    };
+  }
 }
 
 // -----------------------------------------------------------------------------

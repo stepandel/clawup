@@ -206,6 +206,17 @@ export const KEY_INSTRUCTIONS = {
       "5. Press Enter to skip if not needed",
     ],
   },
+  hcloudToken: {
+    title: "Hetzner Cloud API Token",
+    steps: [
+      "To get your Hetzner Cloud API token:",
+      "1. Go to https://console.hetzner.cloud/",
+      "2. Select your project (or create one)",
+      "3. Go to Security → API Tokens",
+      "4. Click \"Generate API Token\" with Read & Write permissions",
+      "5. Copy the token",
+    ],
+  },
 } as const;
 
 /** Generate a Slack app manifest JSON for a given agent */

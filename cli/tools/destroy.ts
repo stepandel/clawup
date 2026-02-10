@@ -124,7 +124,11 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
     }
   }
 
-  // Show what will be destroyed
+  // Show what will be destroyed (provider-aware)
+  const manifestProvider = manifest.provider ?? "aws";
+  const resourceLabel = manifestProvider === "hetzner" ? "Hetzner servers" : "EC2 instances";
+  const infraLabel = manifestProvider === "hetzner" ? "Firewall rules" : "VPC, subnet, and security group";
+
   ui.note(
     [
       `Stack:  ${manifest.stackName}`,
@@ -134,9 +138,9 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
       formatAgentList(manifest.agents),
       ``,
       `This will PERMANENTLY DESTROY:`,
-      `  - ${manifest.agents.length} EC2 instances`,
+      `  - ${manifest.agents.length} ${resourceLabel}`,
       `  - All workspace data on those instances`,
-      `  - VPC, subnet, and security group`,
+      `  - ${infraLabel}`,
       `  - Tailscale device registrations`,
     ].join("\n"),
     "Destruction Plan"

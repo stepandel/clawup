@@ -226,6 +226,24 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(tailscaleApiKey);
 
+  // Hetzner API token (required for Hetzner provider)
+  let hcloudToken: string | undefined;
+  if (provider === "hetzner") {
+    p.note(
+      KEY_INSTRUCTIONS.hcloudToken.steps.join("\n"),
+      KEY_INSTRUCTIONS.hcloudToken.title
+    );
+
+    const token = await p.password({
+      message: "Hetzner Cloud API token",
+      validate: (val) => {
+        if (!val) return "API token is required for Hetzner deployments";
+      },
+    });
+    handleCancel(token);
+    hcloudToken = token as string;
+  }
+
   // Step 4: Choose agents
   p.log.step("Configure agents");
 
@@ -559,6 +577,9 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     setConfig("aws:region", basicConfig.region);
   } else {
     setConfig("hetzner:location", basicConfig.region);
+    if (hcloudToken) {
+      setConfig("hcloud:token", hcloudToken, true);
+    }
   }
   setConfig("anthropicApiKey", anthropicApiKey as string, true);
   setConfig("tailscaleAuthKey", tailscaleAuthKey as string, true);
