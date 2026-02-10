@@ -302,7 +302,7 @@ export default function Home() {
       {/* Footer */}
       <footer
         style={{
-          borderTop: "1px solid #262626",
+          borderTop: "1px solid `#262626`",
           marginTop: "80px",
           padding: "40px",
         }}
@@ -333,7 +333,9 @@ export default function Home() {
             GitHub
           </a>
           <a
-            href="#"
+            href="https://github.com/stepandel/agent-army#readme"
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
               color: "#a3a3a3",
               textDecoration: "none",
