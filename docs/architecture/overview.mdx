@@ -29,7 +29,7 @@ Everything starts with `agent-army.json` — the manifest file that defines your
 Each agent is provisioned as a Pulumi component resource (`OpenClawAgent` for AWS, `HetznerAgent` for Hetzner). Components encapsulate: server, volume, security group, and cloud-init bootstrap.
 
 ### Secure Networking
-All agents join a Tailscale mesh VPN during bootstrap. SSH access goes through Tailscale — no public ports exposed. Agent hostnames follow the pattern `<stack>-<agent-name>`.
+All agents join a Tailscale mesh VPN during bootstrap. SSH access goes through Tailscale — no public ports are exposed by default (security groups/firewalls restrict inbound traffic). Agent hostnames follow the pattern `<stack>-<agent-name>`.
 
 ## Project Structure
 
