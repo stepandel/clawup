@@ -1,4 +1,4 @@
-# Agent Army
+# Agent Army 🅰
 
 Deploy a fleet of specialized [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud** — managed entirely from your terminal.
 
