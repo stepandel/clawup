@@ -1,0 +1,72 @@
+---
+title: "init"
+description: "Interactive setup wizard for configuring your agent fleet"
+---
+
+# agent-army init
+
+Interactive setup wizard that walks you through configuring your stack, secrets, and agents.
+
+## Usage
+
+```bash
+agent-army init [options]
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--deploy` | Deploy immediately after init completes |
+| `-y, --yes` | Skip confirmation prompt (used with `--deploy`) |
+
+## Wizard Steps
+
+### 1. Stack Name
+Choose a unique name for your deployment (e.g., `dev`, `prod`, `staging`). This becomes part of your Tailscale hostnames and resource tags.
+
+### 2. Cloud Provider
+Select your cloud provider:
+- **AWS** — Amazon Web Services EC2 instances
+- **Hetzner** — Hetzner Cloud servers (EU/US)
+
+### 3. Region
+Choose a deployment region. Options are provider-specific:
+
+**AWS:** us-east-1, us-east-2, us-west-2, eu-west-1, eu-central-1, ap-southeast-1, ap-northeast-1
+
+**Hetzner:** fsn1 (Falkenstein), nbg1 (Nuremberg), hel1 (Helsinki), ash (Ashburn)
+
+### 4. Instance Type
+Select server size. Affects performance and cost.
+
+### 5. Owner Configuration
+- **Name** — Your name (used in agent onboarding)
+- **Timezone** — e.g., `America/New_York`
+- **Working hours** — e.g., `9am-6pm`
+
+### 6. Agent Selection
+Pick from available presets and optionally customize each agent.
+
+### 7. API Keys & Secrets
+Configure required credentials (Anthropic API key, provider keys, etc.).
+
+### 8. Review & Confirm
+Review your full configuration with cost estimates before saving.
+
+## Examples
+
+```bash
+# Standard interactive init
+agent-army init
+
+# Init and deploy immediately
+agent-army init --deploy
+
+# Init, deploy, skip confirmation
+agent-army init --deploy --yes
+```
+
+## Output
+
+Creates `~/.agent-army/configs/<stack-name>/agent-army.json` with your full manifest.

@@ -1,0 +1,38 @@
+---
+title: "CLI Overview"
+description: "Agent Army command-line interface reference"
+---
+
+# CLI Overview
+
+The Agent Army CLI provides commands for the full agent lifecycle: setup, deployment, monitoring, access, and teardown.
+
+## Installation
+
+```bash
+npm install -g agent-army
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| [`init`](/cli/init) | Interactive setup wizard — configure stack, secrets, and agents |
+| [`deploy`](/cli/deploy) | Deploy agents with Pulumi |
+| [`status`](/cli/status) | Show agent statuses from stack outputs |
+| [`ssh`](/cli/ssh) | SSH to an agent by name or alias |
+| [`validate`](/cli/validate) | Health check agents via Tailscale SSH |
+| [`destroy`](/cli/destroy) | Tear down all resources |
+| [`list`](/cli/list) | List all saved configs |
+
+## Global Options
+
+```bash
+agent-army --version    # Show version
+agent-army --help       # Show help
+agent-army <cmd> --help # Show command-specific help
+```
+
+## Config Management
+
+Configs are stored in `~/.agent-army/configs/<stack>/agent-army.json`. The CLI auto-detects your config if only one exists; use `-c <name>` to specify when you have multiple.

@@ -1,0 +1,59 @@
+---
+title: "Contributing"
+description: "How to contribute to Agent Army"
+---
+
+# Contributing
+
+Agent Army is open source. Contributions are welcome!
+
+## Getting Started
+
+```bash
+# Clone the repo
+git clone https://github.com/stepandel/agent-army.git
+cd agent-army
+
+# Install dependencies
+pnpm install
+
+# Build the CLI
+pnpm --filter @agent-army/cli build
+
+# Run the web app
+pnpm --filter agent-army-web dev
+```
+
+## Project Structure
+
+- `cli/` — CLI package (commands, adapters, types, constants)
+- `web/` — Next.js web app
+- `src/` — Pulumi infrastructure components
+- `presets/` — Agent preset configurations
+- `docs/` — Mintlify documentation
+
+## Development Workflow
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Run `pnpm build` to verify
+4. Submit a PR with a clear description
+
+## Conventions
+
+- **Commits:** Use [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.)
+- **PRs:** One PR per feature/fix, link to relevant issues
+- **TypeScript:** Strict mode, no `any` without comment
+
+## Adding a New Agent Preset
+
+1. Add preset definition to `cli/lib/constants.ts`
+2. Create preset files in `presets/<role>/`
+3. Update documentation in `docs/architecture/agent-presets.mdx`
+
+## Adding a New Cloud Provider
+
+1. Create a new component in `src/components/`
+2. Add provider constants to `cli/lib/constants.ts`
+3. Update the CLI adapter and web wizard
+4. Document in `docs/architecture/cloud-providers.mdx`

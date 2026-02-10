@@ -1,0 +1,52 @@
+---
+title: "ssh"
+description: "SSH into an agent by name or alias"
+---
+
+# agent-army ssh
+
+Connect to an agent via Tailscale SSH. Supports agent names and aliases.
+
+## Usage
+
+```bash
+agent-army ssh <agent> [command...] [options]
+```
+
+## Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `agent` | Agent name or alias (e.g., `titus`, `marcus`, `scout`) |
+| `command...` | Optional command to run on the agent |
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-u, --user <user>` | SSH user (default: `ubuntu`) |
+| `-c, --config <name>` | Config name (auto-detected if only one) |
+
+## Agent Aliases
+
+| Alias | Agent | Role |
+|-------|-------|------|
+| `marcus` | agent-pm | PM |
+| `titus` | agent-eng | Engineer |
+| `scout` | agent-tester | Tester |
+
+## Examples
+
+```bash
+# Interactive SSH session
+agent-army ssh titus
+
+# Run a command
+agent-army ssh titus uptime
+
+# Use full agent name
+agent-army ssh agent-eng
+
+# Custom SSH user
+agent-army ssh titus -u root
+```

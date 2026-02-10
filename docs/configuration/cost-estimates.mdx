@@ -1,0 +1,70 @@
+---
+title: "Cost Estimates"
+description: "Estimated monthly costs by provider and instance type"
+---
+
+# Cost Estimates
+
+Monthly cost estimates for running Agent Army. Costs are per agent (each agent runs on its own server).
+
+## AWS
+
+| Instance Type | vCPU | RAM | Est. Monthly Cost |
+|---------------|------|-----|-------------------|
+| t3.small | 2 | 2 GB | ~$15 |
+| t3.medium | 2 | 4 GB | ~$30 |
+| t3.large | 2 | 8 GB | ~$60 |
+
+**Additional costs:** EBS storage (~$0.08/GB/month), data transfer.
+
+### Example: 3-Agent Fleet on AWS
+
+| Component | Cost |
+|-----------|------|
+| 3× t3.medium instances | $90/mo |
+| Storage (30+50+30 GB) | ~$9/mo |
+| **Total** | **~$99/mo** |
+
+## Hetzner (EU)
+
+| Server Type | vCPU | RAM | Est. Monthly Cost |
+|-------------|------|-----|-------------------|
+| cx22 | 2 | 4 GB | ~$4 |
+| cx32 | 4 | 8 GB | ~$7 |
+| cx42 | 8 | 16 GB | ~$14 |
+
+## Hetzner (US)
+
+| Server Type | vCPU | RAM | Est. Monthly Cost |
+|-------------|------|-----|-------------------|
+| cpx21 | 3 | 4 GB | ~$5 |
+| cpx31 | 4 | 8 GB | ~$9 |
+| cpx41 | 8 | 16 GB | ~$16 |
+
+### Example: 3-Agent Fleet on Hetzner (EU)
+
+| Component | Cost |
+|-----------|------|
+| 3× cx32 servers | $21/mo |
+| Storage (30+50+30 GB) | ~$5/mo |
+| **Total** | **~$26/mo** |
+
+## Cost Comparison
+
+For a typical 3-agent fleet (PM + Engineer + Tester):
+
+| Provider | Instance | Monthly Total |
+|----------|----------|---------------|
+| Hetzner EU | cx22 | ~$17 |
+| Hetzner EU | cx32 | ~$26 |
+| Hetzner US | cpx21 | ~$20 |
+| AWS | t3.small | ~$54 |
+| AWS | t3.medium | ~$99 |
+
+<Tip>
+Hetzner offers significantly lower costs with comparable performance for most agent workloads. Consider Hetzner for budget-conscious deployments.
+</Tip>
+
+<Note>
+These are estimates. Actual costs may vary based on data transfer, storage usage, and provider pricing changes. Anthropic API costs for the agents' LLM usage are separate.
+</Note>

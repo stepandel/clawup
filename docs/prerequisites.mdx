@@ -1,0 +1,89 @@
+---
+title: "Prerequisites"
+description: "Tools and accounts required before deploying Agent Army"
+---
+
+# Prerequisites
+
+Before using Agent Army, ensure you have the following tools and accounts set up.
+
+## Required Tools
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Node.js** | 18+ | Runtime for CLI and Pulumi |
+| **Pulumi CLI** | Latest | Infrastructure provisioning |
+| **Tailscale** | Latest | Secure mesh networking |
+
+### Install Pulumi
+
+```bash
+# macOS
+brew install pulumi/tap/pulumi
+
+# Linux
+curl -fsSL https://get.pulumi.com | sh
+
+# Verify
+pulumi version
+```
+
+### Install Tailscale
+
+```bash
+# macOS
+brew install tailscale
+
+# Linux (Ubuntu/Debian)
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+## Cloud Provider Setup
+
+You need credentials for at least one cloud provider.
+
+### AWS
+
+```bash
+# Install AWS CLI
+brew install awscli  # or: pip install awscli
+
+# Configure credentials
+aws configure
+```
+
+Required permissions: EC2, EBS, VPC, Security Groups, IAM.
+
+### Hetzner
+
+```bash
+# Install hcloud CLI
+brew install hcloud
+
+# Set API token
+export HCLOUD_TOKEN="your-token-here"
+```
+
+Get your API token from the [Hetzner Cloud Console](https://console.hetzner.cloud/).
+
+## API Keys
+
+You'll need an Anthropic API key for your agents:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+Get one at [console.anthropic.com](https://console.anthropic.com/).
+
+## Verify Setup
+
+Run the init wizard — it checks prerequisites automatically:
+
+```bash
+agent-army init
+```
+
+<Warning>
+Missing prerequisites will be flagged during init. Install them before proceeding.
+</Warning>

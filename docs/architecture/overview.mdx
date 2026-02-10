@@ -1,0 +1,48 @@
+---
+title: "Architecture Overview"
+description: "How Agent Army provisions and manages agent infrastructure"
+---
+
+# Architecture Overview
+
+Agent Army uses [Pulumi](https://pulumi.com) to provision cloud infrastructure as code, with a component-based architecture that supports multiple cloud providers.
+
+## High-Level Flow
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│  CLI / Web  │────▶│ Pulumi Stack │────▶│ Cloud Provider  │
+│  (Adapter)  │     │ (TypeScript) │     │ (AWS / Hetzner) │
+└─────────────┘     └──────────────┘     └─────────────────┘
+       │                    │                      │
+       ▼                    ▼                      ▼
+  agent-army.json    Component Resources    Servers + Volumes
+  (Manifest)         (per agent)            + Networking
+```
+
+## Key Concepts
+
+### Manifest-Driven
+Everything starts with `agent-army.json` — the manifest file that defines your stack, provider, agents, and configuration. The CLI wizard generates this; Pulumi reads it.
+
+### Component Resources
+Each agent is provisioned as a Pulumi component resource (`OpenClawAgent` for AWS, `HetznerAgent` for Hetzner). Components encapsulate: server, volume, security group, and cloud-init bootstrap.
+
+### Secure Networking
+All agents join a Tailscale mesh VPN during bootstrap. SSH access goes through Tailscale — no public ports are exposed by default (security groups/firewalls restrict inbound traffic). Agent hostnames follow the pattern `<stack>-<agent-name>`.
+
+## Project Structure
+
+```
+agent-army/
+├── cli/                    # CLI and shared logic
+│   ├── bin.ts              # Entry point, command definitions
+│   ├── commands/           # Command implementations
+│   ├── lib/                # Constants, utilities, prerequisites
+│   └── types.ts            # Manifest and agent types
+├── src/
+│   └── components/         # Pulumi component resources
+├── web/                    # Next.js web app
+├── presets/                # Agent preset configurations
+└── docs/                   # This documentation
+```

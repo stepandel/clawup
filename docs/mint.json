@@ -1,0 +1,79 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Agent Army",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#3b82f6",
+    "light": "#60a5fa",
+    "dark": "#1d4ed8"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/stepandel/agent-army"
+    }
+  ],
+  "tabs": [
+    {
+      "name": "CLI Reference",
+      "url": "cli"
+    },
+    {
+      "name": "Architecture",
+      "url": "architecture"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "prerequisites"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "configuration/manifest",
+        "configuration/environment",
+        "configuration/cost-estimates"
+      ]
+    },
+    {
+      "group": "CLI Reference",
+      "pages": [
+        "cli/overview",
+        "cli/init",
+        "cli/deploy",
+        "cli/status",
+        "cli/ssh",
+        "cli/validate",
+        "cli/destroy",
+        "cli/list"
+      ]
+    },
+    {
+      "group": "Architecture",
+      "pages": [
+        "architecture/overview",
+        "architecture/pulumi-components",
+        "architecture/cloud-providers",
+        "architecture/agent-presets"
+      ]
+    },
+    {
+      "group": "Community",
+      "pages": [
+        "contributing"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/stepandel/agent-army"
+  }
+}

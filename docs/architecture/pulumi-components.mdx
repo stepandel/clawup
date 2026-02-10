@@ -1,0 +1,46 @@
+---
+title: "Pulumi Components"
+description: "Infrastructure components that provision each agent"
+---
+
+# Pulumi Components
+
+Agent Army uses Pulumi component resources to encapsulate all infrastructure for each agent into reusable, provider-specific components.
+
+## OpenClawAgent (AWS)
+
+The `OpenClawAgent` component provisions on AWS EC2:
+
+- **EC2 Instance** — Server running Ubuntu 24.04
+- **EBS Volume** — Persistent storage for agent workspace
+- **Security Group** — Firewall rules (Tailscale only, no public SSH)
+- **Cloud-Init** — Bootstrap script for agent setup
+
+## HetznerAgent (Hetzner)
+
+The `HetznerAgent` component provisions on Hetzner Cloud:
+
+- **Cloud Server** — Server with chosen type (cx/cpx series)
+- **Volume** — Persistent block storage
+- **Firewall** — Network rules
+- **Cloud-Init** — Bootstrap script
+
+## Cloud-Init Bootstrap
+
+Both providers use cloud-init to bootstrap agents on first boot:
+
+1. Install system dependencies (Node.js, Git, build tools)
+2. Install and configure Tailscale
+3. Install OpenClaw
+4. Mount persistent volume
+5. Configure agent workspace with preset files
+6. Start OpenClaw gateway
+
+## Config Generator
+
+The `ConfigGenerator` component creates OpenClaw configuration files for each agent based on the manifest, including:
+
+- Agent identity (SOUL.md, IDENTITY.md)
+- Owner context (USER.md)
+- Tool configuration (TOOLS.md)
+- API keys and secrets

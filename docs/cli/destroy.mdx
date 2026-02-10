@@ -1,0 +1,35 @@
+---
+title: "destroy"
+description: "Tear down all deployed resources"
+---
+
+# agent-army destroy
+
+Destroys all cloud resources provisioned by Pulumi. Includes safety confirmations to prevent accidental deletion.
+
+## Usage
+
+```bash
+agent-army destroy [options]
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-y, --yes` | Skip confirmation prompts (dangerous!) |
+| `-c, --config <name>` | Config name (auto-detected if only one) |
+
+## Examples
+
+```bash
+# Destroy with confirmation
+agent-army destroy
+
+# Skip confirmation (use with caution)
+agent-army destroy --yes
+```
+
+<Warning>
+This permanently deletes all servers, volumes, and associated data. This action cannot be undone. Make sure to back up any important data before destroying.
+</Warning>

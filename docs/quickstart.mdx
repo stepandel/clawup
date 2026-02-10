@@ -1,0 +1,75 @@
+---
+title: "Quick Start"
+description: "Deploy your first agent fleet in 5 minutes"
+---
+
+# Quick Start
+
+Get a fleet of AI agents running on your own infrastructure in minutes.
+
+## 1. Install
+
+```bash
+npm install -g agent-army
+```
+
+## 2. Check Prerequisites
+
+Make sure you have the required tools installed:
+
+- **Node.js** 18+
+- **Pulumi CLI** — [Install guide](https://www.pulumi.com/docs/install/)
+- **AWS CLI** or **Hetzner CLI** — depending on your provider
+- **Tailscale** — [Install guide](https://tailscale.com/download)
+
+<Tip>
+Run `agent-army validate` after deployment to verify all agents are healthy.
+</Tip>
+
+## 3. Initialize
+
+```bash
+agent-army init
+```
+
+The interactive wizard walks you through:
+
+1. **Stack name** — A unique name for your deployment (e.g., `dev`, `prod`)
+2. **Cloud provider** — AWS or Hetzner
+3. **Region** — Where to deploy your servers
+4. **Instance type** — Server size (affects cost)
+5. **Owner info** — Your name, timezone, working hours
+6. **Agent selection** — Pick from presets (PM, Engineer, Tester)
+7. **Review** — Confirm config and estimated costs
+
+## 4. Deploy
+
+```bash
+agent-army deploy
+```
+
+Pulumi provisions your infrastructure: servers, volumes, networking, and agent bootstrap.
+
+<Note>
+First deployment takes 3-5 minutes. Subsequent deployments are incremental.
+</Note>
+
+## 5. Connect
+
+```bash
+# Check status
+agent-army status
+
+# SSH to an agent
+agent-army ssh titus
+
+# Validate health
+agent-army validate
+```
+
+## What's Next?
+
+- [CLI Reference](/cli/overview) — Full command documentation
+- [Configuration](/configuration/manifest) — Customize your manifest
+- [Architecture](/architecture/overview) — Understand how it works
+- [Cost Estimates](/configuration/cost-estimates) — Pricing by provider
