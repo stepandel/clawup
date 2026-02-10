@@ -2,6 +2,7 @@
 
 ## Always
 
+- [ ] If `BOOTSTRAP.md` exists in workspace, follow it first. Do not continue with the rest of this checklist until bootstrap is complete.
 - [ ] Load `~/.tester-state.json`. Query Linear for tickets in "In Review" or "In Review by Agent" with a linked PR across teams MUL, AGE, PINE. Skip tickets already tested at same PR head commit. If none remain → HEARTBEAT_OK.
 - [ ] For each untested ticket: assign yourself on Linear, fetch repo, checkout PR branch.
 - [ ] Check PR for unresolved review comments. If any exist, use `/pr-review-responder` skill to parse comments, apply fixes by delegating them to Claude Code, and push before proceeding.
