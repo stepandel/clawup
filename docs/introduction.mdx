@@ -1,0 +1,56 @@
+---
+title: "What is Agent Army?"
+description: "Deploy and manage a fleet of AI agents on your own cloud infrastructure"
+---
+
+# Agent Army
+
+Agent Army lets you deploy a fleet of [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner — with a single command.
+
+## Why Agent Army?
+
+Running AI agents in production requires infrastructure: servers, networking, persistent storage, secure credential management, and orchestration. Agent Army handles all of this so you can focus on what your agents do, not where they run.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="One-Command Deploy" icon="rocket">
+    Interactive wizard configures everything. Deploy your entire fleet with `agent-army deploy`.
+  </Card>
+  <Card title="Multi-Cloud" icon="cloud">
+    Deploy to AWS EC2 or Hetzner Cloud. Same agent config, different providers.
+  </Card>
+  <Card title="Built-in Presets" icon="users">
+    Pre-configured agent roles: PM (Marcus), Engineer (Titus), and Tester (Scout).
+  </Card>
+  <Card title="Secure Networking" icon="shield">
+    Tailscale mesh VPN connects all agents. SSH access without exposing ports.
+  </Card>
+</CardGroup>
+
+## How It Works
+
+1. **Configure** — Run `agent-army init` to set up your stack, choose a provider, select agents
+2. **Deploy** — Run `agent-army deploy` to provision infrastructure with Pulumi
+3. **Manage** — Use `agent-army status`, `ssh`, and `validate` to monitor your fleet
+
+## Agent Presets
+
+| Preset | Name | Role | Description |
+|--------|------|------|-------------|
+| `pm` | Marcus | Project Manager | Break down tickets, research, plan and sequence work |
+| `eng` | Titus | Engineer | Lead engineering, coding, shipping |
+| `tester` | Scout | Tester | Quality assurance, verification, bug hunting |
+
+Each agent runs on its own server with persistent EBS/volume storage, pre-configured with OpenClaw and all necessary tools.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="play" href="/quickstart">
+    Get your first fleet running in 5 minutes.
+  </Card>
+  <Card title="Prerequisites" icon="list-check" href="/prerequisites">
+    Check what you need before deploying.
+  </Card>
+</CardGroup>

@@ -1,0 +1,59 @@
+---
+title: "Agent Presets"
+description: "Pre-configured agent roles and customization options"
+---
+
+# Agent Presets
+
+Agent Army ships with pre-configured agent presets, each optimized for a specific role.
+
+## Available Presets
+
+### Marcus — Project Manager (`pm`)
+
+- **Volume:** 30 GB
+- **Focus:** Break down tickets, research, plan and sequence work, track progress, unblock teams
+- **Tools:** Linear, GitHub, web search
+- **Best for:** Coordinating work across agents, managing backlogs, stakeholder communication
+
+### Titus — Engineer (`eng`)
+
+- **Volume:** 50 GB
+- **Focus:** Lead engineering, coding, shipping
+- **Tools:** Claude Code, GitHub, build tools, testing frameworks
+- **Best for:** Writing code, reviewing PRs, fixing bugs, implementing features
+
+### Scout — Tester (`tester`)
+
+- **Volume:** 30 GB
+- **Focus:** Quality assurance, verification, bug hunting
+- **Tools:** GitHub, testing frameworks, browser automation
+- **Best for:** PR review, test writing, deployment verification, bug reproduction
+
+## Configuration
+
+Each agent is defined in the manifest as an `AgentDefinition`:
+
+```typescript
+interface AgentDefinition {
+  name: string;          // Resource name (e.g., "agent-pm")
+  displayName: string;   // Human name (e.g., "Marcus")
+  role: string;          // Role identifier
+  preset: string | null; // Preset name or null for custom
+  volumeSize: number;    // Persistent storage in GB
+  instanceType?: string; // Override instance type
+  envVars?: Record<string, string>; // Extra env vars
+}
+```
+
+## Customization
+
+You can customize preset agents during init:
+
+- **Volume size** — Adjust persistent storage
+- **Instance type** — Override the default server size
+- **Environment variables** — Add agent-specific config
+
+## Custom Agents
+
+Set `preset: null` and provide custom `soulContent` and `identityContent` to create agents with completely custom personalities and roles.

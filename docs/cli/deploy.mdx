@@ -1,0 +1,50 @@
+---
+title: "deploy"
+description: "Deploy your agent fleet with Pulumi"
+---
+
+# agent-army deploy
+
+Provisions infrastructure and deploys your agent fleet using Pulumi.
+
+## Usage
+
+```bash
+agent-army deploy [options]
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-y, --yes` | Skip confirmation prompt |
+| `-c, --config <name>` | Config name (auto-detected if only one) |
+
+## What It Does
+
+1. Reads your `agent-army.json` manifest
+2. Runs `pulumi up` to provision/update infrastructure
+3. Creates servers, volumes, networking, and security groups
+4. Bootstraps each agent with OpenClaw and configured tools
+5. Connects agents to your Tailscale network
+
+## Examples
+
+```bash
+# Deploy with confirmation
+agent-army deploy
+
+# Deploy without confirmation
+agent-army deploy --yes
+
+# Deploy a specific config
+agent-army deploy -c production
+```
+
+<Note>
+First deployment takes 3-5 minutes. Subsequent deployments are incremental — only changes are applied.
+</Note>
+
+<Warning>
+Deployment creates cloud resources that incur costs. Review your config and cost estimates before deploying.
+</Warning>

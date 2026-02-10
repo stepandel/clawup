@@ -1,0 +1,75 @@
+---
+title: "Cloud Providers"
+description: "AWS and Hetzner provider details and comparison"
+---
+
+# Cloud Providers
+
+Agent Army supports two cloud providers. Choose based on your region needs and budget.
+
+## AWS
+
+**Best for:** US-based teams, enterprise compliance, wide region availability.
+
+### Supported Regions
+
+| Region | Location |
+|--------|----------|
+| us-east-1 | N. Virginia |
+| us-east-2 | Ohio |
+| us-west-2 | Oregon |
+| eu-west-1 | Ireland |
+| eu-central-1 | Frankfurt |
+| ap-southeast-1 | Singapore |
+| ap-northeast-1 | Tokyo |
+
+### Instance Types
+
+| Type | vCPU | RAM | Est. Cost |
+|------|------|-----|-----------|
+| t3.small | 2 | 2 GB | ~$15/mo |
+| t3.medium | 2 | 4 GB | ~$30/mo |
+| t3.large | 2 | 8 GB | ~$60/mo |
+
+## Hetzner
+
+**Best for:** Budget-conscious teams, EU-based deployments, excellent price/performance.
+
+### Supported Locations
+
+| Location | City |
+|----------|------|
+| fsn1 | Falkenstein, DE |
+| nbg1 | Nuremberg, DE |
+| hel1 | Helsinki, FI |
+| ash | Ashburn, US |
+
+### Server Types (EU)
+
+| Type | vCPU | RAM | Est. Cost |
+|------|------|-----|-----------|
+| cx22 | 2 | 4 GB | ~$4/mo |
+| cx32 | 4 | 8 GB | ~$7/mo |
+| cx42 | 8 | 16 GB | ~$14/mo |
+
+### Server Types (US)
+
+| Type | vCPU | RAM | Est. Cost |
+|------|------|-----|-----------|
+| cpx21 | 3 | 4 GB | ~$5/mo |
+| cpx31 | 4 | 8 GB | ~$9/mo |
+| cpx41 | 8 | 16 GB | ~$16/mo |
+
+<Note>
+US Hetzner locations (ash) use `cpx` series instead of `cx` series. The CLI handles this automatically.
+</Note>
+
+## Comparison
+
+| Feature | AWS | Hetzner |
+|---------|-----|---------|
+| Starting price | ~$15/mo/agent | ~$4/mo/agent |
+| Regions | 7 | 4 |
+| EU locations | 2 | 3 |
+| US locations | 3 | 1 |
+| Asia locations | 2 | 0 |

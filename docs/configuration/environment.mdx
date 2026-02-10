@@ -1,0 +1,51 @@
+---
+title: "Environment Variables"
+description: "Required and optional environment variables for Agent Army"
+---
+
+# Environment Variables
+
+Agent Army uses environment variables for secrets and provider credentials. These are set during `agent-army init` and stored securely in Pulumi config.
+
+## Required
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic API key for agent LLM access (starts with `sk-ant-`) |
+
+## Provider-Specific
+
+### AWS
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
+| `AWS_REGION` | Default region (can also be set via `aws configure`) |
+
+### Hetzner
+
+| Variable | Description |
+|----------|-------------|
+| `HCLOUD_TOKEN` | Hetzner Cloud API token |
+
+## Optional
+
+| Variable | Description |
+|----------|-------------|
+| `TAILSCALE_AUTH_KEY` | Pre-authenticated Tailscale key (otherwise prompted) |
+| `LINEAR_API_KEY` | Linear API key for ticket integration |
+| `GITHUB_TOKEN` | GitHub token for repo access |
+
+## Agent Environment
+
+Each agent receives these environment variables on its server:
+
+- `ANTHROPIC_API_KEY` — For LLM access
+- `LINEAR_API_KEY` — If configured
+- `GITHUB_TOKEN` — If configured
+- Any custom `envVars` from the agent definition
+
+<Note>
+Secrets are stored encrypted in Pulumi state and injected into agent servers via cloud-init. They are never written to the manifest file.
+</Note>

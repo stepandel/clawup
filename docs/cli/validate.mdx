@@ -1,0 +1,31 @@
+---
+title: "validate"
+description: "Health check your agents via Tailscale SSH"
+---
+
+# agent-army validate
+
+Runs health checks against all deployed agents via Tailscale SSH to verify they're reachable and functioning.
+
+## Usage
+
+```bash
+agent-army validate [options]
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-t, --timeout <seconds>` | SSH timeout in seconds (default: 30) |
+| `-c, --config <name>` | Config name (auto-detected if only one) |
+
+## Examples
+
+```bash
+# Validate all agents
+agent-army validate
+
+# With custom timeout
+agent-army validate --timeout 60
+```
