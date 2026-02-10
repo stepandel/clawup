@@ -93,41 +93,6 @@ export const HETZNER_COST_ESTIMATES: Record<string, number> = {
   cx42: 14,
 };
 
-/** Coding CLI definitions */
-export interface CodingCliDef {
-  displayName: string;
-  description: string;
-  binaryPath: string;
-  installMethod: "pip" | "npm" | "binary";
-}
-
-export const CODING_CLIS: Record<string, CodingCliDef> = {
-  "claude-code": {
-    displayName: "Claude Code",
-    description: "Anthropic's official CLI for Claude",
-    binaryPath: "$HOME/.local/bin/claude",
-    installMethod: "pip",
-  },
-  codex: {
-    displayName: "Codex",
-    description: "OpenAI's Codex CLI",
-    binaryPath: "codex",
-    installMethod: "npm",
-  },
-  amp: {
-    displayName: "Amp",
-    description: "Sourcegraph's Amp CLI",
-    binaryPath: "amp",
-    installMethod: "npm",
-  },
-  opencode: {
-    displayName: "OpenCode",
-    description: "Open-source coding assistant CLI",
-    binaryPath: "opencode",
-    installMethod: "npm",
-  },
-};
-
 /** Manifest filename */
 export const MANIFEST_FILE = "agent-army.json";
 
@@ -148,38 +113,7 @@ export const MODEL_PROVIDERS = {
       { value: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5" },
     ],
   },
-  openai: {
-    name: "OpenAI",
-    envVar: "OPENAI_API_KEY",
-    keyPrefix: "sk-",
-    models: [
-      { value: "openai/gpt-5.2", label: "GPT-5.2 (Recommended)" },
-      { value: "openai/gpt-5.2-pro", label: "GPT-5.2 Pro" },
-      { value: "openai/o3", label: "o3" },
-      { value: "openai/gpt-4.1", label: "GPT-4.1" },
-      { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
-    ],
-  },
-  opencodezen: {
-    name: "OpenCode Zen",
-    envVar: "OPENCODE_ZEN_API_KEY",
-    keyPrefix: "",
-    models: [
-      { value: "opencodezen/zen-1", label: "Zen-1 (Recommended)" },
-    ],
-  },
-  google: {
-    name: "Google Gemini",
-    envVar: "GOOGLE_API_KEY",
-    keyPrefix: "",
-    models: [
-      { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (Recommended)" },
-      { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-    ],
-  },
 } as const;
-
-export type ModelProviderKey = keyof typeof MODEL_PROVIDERS;
 
 /**
  * Build the Tailscale hostname for an agent.
@@ -270,33 +204,6 @@ export const KEY_INSTRUCTIONS = {
       "3. Select repositories, set expiration, and permissions (e.g., repo, read:org)",
       "4. Copy the token (starts with github_pat_ or ghp_)",
       "5. Press Enter to skip if not needed",
-    ],
-  },
-  openaiApiKey: {
-    title: "OpenAI API Key",
-    steps: [
-      "To get your OpenAI API key:",
-      "1. Go to https://platform.openai.com/api-keys",
-      "2. Click \"Create new secret key\"",
-      "3. Copy the key (starts with sk-)",
-    ],
-  },
-  opencodeZenApiKey: {
-    title: "OpenCode Zen API Key",
-    steps: [
-      "To get your OpenCode Zen API key:",
-      "1. Go to https://opencodezen.com/account",
-      "2. Navigate to API Keys section",
-      "3. Create and copy your API key",
-    ],
-  },
-  googleApiKey: {
-    title: "Google Gemini API Key",
-    steps: [
-      "To get your Google Gemini API key:",
-      "1. Go to https://aistudio.google.com/apikey",
-      "2. Click \"Create API key\"",
-      "3. Copy the generated key",
     ],
   },
 } as const;

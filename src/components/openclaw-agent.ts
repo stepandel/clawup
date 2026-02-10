@@ -128,17 +128,6 @@ export interface OpenClawAgentArgs {
    */
   githubToken?: pulumi.Input<string>;
 
-  /**
-   * Coding CLIs to install (default: ["claude-code"])
-   * Options: "claude-code", "codex", "opencode", "amp"
-   */
-  codingClis?: string[];
-
-  /**
-   * Model provider API keys (env var name -> key value)
-   * Example: { "OPENAI_API_KEY": "sk-...", "GOOGLE_API_KEY": "..." }
-   */
-  modelApiKeys?: Record<string, pulumi.Input<string>>;
 }
 
 /**
@@ -425,19 +414,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
 
-    // Resolve modelApiKeys to a single output
-    const modelApiKeysOutput = args.modelApiKeys
-      ? pulumi.output(args.modelApiKeys).apply((keys) => {
-          const resolved: Record<string, string> = {};
-          for (const [envVar, key] of Object.entries(keys)) {
-            resolved[envVar] = key as string;
-          }
-          return resolved;
-        })
-      : pulumi.output({} as Record<string, string>);
-
-    // Combine all string outputs first
-    const stringOutputs = pulumi.all([
+    // Combine all string outputs
+    const userData = pulumi.all([
       args.tailscaleAuthKey,
       args.anthropicApiKey,
       gatewayTokenValue,
@@ -446,21 +424,16 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       linearApiKeyOutput,
       braveSearchApiKeyOutput,
       githubTokenOutput,
-    ]);
-
-    // Combine with modelApiKeys output
-    const userData = pulumi
-      .all([stringOutputs, modelApiKeysOutput])
-      .apply(([[
-        tsAuthKey,
-        apiKey,
-        gwToken,
-        slackBotToken,
-        slackAppToken,
-        linearApiKey,
-        braveSearchApiKey,
-        githubToken,
-      ], modelApiKeys]) => {
+    ]).apply(([
+      tsAuthKey,
+      apiKey,
+      gwToken,
+      slackBotToken,
+      slackAppToken,
+      linearApiKey,
+      braveSearchApiKey,
+      githubToken,
+    ]) => {
         // Include stack name in Tailscale hostname to avoid conflicts across deployments
         const tsHostname = `${pulumi.getStack()}-${name}`;
 
@@ -486,10 +459,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           braveSearchApiKey: braveSearchApiKey || undefined,
           // GitHub token for gh CLI auth
           githubToken: githubToken || undefined,
-          // Coding CLIs to install (default to claude-code for backward compat)
-          codingClis: args.codingClis ?? ["claude-code"],
-          // Model provider API keys
-          modelApiKeys: Object.keys(modelApiKeys).length > 0 ? modelApiKeys : undefined,
         };
 
         const script = generateCloudInit(cloudInitConfig);
@@ -502,7 +471,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           linearApiKey: linearApiKey || undefined,
           braveSearchApiKey: braveSearchApiKey || undefined,
           githubToken: githubToken || undefined,
-          modelApiKeys: Object.keys(modelApiKeys).length > 0 ? modelApiKeys : undefined,
         });
       });
 

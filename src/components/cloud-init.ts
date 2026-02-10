@@ -12,8 +12,6 @@ export interface CloudInitConfig {
   tailscaleAuthKey: string;
   /** Gateway authentication token */
   gatewayToken: string;
-  /** Model provider API keys (env var name -> key value) */
-  modelApiKeys?: Record<string, string>;
   /** Gateway port (default: 18789) */
   gatewayPort?: number;
   /** Browser control port (default: 18791) */
@@ -50,8 +48,6 @@ export interface CloudInitConfig {
   braveSearchApiKey?: string;
   /** GitHub personal access token for gh CLI auth */
   githubToken?: string;
-  /** Coding CLIs to install (default: ["claude-code"]) */
-  codingClis?: string[];
 }
 
 /**
@@ -130,20 +126,11 @@ GH_AUTH_SCRIPT
 `
     : "";
 
-  // Coding CLIs installation (default to claude-code for backward compatibility)
-  const codingClis = config.codingClis ?? ["claude-code"];
-  const codingClisInstallScript = generateCodingClisInstallScript(codingClis);
+  // Claude Code CLI installation script
+  const codingClisInstallScript = generateClaudeCodeInstallScript();
 
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
-
-  // Generate model API key exports
-  const modelApiKeyExports = config.modelApiKeys
-    ? Object.entries(config.modelApiKeys)
-        .filter(([, value]) => value) // Only export non-empty values
-        .map(([envVar, _]) => `\${${envVar}:+echo 'export ${envVar}="\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
-        .join("\n")
-    : "";
 
   // Generate additional env vars
   const additionalEnvVars = config.envVars
@@ -264,7 +251,6 @@ fi
 \${LINEAR_API_KEY:+echo 'export LINEAR_API_KEY="\${LINEAR_API_KEY}"' >> /home/ubuntu/.bashrc}
 \${BRAVE_SEARCH_API_KEY:+echo 'export BRAVE_SEARCH_API_KEY="\${BRAVE_SEARCH_API_KEY}"' >> /home/ubuntu/.bashrc}
 \${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
-${modelApiKeyExports}
 ${additionalEnvVars}
 ${tailscaleSection}${denoInstallScript}${ghAuthScript}
 ${codingClisInstallScript}
@@ -372,8 +358,6 @@ export function interpolateCloudInit(
     linearApiKey?: string;
     braveSearchApiKey?: string;
     githubToken?: string;
-    /** Model provider API keys (env var name -> key value) */
-    modelApiKeys?: Record<string, string>;
   }
 ): string {
   let result = script
@@ -393,93 +377,22 @@ export function interpolateCloudInit(
   result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
 
-  // Interpolate model API keys
-  if (values.modelApiKeys) {
-    for (const [envVar, apiKey] of Object.entries(values.modelApiKeys)) {
-      if (apiKey) {
-        result = result.replace(new RegExp(`\\$\\{${envVar}:-\\}`, "g"), apiKey);
-        result = result.replace(new RegExp(`\\$\\{${envVar}\\}`, "g"), apiKey);
-      } else {
-        result = result.replace(new RegExp(`\\$\\{${envVar}:-\\}`, "g"), "");
-        result = result.replace(new RegExp(`\\$\\{${envVar}\\}`, "g"), "");
-      }
-    }
-  }
-
   return result;
 }
 
-/** Coding CLI definitions */
-interface CodingCliDef {
-  name: string;
-  displayName: string;
-  installMethod: "curl" | "npm";
-  installCommand: string;
-  binaryPath: string;
-}
-
-const CODING_CLI_DEFS: Record<string, CodingCliDef> = {
-  "claude-code": {
-    name: "claude-code",
-    displayName: "Claude Code",
-    installMethod: "curl",
-    installCommand: "curl -fsSL https://claude.ai/install.sh | bash",
-    binaryPath: "$HOME/.local/bin/claude",
-  },
-  codex: {
-    name: "codex",
-    displayName: "Codex",
-    installMethod: "npm",
-    installCommand: "npm install -g @openai/codex",
-    binaryPath: "codex",
-  },
-  opencode: {
-    name: "opencode",
-    displayName: "OpenCode",
-    installMethod: "curl",
-    installCommand: "curl -fsSL https://opencode.ai/install.sh | bash",
-    binaryPath: "$HOME/.local/bin/opencode",
-  },
-  amp: {
-    name: "amp",
-    displayName: "Amp",
-    installMethod: "npm",
-    installCommand: "npm install -g @anthropic/amp",
-    binaryPath: "amp",
-  },
-};
-
 /**
- * Generates bash script to install coding CLIs
+ * Generates bash script to install Claude Code CLI
  */
-function generateCodingClisInstallScript(clis: string[]): string {
-  if (clis.length === 0) {
-    return "";
-  }
-
-  const scripts: string[] = [];
-
-  for (const cliName of clis) {
-    const cli = CODING_CLI_DEFS[cliName];
-    if (!cli) {
-      scripts.push(`
-# Unknown coding CLI: ${cliName}
-echo "WARNING: Unknown coding CLI '${cliName}' — skipping"
-`);
-      continue;
-    }
-
-    if (cli.installMethod === "curl") {
-      // Curl-based installer (runs in user context)
-      scripts.push(`
-# Install ${cli.displayName} CLI for ubuntu user
-echo "Installing ${cli.displayName}..."
-sudo -u ubuntu bash << '${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT' || echo "WARNING: ${cli.displayName} installation failed. Install manually with: ${cli.installCommand}"
+function generateClaudeCodeInstallScript(): string {
+  return `
+# Install Claude Code CLI for ubuntu user
+echo "Installing Claude Code..."
+sudo -u ubuntu bash << 'CLAUDE_CODE_INSTALL_SCRIPT' || echo "WARNING: Claude Code installation failed. Install manually with: curl -fsSL https://claude.ai/install.sh | bash"
 set -e
 cd ~
 
-# Install ${cli.displayName} via official installer
-${cli.installCommand}
+# Install Claude Code via official installer
+curl -fsSL https://claude.ai/install.sh | bash
 
 # Add .local/bin to PATH in .bashrc if not already there
 if ! grep -q '.local/bin' ~/.bashrc; then
@@ -487,43 +400,13 @@ if ! grep -q '.local/bin' ~/.bashrc; then
 fi
 
 # Verify installation
-BINARY_PATH="${cli.binaryPath}"
-BINARY_PATH=\${BINARY_PATH//\\$HOME/$HOME}
-if [ -x "$BINARY_PATH" ] || command -v $(basename "${cli.binaryPath}") &>/dev/null; then
-  echo "${cli.displayName} installed successfully"
+BINARY_PATH="$HOME/.local/bin/claude"
+if [ -x "$BINARY_PATH" ] || command -v claude &>/dev/null; then
+  echo "Claude Code installed successfully"
 else
-  echo "WARNING: ${cli.displayName} installation may have failed"
+  echo "WARNING: Claude Code installation may have failed"
   exit 1
 fi
-${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT
-`);
-    } else {
-      // NPM-based installer (runs in user context with NVM loaded)
-      scripts.push(`
-# Install ${cli.displayName} CLI for ubuntu user
-echo "Installing ${cli.displayName}..."
-sudo -u ubuntu bash << '${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT' || echo "WARNING: ${cli.displayName} installation failed. Install manually with: ${cli.installCommand}"
-set -e
-cd ~
-
-# Load NVM
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-# Install ${cli.displayName} via npm
-${cli.installCommand}
-
-# Verify installation
-if command -v ${cli.binaryPath} &>/dev/null; then
-  echo "${cli.displayName} installed successfully"
-else
-  echo "WARNING: ${cli.displayName} installation may have failed"
-  exit 1
-fi
-${cli.name.toUpperCase().replace(/-/g, "_")}_INSTALL_SCRIPT
-`);
-    }
-  }
-
-  return scripts.join("\n");
+CLAUDE_CODE_INSTALL_SCRIPT
+`;
 }

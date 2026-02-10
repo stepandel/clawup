@@ -17,9 +17,7 @@ import {
   KEY_INSTRUCTIONS,
   MODEL_PROVIDERS,
   slackAppManifest,
-  CODING_CLIS,
 } from "../lib/constants";
-import type { ModelProviderKey } from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
 import { saveManifest } from "../lib/config";
@@ -156,80 +154,34 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     githubRepo: githubRepo as string,
   };
 
-  // Step 3: Collect model providers and secrets
-  p.log.step("Configure model providers");
+  // Step 3: Collect Anthropic API key and model
+  p.log.step("Configure Anthropic API key");
 
-  // Select model providers
-  const selectedProviders = await p.multiselect({
-    message: "Select model providers to configure",
-    options: Object.entries(MODEL_PROVIDERS).map(([key, provider]) => ({
-      value: key as ModelProviderKey,
-      label: provider.name,
-      hint: key === "anthropic" ? "Recommended" : undefined,
-    })),
-    required: true,
-    initialValues: ["anthropic" as ModelProviderKey],
-  });
-  handleCancel(selectedProviders);
-
-  // Ensure Anthropic is always included for backward compatibility
-  const providers = selectedProviders as ModelProviderKey[];
-  if (!providers.includes("anthropic")) {
-    providers.unshift("anthropic");
-    p.log.info("Added Anthropic provider (required for backward compatibility)");
-  }
-
-  // Collect API keys for each provider
-  const modelApiKeys: Record<string, string> = {};
-  let anthropicApiKey = "";
-
-  for (const providerKey of providers) {
-    const provider = MODEL_PROVIDERS[providerKey];
-    const keyInstructions = providerKey === "anthropic"
-      ? KEY_INSTRUCTIONS.anthropicApiKey
-      : providerKey === "openai"
-      ? KEY_INSTRUCTIONS.openaiApiKey
-      : providerKey === "opencodezen"
-      ? KEY_INSTRUCTIONS.opencodeZenApiKey
-      : KEY_INSTRUCTIONS.googleApiKey;
-
-    p.note(keyInstructions.steps.join("\n"), keyInstructions.title);
-
-    const apiKey = await p.text({
-      message: `${provider.name} API key`,
-      placeholder: provider.keyPrefix ? `${provider.keyPrefix}...` : "your-api-key",
-      validate: (val) => {
-        if (!val) return "API key is required";
-        if (provider.keyPrefix && !val.startsWith(provider.keyPrefix)) {
-          return `Must start with ${provider.keyPrefix}`;
-        }
-      },
-    });
-    handleCancel(apiKey);
-
-    modelApiKeys[provider.envVar] = apiKey as string;
-
-    // Keep anthropicApiKey for backward compatibility
-    if (providerKey === "anthropic") {
-      anthropicApiKey = apiKey as string;
-    }
-  }
-
-  // Select default model
-  const allModels = providers.flatMap((providerKey) =>
-    MODEL_PROVIDERS[providerKey].models.map((m) => ({
-      ...m,
-      provider: providerKey,
-    }))
+  p.note(
+    KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
+    KEY_INSTRUCTIONS.anthropicApiKey.title
   );
 
+  const anthropicApiKey = await p.text({
+    message: "Anthropic API key",
+    placeholder: `${MODEL_PROVIDERS.anthropic.keyPrefix}...`,
+    validate: (val) => {
+      if (!val) return "API key is required";
+      if (!val.startsWith(MODEL_PROVIDERS.anthropic.keyPrefix)) {
+        return `Must start with ${MODEL_PROVIDERS.anthropic.keyPrefix}`;
+      }
+    },
+  });
+  handleCancel(anthropicApiKey);
+
+  // Select default model (Anthropic models only)
   const defaultModel = await p.select({
     message: "Select default model for agents",
-    options: allModels.map((m) => ({
+    options: MODEL_PROVIDERS.anthropic.models.map((m) => ({
       value: m.value,
-      label: `${m.label} (${MODEL_PROVIDERS[m.provider].name})`,
+      label: m.label,
     })),
-    initialValue: allModels[0]?.value ?? "anthropic/claude-sonnet-4-5",
+    initialValue: MODEL_PROVIDERS.anthropic.models[0]?.value ?? "anthropic/claude-sonnet-4-5",
   });
   handleCancel(defaultModel);
 
@@ -393,45 +345,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     exitWithError("No agents configured. At least one agent is required.");
   }
 
-  // Step 5: Select coding CLIs
-  p.log.step("Configure coding CLIs");
-
-  const selectedCodingClis = await p.multiselect({
-    message: "Select coding CLIs to install",
-    options: Object.entries(CODING_CLIS).map(([key, cli]) => ({
-      value: key,
-      label: cli.displayName,
-      hint: cli.description,
-    })),
-    initialValues: ["claude-code"],
-    required: false,
-  });
-  handleCancel(selectedCodingClis);
-
-  const codingClis = (selectedCodingClis as string[]).length > 0
-    ? (selectedCodingClis as string[])
-    : ["claude-code"]; // Default to claude-code if none selected
-
-  // Note about API keys for non-Anthropic CLIs
-  const nonAnthropicClis = codingClis.filter(cli => cli !== "claude-code");
-  if (nonAnthropicClis.length > 0) {
-    p.note(
-      [
-        "The following CLIs require API keys configured post-deployment:",
-        ...nonAnthropicClis.map(cli => {
-          if (cli === "codex") return "• Codex: Set OPENAI_API_KEY in agent's environment";
-          if (cli === "amp") return "• Amp: Set AMP_API_KEY in agent's environment";
-          if (cli === "opencode") return "• OpenCode: Set OPENCODE_API_KEY in agent's environment";
-          return `• ${cli}: Configure API key in agent's environment`;
-        }),
-        "",
-        "Add these to ~/.openclaw/openclaw.json under 'env' after deployment.",
-      ].join("\n"),
-      "API Keys Required"
-    );
-  }
-
-  // Step 6: Configure integrations
+  // Step 5: Configure integrations
   p.log.step("Configure integrations");
 
   // Slack and Linear are always required
@@ -592,8 +506,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   const providerLabel = basicConfig.provider === "aws" ? "AWS" : "Hetzner";
   const regionLabel = basicConfig.provider === "aws" ? "Region" : "Location";
-  const codingCliNames = codingClis.map(cli => CODING_CLIS[cli as keyof typeof CODING_CLIS]?.displayName ?? cli);
-  const providerNames = providers.map((p) => MODEL_PROVIDERS[p].name);
 
   p.note(
     [
@@ -606,8 +518,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       `Working hours:  ${basicConfig.workingHours}`,
       `Linear team:    ${basicConfig.linearTeam}`,
       `GitHub repo:    ${basicConfig.githubRepo}`,
-      `Coding CLIs:    ${codingCliNames.join(", ")}`,
-      `Model providers: ${providerNames.join(", ")}`,
       `Default model:  ${String(defaultModel)}`,
       `Integrations:   ${integrationNames.join(", ")}`,
       ``,
@@ -664,10 +574,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   setConfig("linearTeam", basicConfig.linearTeam as string);
   setConfig("githubRepo", basicConfig.githubRepo as string);
   setConfig("defaultModel", defaultModel as string);
-  // Set model API keys for each provider
-  for (const [envVar, apiKey] of Object.entries(modelApiKeys)) {
-    setConfig(envVar, apiKey, true);
-  }
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
     if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true);
@@ -693,7 +599,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     linearTeam: basicConfig.linearTeam as string,
     githubRepo: basicConfig.githubRepo as string,
     agents,
-    codingClis,
   };
   saveManifest(configName, manifest);
   s.stop("Config saved");
