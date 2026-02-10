@@ -63,8 +63,7 @@
         "architecture/overview",
         "architecture/pulumi-components",
         "architecture/cloud-providers",
-        "architecture/agent-presets",
-        "architecture/adapter-pattern"
+        "architecture/agent-presets"
       ]
     },
     {

@@ -28,13 +28,6 @@ Everything starts with `agent-army.json` — the manifest file that defines your
 ### Component Resources
 Each agent is provisioned as a Pulumi component resource (`OpenClawAgent` for AWS, `HetznerAgent` for Hetzner). Components encapsulate: server, volume, security group, and cloud-init bootstrap.
 
-### Adapter Pattern
-Core logic is separated from runtime concerns through adapters:
-- **CLIAdapter** — Interactive terminal prompts via `@clack/prompts`
-- **APIAdapter** — HTTP request/response for the web UI
-
-This means the same wizard logic works in both CLI and web contexts.
-
 ### Secure Networking
 All agents join a Tailscale mesh VPN during bootstrap. SSH access goes through Tailscale — no public ports exposed. Agent hostnames follow the pattern `<stack>-<agent-name>`.
 
@@ -45,7 +38,6 @@ agent-army/
 ├── cli/                    # CLI and shared logic
 │   ├── bin.ts              # Entry point, command definitions
 │   ├── commands/           # Command implementations
-│   ├── adapters/           # Runtime adapters (CLI, API)
 │   ├── lib/                # Constants, utilities, prerequisites
 │   └── types.ts            # Manifest and agent types
 ├── src/
