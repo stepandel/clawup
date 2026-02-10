@@ -4,24 +4,12 @@ Interactive command-line tool for deploying and managing your fleet of [OpenClaw
 
 ## Installation
 
-The CLI is bundled with the project. After cloning:
-
 ```bash
-npm install
-npm run build
-```
+# Global install
+npm install -g @agent-army/cli
 
-Then run via `npx`:
-
-```bash
-npx agent-army <command>
-```
-
-Or link globally:
-
-```bash
-npm link
-agent-army <command>
+# Or run directly
+npx @agent-army/cli init
 ```
 
 ## Commands

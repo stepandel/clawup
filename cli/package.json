@@ -1,0 +1,22 @@
+{
+  "name": "@agent-army/cli",
+  "version": "0.1.0",
+  "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS",
+  "bin": { "agent-army": "dist/bin.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.9",
+    "commander": "^13.0",
+    "picocolors": "^1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
