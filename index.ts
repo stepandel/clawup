@@ -120,6 +120,22 @@ function loadPresetFiles(presetDir: string, baseDir: string = "base"): Record<st
     }
   }
 
+  // Load shared skills from presets/skills/
+  const skillsPath = path.join(presetsPath, "skills");
+  if (fs.existsSync(skillsPath)) {
+    for (const skillDir of fs.readdirSync(skillsPath)) {
+      const skillDirPath = path.join(skillsPath, skillDir);
+      if (fs.statSync(skillDirPath).isDirectory()) {
+        for (const filename of fs.readdirSync(skillDirPath)) {
+          const filePath = path.join(skillDirPath, filename);
+          if (fs.statSync(filePath).isFile()) {
+            files[`skills/${skillDir}/${filename}`] = fs.readFileSync(filePath, "utf-8");
+          }
+        }
+      }
+    }
+  }
+
   return files;
 }
 
