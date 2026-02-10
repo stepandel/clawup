@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['@pulumi/pulumi'],
-  },
+  serverExternalPackages: ['@pulumi/pulumi'],
 };
 
 module.exports = nextConfig;
