@@ -32,7 +32,7 @@ node -e "
   for (const name of ['@pulumi/pulumi', '@pulumi/aws', '@pulumi/hcloud', '@pulumi/tls']) {
     if (pkg.dependencies[name]) deps[name] = pkg.dependencies[name];
   }
-  const out = { name: 'agent-army-infra', private: true, dependencies: deps };
+  const out = { name: 'agent-army-infra', private: true, main: 'dist/index.js', dependencies: deps };
   console.log(JSON.stringify(out, null, 2));
 " > "$INFRA/package.json"
 
