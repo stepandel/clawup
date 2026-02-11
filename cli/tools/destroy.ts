@@ -7,6 +7,7 @@
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
 import { tailscaleHostname } from "../lib/constants";
+import { listTailscaleDevices, deleteTailscaleDevice } from "../lib/tailscale";
 import pc from "picocolors";
 
 export interface DestroyOptions {
@@ -14,12 +15,6 @@ export interface DestroyOptions {
   yes?: boolean;
   /** Config name (auto-detected if only one) */
   config?: string;
-}
-
-interface TailscaleDevice {
-  id: string;
-  name: string;
-  hostname: string;
 }
 
 /**
@@ -42,51 +37,6 @@ function formatAgentList(
 function getConfig(exec: ExecAdapter, key: string): string | null {
   const result = exec.capture("pulumi", ["config", "get", key]);
   return result.exitCode === 0 ? result.stdout.trim() : null;
-}
-
-/**
- * List all devices on a tailnet via the Tailscale API.
- */
-function listTailscaleDevices(
-  exec: ExecAdapter,
-  apiKey: string,
-  tailnet: string
-): TailscaleDevice[] | null {
-  const result = exec.capture("curl", [
-    "-sf",
-    "-H", `Authorization: Bearer ${apiKey}`,
-    `https://api.tailscale.com/api/v2/tailnet/${tailnet}/devices?fields=default`,
-  ]);
-  if (result.exitCode !== 0) return null;
-  try {
-    const data = JSON.parse(result.stdout);
-    if (!data.devices || !Array.isArray(data.devices)) return null;
-    return data.devices.map((d: Record<string, unknown>) => ({
-      id: d.id as string,
-      name: (d.name as string) ?? "",
-      hostname: (d.hostname as string) ?? "",
-    }));
-  } catch (err) {
-    console.warn(`[destroy] Failed to parse Tailscale API response: ${err instanceof Error ? err.message : String(err)}`);
-    return null;
-  }
-}
-
-/**
- * Delete a single Tailscale device by ID.
- */
-function deleteTailscaleDevice(
-  exec: ExecAdapter,
-  apiKey: string,
-  deviceId: string
-): boolean {
-  const result = exec.capture("curl", [
-    "-sf",
-    "-X", "DELETE",
-    "-H", `Authorization: Bearer ${apiKey}`,
-    `https://api.tailscale.com/api/v2/device/${deviceId}`,
-  ]);
-  return result.exitCode === 0;
 }
 
 /**
@@ -189,7 +139,7 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
     const apiFailed: string[] = [];
 
     const tailnet = tailnetDnsName;
-    const devices = listTailscaleDevices(exec, tailscaleApiKey, tailnet);
+    const devices = listTailscaleDevices(tailscaleApiKey, tailnet);
 
     if (devices) {
       for (const agent of manifest.agents) {
@@ -198,7 +148,7 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
           d.hostname === tsHost || d.name.startsWith(`${tsHost}.`)
         );
         if (device) {
-          const deleted = deleteTailscaleDevice(exec, tailscaleApiKey, device.id);
+          const deleted = deleteTailscaleDevice(tailscaleApiKey, device.id);
           if (!deleted) apiFailed.push(agent.name);
         }
       }
