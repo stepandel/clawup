@@ -5,6 +5,7 @@
 import * as p from "@clack/prompts";
 import type { PrereqResult } from "../types";
 import { commandExists, capture } from "./exec";
+import { isVendored } from "./vendor";
 import { isDevMode } from "./workspace";
 
 /**
@@ -17,13 +18,14 @@ export async function checkPrerequisites(): Promise<boolean> {
   // Pulumi CLI
   if (commandExists("pulumi")) {
     const ver = capture("pulumi", ["version"]);
-    results.push({ name: "Pulumi", ok: true, message: `found (${ver.stdout})` });
+    const source = isVendored("pulumi") ? "vendored" : "system";
+    results.push({ name: "Pulumi", ok: true, message: `found (${ver.stdout}, ${source})` });
   } else {
     results.push({
       name: "Pulumi",
       ok: false,
       message: "not found",
-      hint: "Install from https://www.pulumi.com/docs/iac/download-install/",
+      hint: "Install from https://www.pulumi.com/docs/iac/download-install/ or run `npm install` to vendor automatically",
     });
   }
 
@@ -52,13 +54,14 @@ export async function checkPrerequisites(): Promise<boolean> {
 
   // AWS CLI
   if (commandExists("aws")) {
-    results.push({ name: "AWS CLI", ok: true, message: "found" });
+    const source = isVendored("aws") ? "vendored" : "system";
+    results.push({ name: "AWS CLI", ok: true, message: `found (${source})` });
   } else {
     results.push({
       name: "AWS CLI",
       ok: false,
       message: "not found",
-      hint: "Install from https://aws.amazon.com/cli/",
+      hint: "Install from https://aws.amazon.com/cli/ or run `npm install` to vendor automatically",
     });
   }
 

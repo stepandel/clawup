@@ -2,8 +2,9 @@
  * Child process helpers for CLI commands
  */
 
-import { execSync, spawn, spawnSync, type SpawnOptions } from "child_process";
+import { execSync, spawn, type SpawnOptions } from "child_process";
 import { trackChild } from "./process";
+import { resolveCommand, commandExistsWithVendor } from "./vendor";
 
 /** Result of a captured command execution */
 export interface ExecResult {
@@ -13,11 +14,13 @@ export interface ExecResult {
 }
 
 /**
- * Execute a command and capture output
+ * Execute a command and capture output.
+ * Resolves vendored binaries before falling back to system PATH.
  */
 export function capture(command: string, args: string[] = [], cwd?: string): ExecResult {
+  const resolved = resolveCommand(command);
   try {
-    const result = execSync([command, ...args].join(" "), {
+    const result = execSync([resolved, ...args].join(" "), {
       cwd,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -36,15 +39,17 @@ export function capture(command: string, args: string[] = [], cwd?: string): Exe
 /**
  * Execute a command with streaming output (stdout/stderr pass-through)
  * Returns the exit code.
+ * Resolves vendored binaries before falling back to system PATH.
  */
 export function stream(command: string, args: string[] = [], cwd?: string): Promise<number> {
+  const resolved = resolveCommand(command);
   return new Promise((resolve) => {
     const opts: SpawnOptions = {
       cwd,
       stdio: "inherit",
       shell: true,
     };
-    const child = spawn(command, args, opts);
+    const child = spawn(resolved, args, opts);
     trackChild(child);
     child.on("close", (code) => resolve(code ?? 1));
     child.on("error", (err) => {
@@ -55,10 +60,8 @@ export function stream(command: string, args: string[] = [], cwd?: string): Prom
 }
 
 /**
- * Check if a command exists on the system
+ * Check if a command exists, checking vendor directory first, then system PATH.
  */
 export function commandExists(command: string): boolean {
-  const bin = process.platform === "win32" ? "where" : "which";
-  const result = spawnSync(bin, [command], { shell: false, stdio: "ignore" });
-  return result.status === 0;
+  return commandExistsWithVendor(command);
 }

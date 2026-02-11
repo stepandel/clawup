@@ -9,6 +9,7 @@ import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { execSync, spawn, spawnSync, type SpawnOptions } from "child_process";
 import { trackChild } from "../lib/process";
+import { resolveCommand, commandExistsWithVendor } from "../lib/vendor";
 import type {
   RuntimeAdapter,
   UIAdapter,
@@ -28,8 +29,9 @@ import type {
 
 class CLIExecAdapter implements ExecAdapter {
   capture(command: string, args: string[] = [], cwd?: string): ExecResult {
+    const resolved = resolveCommand(command);
     try {
-      const result = execSync([command, ...args].join(" "), {
+      const result = execSync([resolved, ...args].join(" "), {
         cwd,
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
@@ -46,13 +48,14 @@ class CLIExecAdapter implements ExecAdapter {
   }
 
   stream(command: string, args: string[] = [], options?: StreamOptions): Promise<number> {
+    const resolved = resolveCommand(command);
     return new Promise((resolve) => {
       const opts: SpawnOptions = {
         cwd: options?.cwd,
         stdio: options?.capture ? "pipe" : "inherit",
         shell: true,
       };
-      const child = spawn(command, args, opts);
+      const child = spawn(resolved, args, opts);
       trackChild(child);
       child.on("close", (code) => resolve(code ?? 1));
       child.on("error", (err) => {
@@ -63,9 +66,7 @@ class CLIExecAdapter implements ExecAdapter {
   }
 
   commandExists(command: string): boolean {
-    const bin = process.platform === "win32" ? "where" : "which";
-    const result = spawnSync(bin, [command], { shell: false, stdio: "ignore" });
-    return result.status === 0;
+    return commandExistsWithVendor(command);
   }
 }
 

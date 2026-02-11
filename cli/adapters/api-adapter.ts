@@ -6,6 +6,7 @@
  * and accumulates responses as structured JSON.
  */
 
+import { resolveCommand, commandExistsWithVendor } from "../lib/vendor";
 import type {
   RuntimeAdapter,
   UIAdapter,
@@ -61,8 +62,9 @@ export interface APIResponse {
 class APIExecAdapter implements ExecAdapter {
   capture(command: string, args: string[] = [], cwd?: string): ExecResult {
     const { execFileSync } = require("child_process");
+    const resolved = resolveCommand(command);
     try {
-      const result = execFileSync(command, args, {
+      const result = execFileSync(resolved, args, {
         cwd,
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
@@ -85,10 +87,7 @@ class APIExecAdapter implements ExecAdapter {
   }
 
   commandExists(command: string): boolean {
-    const { spawnSync } = require("child_process");
-    const bin = process.platform === "win32" ? "where" : "which";
-    const result = spawnSync(bin, [command], { shell: false, stdio: "ignore" });
-    return result.status === 0;
+    return commandExistsWithVendor(command);
   }
 }
 
