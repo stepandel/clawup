@@ -11,7 +11,7 @@ const posts: Record<string, {
 }> = {
   launch: {
     title: "A team of agents (PM, Eng, QA) tackles my Linear tickets while I\u2019m driving",
-    date: "June 10, 2025",
+    date: "February 10, 2026",
     location: "San Francisco, CA",
     author: "Stepan",
     authorUrl: "https://x.com/stepanarsent",
