@@ -9,7 +9,8 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "lint": "eslint src/**/*.ts",
-    "test": "echo \"No tests yet\""
+    "test": "echo \"No tests yet\"",
+    "build:cli-infra": "bash scripts/bundle-infra.sh"
   },
   "keywords": [
     "pulumi",

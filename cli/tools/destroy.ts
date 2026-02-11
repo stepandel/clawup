@@ -8,6 +8,7 @@ import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapter
 import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
 import { tailscaleHostname } from "../lib/constants";
 import { listTailscaleDevices, deleteTailscaleDevice } from "../lib/tailscale";
+import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import pc from "picocolors";
 
 export interface DestroyOptions {
@@ -34,8 +35,8 @@ function formatAgentList(
 /**
  * Get Pulumi config value
  */
-function getConfig(exec: ExecAdapter, key: string): string | null {
-  const result = exec.capture("pulumi", ["config", "get", key]);
+function getConfig(exec: ExecAdapter, key: string, cwd?: string): string | null {
+  const result = exec.capture("pulumi", ["config", "get", key], cwd);
   return result.exitCode === 0 ? result.stdout.trim() : null;
 }
 
@@ -49,6 +50,14 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
   const { ui, exec } = runtime;
 
   ui.intro("Agent Army");
+
+  // Ensure workspace is set up (no-op in dev mode)
+  const wsResult = ensureWorkspace();
+  if (!wsResult.ok) {
+    ui.log.error(wsResult.error ?? "Failed to set up workspace.");
+    process.exit(1);
+  }
+  const cwd = getWorkspaceDir();
 
   // Resolve config name and load manifest
   let configName: string;
@@ -66,9 +75,9 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
   }
 
   // Select/create stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName]);
+  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
   if (selectResult.exitCode !== 0) {
-    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName]);
+    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName], cwd);
     if (initResult.exitCode !== 0) {
       ui.log.error(`Could not select Pulumi stack "${manifest.stackName}".`);
       process.exit(1);
@@ -117,12 +126,12 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
   }
 
   // Sync manifest to project root so the Pulumi program can read it
-  syncManifestToProject(configName);
+  syncManifestToProject(configName, cwd);
 
   // Destroy infrastructure
   ui.log.step("Running pulumi destroy...");
   console.log();
-  const exitCode = await exec.stream("pulumi", ["destroy", "--yes"]);
+  const exitCode = await exec.stream("pulumi", ["destroy", "--yes"], { cwd });
   console.log();
 
   if (exitCode !== 0) {
@@ -131,8 +140,8 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
   }
 
   // Clean up Tailscale devices after infrastructure is destroyed
-  const tailnetDnsName = getConfig(exec, "tailnetDnsName");
-  const tailscaleApiKey = getConfig(exec, "tailscaleApiKey");
+  const tailnetDnsName = getConfig(exec, "tailnetDnsName", cwd);
+  const tailscaleApiKey = getConfig(exec, "tailscaleApiKey", cwd);
 
   if (tailnetDnsName && tailscaleApiKey) {
     const spinner = ui.spinner("Removing agents from Tailscale...");

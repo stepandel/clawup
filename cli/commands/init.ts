@@ -21,8 +21,8 @@ import {
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
 import { saveManifest } from "../lib/config";
+import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, handleCancel, exitWithError, formatCost, formatAgentList } from "../lib/ui";
-import { capture } from "../lib/exec";
 
 interface InitOptions {
   deploy?: boolean;
@@ -516,9 +516,19 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // Step 9: Execute setup
   const s = p.spinner();
 
+  // Set up workspace (installs Pulumi SDK deps on first run, no-op in dev mode)
+  s.start("Setting up workspace...");
+  const wsResult = ensureWorkspace();
+  if (!wsResult.ok) {
+    s.stop("Failed to set up workspace");
+    exitWithError(wsResult.error ?? "Failed to set up workspace.");
+  }
+  s.stop("Workspace ready");
+  const cwd = getWorkspaceDir();
+
   // Select/create stack
   s.start("Selecting Pulumi stack...");
-  const stackResult = selectOrCreateStack(basicConfig.stackName as string);
+  const stackResult = selectOrCreateStack(basicConfig.stackName as string, cwd);
   if (!stackResult.ok) {
     s.stop("Failed to select/create stack");
     if (stackResult.error) p.log.error(stackResult.error);
@@ -528,35 +538,35 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   // Set Pulumi config
   s.start("Setting Pulumi configuration...");
-  setConfig("provider", basicConfig.provider);
+  setConfig("provider", basicConfig.provider, false, cwd);
   if (basicConfig.provider === "aws") {
-    setConfig("aws:region", basicConfig.region);
+    setConfig("aws:region", basicConfig.region, false, cwd);
   } else {
-    setConfig("hetzner:location", basicConfig.region);
+    setConfig("hetzner:location", basicConfig.region, false, cwd);
     if (hcloudToken) {
-      setConfig("hcloud:token", hcloudToken, true);
+      setConfig("hcloud:token", hcloudToken, true, cwd);
     }
   }
-  setConfig("anthropicApiKey", anthropicApiKey as string, true);
-  setConfig("tailscaleAuthKey", tailscaleAuthKey as string, true);
-  setConfig("tailnetDnsName", tailnetDnsName as string);
+  setConfig("anthropicApiKey", anthropicApiKey as string, true, cwd);
+  setConfig("tailscaleAuthKey", tailscaleAuthKey as string, true, cwd);
+  setConfig("tailnetDnsName", tailnetDnsName as string, false, cwd);
   if (tailscaleApiKey) {
-    setConfig("tailscaleApiKey", tailscaleApiKey as string, true);
+    setConfig("tailscaleApiKey", tailscaleApiKey as string, true, cwd);
   }
-  setConfig("instanceType", basicConfig.instanceType as string);
-  setConfig("ownerName", basicConfig.ownerName as string);
-  setConfig("timezone", basicConfig.timezone as string);
-  setConfig("workingHours", basicConfig.workingHours as string);
-  setConfig("userNotes", basicConfig.userNotes as string);
-  setConfig("linearTeam", basicConfig.linearTeam as string);
-  setConfig("githubRepo", basicConfig.githubRepo as string);
-  setConfig("defaultModel", defaultModel as string);
+  setConfig("instanceType", basicConfig.instanceType as string, false, cwd);
+  setConfig("ownerName", basicConfig.ownerName as string, false, cwd);
+  setConfig("timezone", basicConfig.timezone as string, false, cwd);
+  setConfig("workingHours", basicConfig.workingHours as string, false, cwd);
+  setConfig("userNotes", basicConfig.userNotes as string, false, cwd);
+  setConfig("linearTeam", basicConfig.linearTeam as string, false, cwd);
+  setConfig("githubRepo", basicConfig.githubRepo as string, false, cwd);
+  setConfig("defaultModel", defaultModel as string, false, cwd);
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
-    if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true);
-    if (creds.slackAppToken) setConfig(`${role}SlackAppToken`, creds.slackAppToken, true);
-    if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true);
-    if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true);
+    if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true, cwd);
+    if (creds.slackAppToken) setConfig(`${role}SlackAppToken`, creds.slackAppToken, true, cwd);
+    if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true, cwd);
+    if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true, cwd);
   }
   s.stop("Configuration saved");
 
@@ -578,19 +588,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   };
   saveManifest(configName, manifest);
   s.stop("Config saved");
-
-  // Install dependencies if needed
-  const result = capture("ls", ["node_modules"]);
-  if (result.exitCode !== 0) {
-    s.start("Installing dependencies...");
-    const installResult = capture("pnpm", ["install"]);
-    if (installResult.exitCode !== 0) {
-      s.stop("Failed to install dependencies");
-      p.log.warn("Run 'pnpm install' manually before deploying.");
-    } else {
-      s.stop("Dependencies installed");
-    }
-  }
 
   if (opts.deploy) {
     p.log.success("Config saved! Starting deployment...\n");

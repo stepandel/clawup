@@ -5,6 +5,7 @@
 import * as p from "@clack/prompts";
 import type { PrereqResult } from "../types";
 import { commandExists, capture } from "./exec";
+import { isDevMode } from "./workspace";
 
 /**
  * Run all prerequisite checks and display results.
@@ -61,16 +62,18 @@ export async function checkPrerequisites(): Promise<boolean> {
     });
   }
 
-  // pnpm
-  if (commandExists("pnpm")) {
-    results.push({ name: "pnpm", ok: true, message: "found" });
-  } else {
-    results.push({
-      name: "pnpm",
-      ok: false,
-      message: "not found",
-      hint: "Install with: npm install -g pnpm",
-    });
+  // pnpm (only required in dev mode — installed mode uses npm in the workspace)
+  if (isDevMode()) {
+    if (commandExists("pnpm")) {
+      results.push({ name: "pnpm", ok: true, message: "found" });
+    } else {
+      results.push({
+        name: "pnpm",
+        ok: false,
+        message: "not found",
+        hint: "Install with: npm install -g pnpm",
+      });
+    }
   }
 
   // Display results

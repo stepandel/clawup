@@ -6,6 +6,7 @@ import * as p from "@clack/prompts";
 import { loadManifest, resolveConfigName, checkAndMigrateLegacy } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
+import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, exitWithError } from "../lib/ui";
 import { spawn } from "child_process";
 
@@ -15,6 +16,13 @@ interface SshOptions {
 }
 
 export async function sshCommand(agentNameOrAlias: string, commandArgs: string[], opts: SshOptions): Promise<void> {
+  // Ensure workspace is set up (no-op in dev mode)
+  const wsResult = ensureWorkspace();
+  if (!wsResult.ok) {
+    exitWithError(wsResult.error ?? "Failed to set up workspace.");
+  }
+  const cwd = getWorkspaceDir();
+
   // Check for legacy config and offer migration
   await checkAndMigrateLegacy();
 
@@ -33,7 +41,7 @@ export async function sshCommand(agentNameOrAlias: string, commandArgs: string[]
   }
 
   // Select stack
-  const stackResult = selectOrCreateStack(manifest.stackName);
+  const stackResult = selectOrCreateStack(manifest.stackName, cwd);
   if (!stackResult.ok) {
     exitWithError(`Could not select Pulumi stack "${manifest.stackName}".`);
   }
@@ -61,7 +69,7 @@ export async function sshCommand(agentNameOrAlias: string, commandArgs: string[]
   }
 
   // Get tailnet DNS name
-  const tailnetDnsName = getConfig("tailnetDnsName");
+  const tailnetDnsName = getConfig("tailnetDnsName", cwd);
   if (!tailnetDnsName) {
     exitWithError("Could not determine tailnet DNS name from Pulumi config.");
   }

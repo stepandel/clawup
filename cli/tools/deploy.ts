@@ -7,6 +7,7 @@
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
 import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
 import { COST_ESTIMATES, HETZNER_COST_ESTIMATES } from "../lib/constants";
+import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import pc from "picocolors";
 
 export interface DeployOptions {
@@ -48,6 +49,14 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
 
   ui.intro("Agent Army");
 
+  // Ensure workspace is set up (no-op in dev mode)
+  const wsResult = ensureWorkspace();
+  if (!wsResult.ok) {
+    ui.log.error(wsResult.error ?? "Failed to set up workspace.");
+    process.exit(1);
+  }
+  const cwd = getWorkspaceDir();
+
   // Resolve config name and load manifest
   let configName: string;
   try {
@@ -64,9 +73,9 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
   }
 
   // Select/create stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName]);
+  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
   if (selectResult.exitCode !== 0) {
-    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName]);
+    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName], cwd);
     if (initResult.exitCode !== 0) {
       ui.log.error(initResult.stderr || selectResult.stderr);
       ui.log.error(`Could not select Pulumi stack "${manifest.stackName}".`);
@@ -105,15 +114,15 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
   }
 
   // Sync manifest to project root so the Pulumi program can read it
-  syncManifestToProject(configName);
+  syncManifestToProject(configName, cwd);
 
   // Sync instanceType from manifest to Pulumi config
-  exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType]);
+  exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType], cwd);
 
   // Deploy
   ui.log.step("Running pulumi up...");
   console.log();
-  const exitCode = await exec.stream("pulumi", ["up", "--yes"]);
+  const exitCode = await exec.stream("pulumi", ["up", "--yes"], { cwd });
   console.log();
 
   if (exitCode !== 0) {
@@ -129,7 +138,7 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
     "output",
     "--json",
     "--show-secrets",
-  ]);
+  ], cwd);
   if (outputsResult.exitCode === 0) {
     try {
       const outputs = JSON.parse(outputsResult.stdout) as Record<string, unknown>;

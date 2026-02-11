@@ -29,7 +29,14 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           cd cli && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
-      - run: pnpm --filter agent-army build
+      - name: Build root Pulumi program
+        run: pnpm build
+
+      - name: Bundle infrastructure into CLI
+        run: bash scripts/bundle-infra.sh
+
+      - name: Build CLI
+        run: pnpm --filter ./cli build
 
       - name: Publish to npm
         run: npm publish --provenance --access public

@@ -7,6 +7,7 @@
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
 import { SSH_USER, tailscaleHostname } from "../lib/constants";
+import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import pc from "picocolors";
 
 export interface ValidateOptions {
@@ -52,8 +53,8 @@ function runSshCheck(
 /**
  * Get Pulumi config value
  */
-function getConfig(exec: ExecAdapter, key: string): string | null {
-  const result = exec.capture("pulumi", ["config", "get", key]);
+function getConfig(exec: ExecAdapter, key: string, cwd?: string): string | null {
+  const result = exec.capture("pulumi", ["config", "get", key], cwd);
   return result.exitCode === 0 ? result.stdout.trim() : null;
 }
 
@@ -67,6 +68,14 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   const { ui, exec } = runtime;
 
   ui.intro("Agent Army");
+
+  // Ensure workspace is set up (no-op in dev mode)
+  const wsResult = ensureWorkspace();
+  if (!wsResult.ok) {
+    ui.log.error(wsResult.error ?? "Failed to set up workspace.");
+    process.exit(1);
+  }
+  const cwd = getWorkspaceDir();
 
   // Resolve config name and load manifest
   let configName: string;
@@ -84,9 +93,9 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   }
 
   // Select/create stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName]);
+  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
   if (selectResult.exitCode !== 0) {
-    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName]);
+    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName], cwd);
     if (initResult.exitCode !== 0) {
       ui.log.error(`Could not select Pulumi stack "${manifest.stackName}".`);
       process.exit(1);
@@ -94,7 +103,7 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   }
 
   // Get tailnet
-  const tailnetDnsName = getConfig(exec, "tailnetDnsName");
+  const tailnetDnsName = getConfig(exec, "tailnetDnsName", cwd);
   if (!tailnetDnsName) {
     ui.log.error("Could not determine tailnet DNS name from Pulumi config.");
     process.exit(1);

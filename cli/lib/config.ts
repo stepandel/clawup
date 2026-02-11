@@ -41,12 +41,12 @@ export function legacyManifestPath(): string {
 }
 
 /**
- * Copy a named config to ./agent-army.json so the Pulumi program can read it.
- * The Pulumi program (index.ts) always reads from the project root manifest.
+ * Copy a named config to agent-army.json so the Pulumi program can read it.
+ * When projectDir is provided, writes there instead of process.cwd().
  */
-export function syncManifestToProject(name: string): void {
+export function syncManifestToProject(name: string, projectDir?: string): void {
   const src = configPath(name);
-  const dest = legacyManifestPath();
+  const dest = path.join(projectDir ?? process.cwd(), MANIFEST_FILE);
   fs.copyFileSync(src, dest);
 }
 

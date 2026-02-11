@@ -7,6 +7,7 @@
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
 import { SSH_USER, tailscaleHostname } from "../lib/constants";
+import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 
 export interface StatusOptions {
   /** Output as JSON */
@@ -75,18 +76,18 @@ function getGhAuthStatus(exec: ExecAdapter, host: string, timeout: number = 5): 
 /**
  * Get Pulumi config value
  */
-function getConfig(exec: ExecAdapter, key: string): string | null {
-  const result = exec.capture("pulumi", ["config", "get", key]);
+function getConfig(exec: ExecAdapter, key: string, cwd?: string): string | null {
+  const result = exec.capture("pulumi", ["config", "get", key], cwd);
   return result.exitCode === 0 ? result.stdout.trim() : null;
 }
 
 /**
  * Get stack outputs
  */
-function getStackOutputs(exec: ExecAdapter, showSecrets: boolean = false): Record<string, unknown> | null {
+function getStackOutputs(exec: ExecAdapter, showSecrets: boolean = false, cwd?: string): Record<string, unknown> | null {
   const args = ["stack", "output", "--json"];
   if (showSecrets) args.push("--show-secrets");
-  const result = exec.capture("pulumi", args);
+  const result = exec.capture("pulumi", args, cwd);
   if (result.exitCode !== 0) return null;
   try {
     return JSON.parse(result.stdout);
@@ -108,6 +109,14 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
     ui.intro("Agent Army");
   }
 
+  // Ensure workspace is set up (no-op in dev mode)
+  const wsResult = ensureWorkspace();
+  if (!wsResult.ok) {
+    ui.log.error(wsResult.error ?? "Failed to set up workspace.");
+    process.exit(1);
+  }
+  const cwd = getWorkspaceDir();
+
   // Resolve config name and load manifest
   let configName: string;
   try {
@@ -124,9 +133,9 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
   }
 
   // Select/create stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName]);
+  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
   if (selectResult.exitCode !== 0) {
-    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName]);
+    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName], cwd);
     if (initResult.exitCode !== 0) {
       if (!options.json) {
         ui.log.error(initResult.stderr || selectResult.stderr);
@@ -137,14 +146,14 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
   }
 
   // Get outputs
-  const outputs = getStackOutputs(exec, true);
+  const outputs = getStackOutputs(exec, true, cwd);
   if (!outputs) {
     ui.log.error("Could not fetch stack outputs. Has the stack been deployed?");
     process.exit(1);
   }
 
   // Get tailnet DNS name for SSH connections
-  const tailnetDnsName = getConfig(exec, "tailnetDnsName");
+  const tailnetDnsName = getConfig(exec, "tailnetDnsName", cwd);
 
   // Build status data with Claude Code and GitHub CLI versions (fetched via SSH)
   const statusData = manifest.agents.map((agent) => {
