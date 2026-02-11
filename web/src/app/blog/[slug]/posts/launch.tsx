@@ -240,9 +240,15 @@ export default function LaunchPost() {
       <p>
         That&apos;s it. Three agents, each on their own cloud instance (AWS or Hetzner),
         connected via a Tailscale mesh VPN, pre-configured with OpenClaw, Claude Code,
-        Linear, GitHub, and Slack integrations. (The first setup is the longest, you need
-        to set up all the keys but after that it&apos;s a one command to deploy or
-        destroy)
+        Linear, GitHub, and Slack integrations. The first setup is the longest — and
+        honestly, the most annoying part isn&apos;t the infrastructure. It&apos;s the
+        accounts. OpenClaw agents behave like humans with computers, and they really need
+        their own accounts with proper permissions. GitHub is the worst offender — they
+        actively block agents from creating accounts. Slack is similar. I ended up
+        manually creating GitHub and Slack accounts for each agent, which felt absurd.
+        The whole setup would&apos;ve been 10x faster if agents could just sign up for
+        email (with something like AgentMail) and create their own accounts. After that
+        initial pain, it&apos;s a single command to deploy or destroy.
       </p>
       <p>Each agent is defined by a set of workspace files:</p>
 
