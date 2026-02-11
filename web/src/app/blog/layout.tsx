@@ -26,7 +26,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
         </a>
         <div className="flex items-center gap-6">
           <a
-            href="/blog"
+            href="/blog/launch"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Blog
@@ -63,7 +63,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
             </div>
             <div className="flex gap-7 flex-wrap">
               {[
-                { label: "Blog", href: "/blog" },
+                { label: "Blog", href: "/blog/launch" },
                 { label: "GitHub", href: "https://github.com/stepandel/agent-army" },
                 { label: "Documentation", href: "https://docs.agent-army.ai" },
               ].map((link) => (

@@ -89,7 +89,7 @@ export default function Home() {
         </a>
         <div className="flex items-center gap-6">
           <a
-            href="/blog"
+            href="/blog/launch"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Blog

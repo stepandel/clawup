@@ -59,15 +59,6 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
         </a>
       </p>
 
-      {/* Back link */}
-      <div className="mt-14 pt-8 border-t border-border">
-        <a
-          href="/blog"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          &larr; Back to blog
-        </a>
-      </div>
     </article>
   );
 }
