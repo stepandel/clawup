@@ -2,7 +2,7 @@ export default function LaunchPost() {
   return (
     <div className="space-y-6 text-[15px] leading-relaxed text-muted-foreground">
       <p>
-        Last week it was a fantastic weather in the Bay Area and I really wanted to take
+        Last week the weather in the Bay Area was fantastic and I really wanted to take
         a road trip and take my eyes off the monitor. But with all the OpenClaw craze
         going on, it was getting really hard to step away.
       </p>
@@ -17,8 +17,9 @@ export default function LaunchPost() {
           @steipete
         </a>{" "}
         to take my work on the road and delegate my ideas to OpenClaw, I went on the
-        trip and came back to several open PRs. Over the next few days my productivity
-        has gone significantly up. Here&apos;s my setup and what I learned.
+        trip and came back to several open PRs. Over the next 7 days, the team
+        cumulatively closed over 150 tickets across 4 projects. Here&apos;s my setup
+        and what I learned.
       </p>
 
       {/* Stage 0 */}
@@ -53,6 +54,23 @@ export default function LaunchPost() {
         are review comments from review agents like CodeRabbit that need to be addressed.
         So I&apos;d send it back to the PR and ask it to fix things up.
       </p>
+      <p>
+        A few things I learned the hard way:
+      </p>
+      <ul className="list-disc list-inside space-y-2 pl-1">
+        <li>
+          Agents stumble when instructions are too concrete and rigid — they need room
+          to reason about the problem, not just follow a script
+        </li>
+        <li>
+          Scout (QA) would consistently ignore PR review comments unless explicitly
+          reminded to check for them in its heartbeat
+        </li>
+        <li>
+          Context windows fill up fast when one agent is doing research, planning, and
+          coding — quality degrades noticeably toward the end of long tasks
+        </li>
+      </ul>
       <p>
         A single agent doing all three stages works, but it&apos;s slow and the context
         gets messy. The agent that researched the problem is now also trying to debug a
@@ -341,8 +359,8 @@ export default function LaunchPost() {
         skills and plugins for your specific workflow.
       </p>
       <p>
-        If you&apos;re spending time waiting for your Claude Code to finish work, go for
-        a walk instead and ask Juno, Titus or Scout to take care of it.
+        If you&apos;re spending time waiting for your Claude Code to finish work, go
+        drive through Big Sur instead — Juno, Titus, and Scout will hold down the fort.
       </p>
     </div>
   );
