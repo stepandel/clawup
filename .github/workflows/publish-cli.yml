@@ -27,7 +27,7 @@ jobs:
       - name: Set version from release tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          cd cli && npm version "$VERSION" --no-git-tag-version
+          cd cli && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - run: pnpm --filter agent-army build
 
