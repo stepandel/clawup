@@ -8,17 +8,14 @@
 
 Your primary coding agent. Spawn for complex tasks.
 
-**Important:**
-- **Requires PTY**: Always use `pty=true` when spawning (it will hang silently without it)
-- **One-shot prompts**: Use `-p` flag for quick tasks: `claude -p "your prompt"`
+**Use the `coding-agent` skill** — it has all the patterns for PTY, background mode, process monitoring, and auto-notify. Read it before spawning Claude Code.
 
-```bash
-# Start Claude Code session
-claude-code --task "Implement feature X" --context "ticket-123.md"
-
-# One-shot prompt (non-interactive)
-claude -p "Add error handling to auth.ts"
-```
+Quick reference:
+- **Always `pty:true`** — hangs without it
+- **`background:true` + `workdir`** for longer tasks
+- **Monitor:** `process action:log sessionId:XXX`
+- **One-shot:** `claude -p "your prompt"` (still needs PTY)
+- **Never run in OpenClaw's directory**
 
 ## Linear
 
