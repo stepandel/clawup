@@ -8,6 +8,7 @@ import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, exitWithError } from "../lib/ui";
+import { requireTailscale } from "../lib/tailscale";
 import { spawn } from "child_process";
 
 interface SshOptions {
@@ -16,6 +17,8 @@ interface SshOptions {
 }
 
 export async function sshCommand(agentNameOrAlias: string, commandArgs: string[], opts: SshOptions): Promise<void> {
+  requireTailscale();
+
   // Ensure workspace is set up (no-op in dev mode)
   const wsResult = ensureWorkspace();
   if (!wsResult.ok) {

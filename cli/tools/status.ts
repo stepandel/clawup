@@ -8,6 +8,7 @@ import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapter
 import { loadManifest, resolveConfigName } from "../lib/config";
 import { SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
+import { isTailscaleRunning } from "../lib/tailscale";
 
 export interface StatusOptions {
   /** Output as JSON */
@@ -154,6 +155,15 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
 
   // Get tailnet DNS name for SSH connections
   const tailnetDnsName = getConfig(exec, "tailnetDnsName", cwd);
+
+  // Warn if Tailscale is not running (SSH version columns will show "—")
+  const tailscaleUp = isTailscaleRunning();
+  if (!tailscaleUp && !options.json) {
+    ui.log.warn(
+      "Tailscale is not running — CLI version columns will show \"—\".\n" +
+      "  Open the Tailscale app or run: tailscale up"
+    );
+  }
 
   // Build status data with Claude Code and GitHub CLI versions (fetched via SSH)
   const statusData = manifest.agents.map((agent) => {

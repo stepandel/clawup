@@ -8,6 +8,7 @@
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
 import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
+import { isTailscaleInstalled, isTailscaleRunning } from "../lib/tailscale";
 import pc from "picocolors";
 
 export interface RedeployOptions {
@@ -167,6 +168,21 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     } catch (err) {
       ui.log.warn(`Could not parse stack outputs: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  // Remind user about Tailscale if not connected
+  if (!isTailscaleInstalled()) {
+    const hint =
+      process.platform === "darwin"
+        ? "Install from the Mac App Store or https://tailscale.com/download"
+        : "Install from https://tailscale.com/download";
+    ui.log.warn(
+      `Tailscale is required to connect to agents.\n  ${hint}\n  Then run: ${pc.cyan("tailscale up")}`
+    );
+  } else if (!isTailscaleRunning()) {
+    ui.log.warn(
+      `Tailscale is not running. Start it before validating agents.\n  Open the Tailscale app or run: ${pc.cyan("tailscale up")}`
+    );
   }
 
   ui.outro("Agents updated. Run `agent-army validate` to verify.");

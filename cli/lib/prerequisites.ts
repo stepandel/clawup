@@ -7,6 +7,7 @@ import type { PrereqResult } from "../types";
 import { commandExists, capture } from "./exec";
 import { isVendored } from "./vendor";
 import { isDevMode } from "./workspace";
+import { isTailscaleInstalled } from "./tailscale";
 
 /**
  * Run all prerequisite checks and display results.
@@ -62,6 +63,22 @@ export async function checkPrerequisites(): Promise<boolean> {
       ok: false,
       message: "not found",
       hint: "Install from https://aws.amazon.com/cli/ or run `npm install` to vendor automatically",
+    });
+  }
+
+  // Tailscale
+  if (isTailscaleInstalled()) {
+    results.push({ name: "Tailscale", ok: true, message: "found" });
+  } else {
+    const hint =
+      process.platform === "darwin"
+        ? "Install from the Mac App Store or https://tailscale.com/download"
+        : "Install from https://tailscale.com/download";
+    results.push({
+      name: "Tailscale",
+      ok: false,
+      message: "not found",
+      hint,
     });
   }
 

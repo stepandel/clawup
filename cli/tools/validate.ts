@@ -8,6 +8,7 @@ import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapter
 import { loadManifest, resolveConfigName } from "../lib/config";
 import { SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
+import { requireTailscale } from "../lib/tailscale";
 import pc from "picocolors";
 
 export interface ValidateOptions {
@@ -68,6 +69,8 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   const { ui, exec } = runtime;
 
   ui.intro("Agent Army");
+
+  requireTailscale();
 
   // Ensure workspace is set up (no-op in dev mode)
   const wsResult = ensureWorkspace();
