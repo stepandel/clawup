@@ -1,6 +1,6 @@
 {
   "name": "agent-army",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS",
   "bin": { "agent-army": "dist/bin.js" },
   "files": ["dist", "infra", "scripts"],
