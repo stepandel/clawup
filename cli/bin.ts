@@ -16,6 +16,7 @@ import { deployCommand } from "./commands/deploy";
 import { statusCommand } from "./commands/status";
 import { sshCommand } from "./commands/ssh";
 import { validateCommand } from "./commands/validate";
+import { pushCommand } from "./commands/push";
 import { destroyCommand } from "./commands/destroy";
 import { listCommand } from "./commands/list";
 import { updateCommand } from "./commands/update";
@@ -80,6 +81,28 @@ program
   .option("-c, --config <name>", "Config name (auto-detected if only one)")
   .action(async (opts) => {
     await validateCommand(opts);
+  });
+
+program
+  .command("push")
+  .description("Push workspace files, skills, and config to running agents")
+  .option("--skills", "Sync presets/skills/ to remote workspace")
+  .option("--workspace", "Sync role-specific preset files + base AGENTS.md")
+  .option("--memory-reset", "Remove remote memory/ dir and MEMORY.md")
+  .option("--openclaw", "Upgrade openclaw to latest + restart gateway")
+  .option("--config-push", "Copy local openclaw.json to remote + restart gateway")
+  .option("-a, --agent <name>", "Target a single agent (name, role, or alias)")
+  .option("-c, --config <name>", "Config name (auto-detected if only one)")
+  .action(async (opts) => {
+    await pushCommand({
+      skills: opts.skills,
+      workspace: opts.workspace,
+      memoryReset: opts.memoryReset,
+      openclaw: opts.openclaw,
+      pushConfig: opts.configPush,
+      agent: opts.agent,
+      config: opts.config,
+    });
   });
 
 program
