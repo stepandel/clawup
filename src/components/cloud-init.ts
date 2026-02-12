@@ -141,7 +141,7 @@ GH_AUTH_SCRIPT
   const modelApiKeyExports = config.modelApiKeys
     ? Object.entries(config.modelApiKeys)
         .filter(([, value]) => value) // Only export non-empty values
-        .map(([envVar, _]) => `\${${envVar}:+echo 'export ${envVar}="\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
+        .map(([envVar, value]) => `echo 'export ${envVar}="${value}"' >> /home/ubuntu/.bashrc`)
         .join("\n")
     : "";
 

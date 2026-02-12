@@ -57,6 +57,14 @@ const config = new pulumi.Config();
 
 const anthropicApiKey = config.requireSecret("anthropicApiKey");
 const tailscaleAuthKey = config.requireSecret("tailscaleAuthKey");
+
+// Model provider API keys (optional — set by init for non-Anthropic providers)
+const modelApiKeys: Record<string, pulumi.Output<string>> = {};
+const MODEL_KEY_NAMES = ["OPENAI_API_KEY", "OPENCODE_ZEN_API_KEY", "GOOGLE_API_KEY"];
+for (const envVar of MODEL_KEY_NAMES) {
+  const val = config.getSecret(envVar);
+  if (val) modelApiKeys[envVar] = val;
+}
 const tailnetDnsName = config.require("tailnetDnsName");
 const instanceType = config.get("instanceType") ?? "t3.medium";
 const ownerName = config.get("ownerName") ?? "Boss";
@@ -361,6 +369,9 @@ for (const agent of manifest.agents) {
 
     // GitHub token (optional)
     githubToken,
+
+    // Model provider API keys (non-Anthropic)
+    modelApiKeys: Object.keys(modelApiKeys).length > 0 ? modelApiKeys : undefined,
 
     // Coding CLIs (default to claude-code for backward compat)
     codingClis: manifest.codingClis ?? ["claude-code"],
