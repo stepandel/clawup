@@ -18,6 +18,13 @@ Process tickets and delegate coding work to Claude Code. Use good judgment — n
 
 Delegate coding tasks to Claude Code — writing code, fixing bugs, tests, refactors, config changes. When delegating, provide: the goal, relevant file paths/context, acceptance criteria, and what NOT to touch.
 
+**Use the `coding-agent` skill when spawning Claude Code.** It has the correct patterns for PTY mode, background execution, process monitoring, and auto-notify on completion. Key requirements:
+- Always use `pty:true` — Claude Code hangs without it
+- Use `background:true` + `workdir` for longer tasks
+- Monitor with `process action:log sessionId:XXX`
+- Append an `openclaw system event` trigger to your prompt so you get notified on completion
+- Never start Claude Code in OpenClaw's own directory
+
 Handle yourself: triage, gathering context, writing ticket updates, reviewing output.
 
 If Claude Code's first attempt misses, give targeted follow-up — don't repeat the whole task. If it's going in circles, re-approach differently.

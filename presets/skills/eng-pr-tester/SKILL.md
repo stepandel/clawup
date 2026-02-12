@@ -13,6 +13,7 @@ Validate that a PR meets all requirements from its linked ticket. You are the la
 1. Read the ticket AND the PR description fully
 2. Identify the acceptance criteria — explicit from the ticket, and implicit (no regressions, clean code)
 3. Check out the PR branch. Pull latest.
+4. When running Claude Code for any validation, **use the `coding-agent` skill patterns** — always `pty:true`, use `background:true` + `workdir` for longer tasks, monitor with `process action:log`
 
 ## Validation Checklist
 
