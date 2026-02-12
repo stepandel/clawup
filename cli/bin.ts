@@ -4,7 +4,7 @@
  * Agent Army CLI — Entry point
  *
  * Provides interactive commands for the full agent lifecycle:
- * init, deploy, status, ssh, validate, destroy
+ * init, deploy, redeploy, status, ssh, validate, destroy
  */
 
 import * as fs from "fs";

@@ -104,6 +104,7 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     });
     if (!confirmed) {
       ui.cancel("Redeploy cancelled.");
+      return;
     }
   }
 
@@ -111,7 +112,11 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
   syncManifestToProject(configName, cwd);
 
   // Sync instanceType from manifest to Pulumi config
-  exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType], cwd);
+  const configSetResult = exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType], cwd);
+  if (configSetResult.exitCode !== 0) {
+    ui.log.error(`Failed to set Pulumi config: ${configSetResult.stderr || "unknown error"}`);
+    process.exit(1);
+  }
 
   // Run pulumi up with --refresh to read actual cloud state first
   const pulumiArgs = stackExists
