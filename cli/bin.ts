@@ -19,6 +19,7 @@ import { validateCommand } from "./commands/validate";
 import { destroyCommand } from "./commands/destroy";
 import { listCommand } from "./commands/list";
 import { updateCommand } from "./commands/update";
+import { redeployCommand } from "./commands/redeploy";
 import { checkForUpdates } from "./lib/update-check";
 
 // Forward SIGINT/SIGTERM to child processes before exiting
@@ -78,6 +79,15 @@ program
   .option("-c, --config <name>", "Config name (auto-detected if only one)")
   .action(async (opts) => {
     await validateCommand(opts);
+  });
+
+program
+  .command("redeploy")
+  .description("Update agents in-place without destroying infrastructure")
+  .option("-y, --yes", "Skip confirmation prompt")
+  .option("-c, --config <name>", "Config name (auto-detected if only one)")
+  .action(async (opts) => {
+    await redeployCommand(opts);
   });
 
 program

@@ -16,6 +16,7 @@ export { deployTool, type DeployOptions } from "./deploy";
 export { statusTool, type StatusOptions } from "./status";
 export { validateTool, type ValidateOptions } from "./validate";
 export { destroyTool, type DestroyOptions } from "./destroy";
+export { redeployTool, type RedeployOptions } from "./redeploy";
 
 // Re-export adapter types and factory for convenience
 export {
