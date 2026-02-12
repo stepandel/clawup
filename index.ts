@@ -118,7 +118,9 @@ function loadPresetFiles(presetDir: string, baseDir: string = "base"): Record<st
     for (const filename of fs.readdirSync(rolePath)) {
       const filePath = path.join(rolePath, filename);
       if (fs.statSync(filePath).isFile()) {
-        files[filename] = fs.readFileSync(filePath, "utf-8");
+        // Remove .tpl extension if present (template files)
+        const outputName = filename.replace(/\.tpl$/, "");
+        files[outputName] = fs.readFileSync(filePath, "utf-8");
       }
     }
   }
@@ -132,7 +134,9 @@ function loadPresetFiles(presetDir: string, baseDir: string = "base"): Record<st
         for (const filename of fs.readdirSync(skillDirPath)) {
           const filePath = path.join(skillDirPath, filename);
           if (fs.statSync(filePath).isFile()) {
-            files[`skills/${skillDir}/${filename}`] = fs.readFileSync(filePath, "utf-8");
+            // Remove .tpl extension if present (template files)
+            const outputName = filename.replace(/\.tpl$/, "");
+            files[`skills/${skillDir}/${outputName}`] = fs.readFileSync(filePath, "utf-8");
           }
         }
       }
