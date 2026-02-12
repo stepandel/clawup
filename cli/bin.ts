@@ -137,7 +137,10 @@ program
     await updateCommand(opts);
   });
 
-program.parse();
-
-// Fire-and-forget update check — never blocks exit
+// Fire-and-forget update check — must run before parse() because
+// Commander's --help/--version call process.exit() synchronously.
+// The cached path (no await) prints the notice before exit;
+// the stale-cache path fetches in the background for the next run.
 checkForUpdates(pkgJson.version).catch(() => {});
+
+program.parse();
