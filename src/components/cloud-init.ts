@@ -297,6 +297,15 @@ sudo -H -u ubuntu \\
 ${configPatchScript}
 PYTHON_SCRIPT
 ${tailscaleServeSection}
+# Run openclaw doctor to fix any missing config
+echo "Running openclaw doctor..."
+sudo -H -u ubuntu bash -c '
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+openclaw doctor --fix --non-interactive || echo "WARNING: openclaw doctor failed"
+'
+
 ${postSetupScript}
 echo "============================================"
 echo "OpenClaw agent setup complete!"
