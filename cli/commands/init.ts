@@ -17,6 +17,7 @@ import {
   KEY_INSTRUCTIONS,
   MODEL_PROVIDERS,
   slackAppManifest,
+  tailscaleHostname,
 } from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
@@ -375,6 +376,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     slackBotToken?: string;
     slackAppToken?: string;
     linearApiKey?: string;
+    linearWebhookSecret?: string;
     linearUserUuid?: string;
     githubToken?: string;
   }> = {};
@@ -474,6 +476,35 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         handleCancel(linearUserUuid);
         integrationCredentials[agent.role].linearUserUuid = linearUserUuid as string;
       }
+    }
+
+    // Per-agent Linear webhook signing secret
+    // The webhook URL is deterministic, so we can show it before deploy
+    p.note(
+      [
+        "Create a webhook in Linear for each agent:",
+        "1. Go to Settings → API → Webhooks → \"New webhook\"",
+        "2. Paste the webhook URL shown below for each agent",
+        "3. Select events to receive (e.g., Issues, Comments)",
+        "4. Copy the \"Signing secret\" shown after creating the webhook",
+      ].join("\n"),
+      "Linear Webhook Setup"
+    );
+
+    for (const agent of agents) {
+      const webhookUrl = `https://${tailscaleHostname(basicConfig.stackName as string, agent.name)}.${tailnetDnsName as string}/hooks/linear`;
+
+      p.log.info(`${agent.displayName} (${agent.role}): ${webhookUrl}`);
+
+      const webhookSecretInput = await p.password({
+        message: `Signing secret for ${agent.displayName} (${agent.role})`,
+        validate: (val) => {
+          if (!val) return "Webhook signing secret is required";
+        },
+      });
+      handleCancel(webhookSecretInput);
+
+      integrationCredentials[agent.role].linearWebhookSecret = webhookSecretInput as string;
     }
   }
 
@@ -601,6 +632,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true, cwd);
     if (creds.slackAppToken) setConfig(`${role}SlackAppToken`, creds.slackAppToken, true, cwd);
     if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true, cwd);
+    if (creds.linearWebhookSecret) setConfig(`${role}LinearWebhookSecret`, creds.linearWebhookSecret, true, cwd);
     if (creds.linearUserUuid) setConfig(`${role}LinearUserUuid`, creds.linearUserUuid, false, cwd);
     if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true, cwd);
   }
