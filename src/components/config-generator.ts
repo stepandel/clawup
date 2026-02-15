@@ -180,9 +180,20 @@ print("Configured Slack channel with Socket Mode")
           agentMapping[options.linear.agentLinearUserUuid] = options.linear.agentId;
         }
         const agentMappingJson = JSON.stringify(agentMapping);
-        const activeActionsJson = options.linear.activeActions
-          ? JSON.stringify(options.linear.activeActions)
-          : null;
+
+        // Transform activeActions { remove: [...], add: [...] } to
+        // stateActions { "stateName": "add"|"remove" } for the plugin schema
+        let stateActionsJson: string | null = null;
+        if (options.linear.activeActions) {
+          const stateActions: Record<string, string> = {};
+          for (const state of options.linear.activeActions.remove ?? []) {
+            stateActions[state] = "remove";
+          }
+          for (const state of options.linear.activeActions.add ?? []) {
+            stateActions[state] = "add";
+          }
+          stateActionsJson = JSON.stringify(stateActions);
+        }
 
         return `
 # Configure openclaw-linear plugin
@@ -193,8 +204,8 @@ config["plugins"]["entries"]["linear"] = {
     "config": {
         "apiKey": os.environ.get("LINEAR_API_KEY", ""),
         "webhookSecret": os.environ.get("LINEAR_WEBHOOK_SECRET", ""),
-        "agentMapping": ${agentMappingJson}${activeActionsJson ? `,
-        "activeActions": ${activeActionsJson}` : ""}
+        "agentMapping": ${agentMappingJson}${stateActionsJson ? `,
+        "stateActions": ${stateActionsJson}` : ""}
     }
 }
 print("Configured openclaw-linear plugin")
