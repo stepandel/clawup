@@ -173,6 +173,7 @@ config.setdefault("plugins", {})
 config["plugins"].setdefault("entries", {})
 config["plugins"]["entries"]["openclaw-linear"] = {
     "enabled": True,
+    "apiKey": os.environ.get("LINEAR_API_KEY", ""),
     "webhookSecret": os.environ.get("LINEAR_WEBHOOK_SECRET", ""),
     "agentMapping": ${agentMappingJson}
 }
@@ -216,12 +217,6 @@ else:
         "ANTHROPIC_API_KEY": anthropic_cred
     }
     print("Configured environment variables: ANTHROPIC_API_KEY (API key)")
-
-# Add LINEAR_API_KEY to env if configured (required by Linear CLI)
-linear_api_key = os.environ.get("LINEAR_API_KEY", "")
-if linear_api_key:
-    config["env"]["LINEAR_API_KEY"] = linear_api_key
-    print("Added LINEAR_API_KEY to environment variables")
 
 # Configure heartbeat (proactive mode)
 config.setdefault("agents", {})

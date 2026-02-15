@@ -84,31 +84,6 @@ export function generateCloudInit(config: CloudInitConfig): string {
     linear: linearOptions,
   });
 
-  // Deno + Linear CLI installation (only if Linear is configured)
-  const denoInstallScript = config.linear
-    ? `
-# Install Deno and Linear CLI for ubuntu user
-echo "Installing Deno and Linear CLI..."
-sudo -u ubuntu bash << 'DENO_INSTALL_SCRIPT'
-set -e
-cd ~
-
-# Install Deno
-curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/home/ubuntu/.deno sh
-
-# Install Linear CLI
-/home/ubuntu/.deno/bin/deno install --global --allow-all --no-config -n linear jsr:@schpet/linear-cli
-
-# Add Deno to PATH in .bashrc if not already there
-if ! grep -q 'DENO_INSTALL' ~/.bashrc; then
-  echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.bashrc
-  echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
-fi
-DENO_INSTALL_SCRIPT
-echo "Deno and Linear CLI installed successfully"
-`
-    : "";
-
   // GitHub CLI installation (system-level via official apt repo)
   const ghCliInstallScript = `
 # Install GitHub CLI
@@ -286,10 +261,9 @@ else
 fi
 \${SLACK_BOT_TOKEN:+echo 'export SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN}"' >> /home/ubuntu/.bashrc}
 \${SLACK_APP_TOKEN:+echo 'export SLACK_APP_TOKEN="\${SLACK_APP_TOKEN}"' >> /home/ubuntu/.bashrc}
-\${LINEAR_API_KEY:+echo 'export LINEAR_API_KEY="\${LINEAR_API_KEY}"' >> /home/ubuntu/.bashrc}
 \${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
-${tailscaleSection}${denoInstallScript}${ghAuthScript}
+${tailscaleSection}${ghAuthScript}
 ${codingClisInstallScript}
 
 # Enable systemd linger for ubuntu user (required for user services to run at boot)

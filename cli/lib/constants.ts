@@ -198,7 +198,7 @@ export const KEY_INSTRUCTIONS = {
   linearApiKey: {
     title: "Linear API Key",
     steps: [
-      "Create a separate Linear account for each agent:",
+      "Create a separate Linear account for each agent (used by openclaw-linear plugin):",
       "1. Invite you+agentname@domain.com to your Linear workspace",
       "   (plus-addressing forwards to your inbox — no new email needed)",
       "   Follow the link in the invite email to create the account and join the org",

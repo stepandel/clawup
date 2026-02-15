@@ -17,22 +17,6 @@ Ticket tracking and verification. The **openclaw-linear plugin** provides tools 
 - `linear_comment_list` — List comments on an issue
 - `linear_comment_add` — Add a comment to an issue
 
-### CLI (fallback/advanced)
-
-- CLI: `/home/ubuntu/.deno/bin/linear`
-- Requires: `PATH="/home/ubuntu/.deno/bin:$PATH"` prefix
-
-```bash
-# Tickets marked Done (need verification)
-linear issue list --filter "state:done" --sort updated
-
-# Reopen a ticket with bug
-linear issue update <ID> --state "In Progress" --comment "Bug found: ..."
-
-# View ticket details
-linear issue view <TICKET-ID>
-```
-
 ## Test Runners
 
 Standard test commands (adjust per project):

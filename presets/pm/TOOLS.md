@@ -17,22 +17,6 @@ Your primary project tracking tool. The **openclaw-linear plugin** provides tool
 - `linear_comment_list` — List comments on an issue
 - `linear_comment_add` — Add a comment to an issue
 
-### CLI (fallback/advanced)
-
-- CLI: `/home/ubuntu/.deno/bin/linear`
-- Requires: `PATH="/home/ubuntu/.deno/bin:$PATH"` prefix
-
-```bash
-# List blocked tickets
-linear issue list --filter "state:blocked"
-
-# Check stale in-progress
-linear issue list --filter "state:in-progress" --sort updated
-
-# View ticket details
-linear issue view <TICKET-ID>
-```
-
 ## Slack
 
 Primary communication channel with team.

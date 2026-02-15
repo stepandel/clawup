@@ -30,22 +30,6 @@ Ticket tracking. The **openclaw-linear plugin** provides tools and a webhook-dri
 - `linear_comment_list` — List comments on an issue
 - `linear_comment_add` — Add a comment to an issue
 
-### CLI (fallback/advanced)
-
-- CLI: `/home/ubuntu/.deno/bin/linear`
-- Requires: `PATH="/home/ubuntu/.deno/bin:$PATH"` prefix
-
-```bash
-# List your assigned tickets
-linear issue list --filter "assignee:me state:todo,in-progress"
-
-# Start working on ticket
-linear issue update <ID> --state "In Progress"
-
-# Mark done
-linear issue update <ID> --state "Done"
-```
-
 ## GitHub
 
 Primary code hosting.
