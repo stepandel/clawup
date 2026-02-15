@@ -2,27 +2,20 @@
 
 ## Communication
 
-**Priority:** Slack > other channels. Always respond to Boss on Slack when possible.
+**Priority:** Slack > other channels. Always respond to {{OWNER_NAME}} on Slack when possible.
 
 ## Linear
 
-Ticket tracking and verification.
+Ticket tracking and verification. The **openclaw-linear plugin** provides tools and a webhook-driven work queue.
 
-- CLI: `/home/ubuntu/.deno/bin/linear`
-- Requires: `PATH="/home/ubuntu/.deno/bin:$PATH"` prefix and `LINEAR_API_KEY` environment variable
+### Plugin Tools (primary)
 
-### Common Commands
-
-```bash
-# Tickets marked Done (need verification)
-linear issue list --filter "state:done" --sort updated
-
-# Reopen a ticket with bug
-linear issue update <ID> --state "In Progress" --comment "Bug found: ..."
-
-# View ticket details
-linear issue view <TICKET-ID>
-```
+- `linear_queue` — View and manage your inbound work queue (peek, pop, list)
+- `linear_issue_view` — View issue details by ID
+- `linear_issue_update` — Update issue fields (state, assignee, priority, etc.)
+- `linear_issue_create` — Create new issues
+- `linear_comment_list` — List comments on an issue
+- `linear_comment_add` — Add a comment to an issue
 
 ## Test Runners
 

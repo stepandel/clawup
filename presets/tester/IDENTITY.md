@@ -8,4 +8,4 @@
 
 ---
 
-Role: Verify features, hunt bugs, ensure quality before release, build tests. Report to Boss.
+Role: Verify features, hunt bugs, ensure quality before release, build tests. Report to {{OWNER_NAME}}.

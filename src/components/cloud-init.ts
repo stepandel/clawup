@@ -4,7 +4,7 @@
  */
 
 import * as zlib from "zlib";
-import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions } from "./config-generator";
+import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions, LinearActiveActions } from "./config-generator";
 
 export interface CloudInitConfig {
   /** Anthropic API key (for backward compatibility) */
@@ -45,6 +45,14 @@ export interface CloudInitConfig {
   slack?: SlackConfigOptions;
   /** Linear configuration */
   linear?: LinearConfigOptions;
+  /** Linear webhook signing secret (shared across agents) */
+  linearWebhookSecret?: string;
+  /** Agent ID for Linear plugin agent mapping (e.g., "agent-pm") */
+  linearAgentId?: string;
+  /** Linear user UUID for this agent */
+  linearUserUuid?: string;
+  /** Linear plugin activeActions config */
+  linearActiveActions?: LinearActiveActions;
   /** GitHub personal access token for gh CLI auth */
   githubToken?: string;
 }
@@ -60,39 +68,24 @@ export function generateCloudInit(config: CloudInitConfig): string {
   const trustedProxies = config.trustedProxies ?? ["127.0.0.1"];
 
   // Generate Python config patch script
+  const linearOptions: LinearConfigOptions | undefined = config.linear
+    ? {
+        ...config.linear,
+        webhookSecret: config.linearWebhookSecret ?? config.linear.webhookSecret,
+        agentId: config.linearAgentId ?? config.linear.agentId,
+        agentLinearUserUuid: config.linearUserUuid ?? config.linear.agentLinearUserUuid,
+        activeActions: config.linearActiveActions ?? config.linear.activeActions,
+      }
+    : undefined;
+
   const configPatchScript = generateConfigPatchScript({
     gatewayPort,
     gatewayToken: config.gatewayToken,
     trustedProxies,
     enableControlUi: true,
     slack: config.slack,
-    linear: config.linear,
+    linear: linearOptions,
   });
-
-  // Deno + Linear CLI installation (only if Linear is configured)
-  const denoInstallScript = config.linear
-    ? `
-# Install Deno and Linear CLI for ubuntu user
-echo "Installing Deno and Linear CLI..."
-sudo -u ubuntu bash << 'DENO_INSTALL_SCRIPT'
-set -e
-cd ~
-
-# Install Deno
-curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/home/ubuntu/.deno sh
-
-# Install Linear CLI
-/home/ubuntu/.deno/bin/deno install --global --allow-all --no-config -n linear jsr:@schpet/linear-cli
-
-# Add Deno to PATH in .bashrc if not already there
-if ! grep -q 'DENO_INSTALL' ~/.bashrc; then
-  echo 'export DENO_INSTALL="$HOME/.deno"' >> ~/.bashrc
-  echo 'export PATH="$DENO_INSTALL/bin:$PATH"' >> ~/.bashrc
-fi
-DENO_INSTALL_SCRIPT
-echo "Deno and Linear CLI installed successfully"
-`
-    : "";
 
   // GitHub CLI installation (system-level via official apt repo)
   const ghCliInstallScript = `
@@ -126,6 +119,22 @@ GH_AUTH_SCRIPT
 
   // Claude Code CLI installation script
   const codingClisInstallScript = generateClaudeCodeInstallScript(config.model);
+
+  // openclaw-linear plugin install step (only if Linear is configured)
+  const linearPluginInstallScript = config.linear
+    ? `
+# Install openclaw-linear plugin
+echo "Installing openclaw-linear plugin..."
+sudo -H -u ubuntu bash -c '
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+openclaw plugins install openclaw-linear || echo "WARNING: openclaw-linear plugin install failed. Install manually with: openclaw plugins install openclaw-linear"
+'
+echo "openclaw-linear plugin installed"
+`
+    : "";
 
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
@@ -168,6 +177,15 @@ tailscale up --authkey="\${TAILSCALE_AUTH_KEY}" --ssh${config.tailscaleHostname 
 echo "Enabling Tailscale HTTPS proxy..."
 tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve failed. Enable HTTPS in your Tailscale admin console first."
 `;
+
+  // Tailscale Funnel section (expose webhook endpoint publicly for Linear webhooks)
+  const tailscaleFunnelSection = !config.skipTailscale && config.linear
+    ? `
+# Enable Tailscale Funnel for Linear webhook endpoint
+echo "Enabling Tailscale Funnel for webhook endpoint..."
+tailscale funnel --bg ${gatewayPort} || echo "WARNING: tailscale funnel failed. Enable Funnel in your Tailscale admin console first."
+`
+    : "";
 
   return `#!/bin/bash
 set -e
@@ -246,10 +264,9 @@ else
 fi
 \${SLACK_BOT_TOKEN:+echo 'export SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN}"' >> /home/ubuntu/.bashrc}
 \${SLACK_APP_TOKEN:+echo 'export SLACK_APP_TOKEN="\${SLACK_APP_TOKEN}"' >> /home/ubuntu/.bashrc}
-\${LINEAR_API_KEY:+echo 'export LINEAR_API_KEY="\${LINEAR_API_KEY}"' >> /home/ubuntu/.bashrc}
 \${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
-${tailscaleSection}${denoInstallScript}${ghAuthScript}
+${tailscaleSection}${ghAuthScript}
 ${codingClisInstallScript}
 
 # Enable systemd linger for ubuntu user (required for user services to run at boot)
@@ -274,7 +291,7 @@ openclaw onboard --non-interactive --accept-risk \\
   --skip-skills || echo "WARNING: OpenClaw onboarding failed. Run openclaw onboard manually."
 '
 ${workspaceFilesScript}
-
+${linearPluginInstallScript}
 # Install daemon service with XDG_RUNTIME_DIR set
 echo "Installing OpenClaw daemon..."
 sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
@@ -293,10 +310,11 @@ sudo -H -u ubuntu \\
   SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN:-}" \\
   SLACK_APP_TOKEN="\${SLACK_APP_TOKEN:-}" \\
   LINEAR_API_KEY="\${LINEAR_API_KEY:-}" \\
+  LINEAR_WEBHOOK_SECRET="\${LINEAR_WEBHOOK_SECRET:-}" \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
-${tailscaleServeSection}
+${tailscaleServeSection}${tailscaleFunnelSection}
 # Run openclaw doctor to fix any missing config
 echo "Running openclaw doctor..."
 sudo -H -u ubuntu bash -c '
@@ -371,6 +389,7 @@ export function interpolateCloudInit(
     slackBotToken?: string;
     slackAppToken?: string;
     linearApiKey?: string;
+    linearWebhookSecret?: string;
     githubToken?: string;
   }
 ): string {
@@ -386,6 +405,8 @@ export function interpolateCloudInit(
   result = result.replace(/\${SLACK_APP_TOKEN}/g, values.slackAppToken ?? "");
   result = result.replace(/\${LINEAR_API_KEY:-}/g, values.linearApiKey ?? "");
   result = result.replace(/\${LINEAR_API_KEY}/g, values.linearApiKey ?? "");
+  result = result.replace(/\${LINEAR_WEBHOOK_SECRET:-}/g, values.linearWebhookSecret ?? "");
+  result = result.replace(/\${LINEAR_WEBHOOK_SECRET}/g, values.linearWebhookSecret ?? "");
   result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
 

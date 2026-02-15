@@ -9,6 +9,7 @@ import * as tls from "@pulumi/tls";
 import * as crypto from "crypto";
 import * as zlib from "zlib";
 import { generateCloudInit, interpolateCloudInit, CloudInitConfig } from "./cloud-init";
+import type { LinearActiveActions } from "./config-generator";
 
 /**
  * Arguments for creating an OpenClaw Agent
@@ -116,6 +117,21 @@ export interface OpenClawAgentArgs {
    * Linear API key for issue tracking
    */
   linearApiKey?: pulumi.Input<string>;
+
+  /**
+   * Linear webhook signing secret (shared across agents)
+   */
+  linearWebhookSecret?: pulumi.Input<string>;
+
+  /**
+   * Linear user UUID for this agent (maps Linear user → agent)
+   */
+  linearUserUuid?: pulumi.Input<string>;
+
+  /**
+   * Linear plugin activeActions config (which workflow states trigger queue add/remove)
+   */
+  linearActiveActions?: LinearActiveActions;
 
   /**
    * GitHub personal access token for gh CLI authentication
@@ -416,6 +432,12 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     const linearApiKeyOutput = args.linearApiKey
       ? pulumi.output(args.linearApiKey)
       : pulumi.output("");
+    const linearWebhookSecretOutput = args.linearWebhookSecret
+      ? pulumi.output(args.linearWebhookSecret)
+      : pulumi.output("");
+    const linearUserUuidOutput = args.linearUserUuid
+      ? pulumi.output(args.linearUserUuid)
+      : pulumi.output("");
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
@@ -428,6 +450,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       slackBotTokenOutput,
       slackAppTokenOutput,
       linearApiKeyOutput,
+      linearWebhookSecretOutput,
+      linearUserUuidOutput,
       githubTokenOutput,
     ]).apply(([
       tsAuthKey,
@@ -436,6 +460,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       slackBotToken,
       slackAppToken,
       linearApiKey,
+      linearWebhookSecret,
+      linearUserUuid,
       githubToken,
     ]) => {
         // Include stack name in Tailscale hostname to avoid conflicts across deployments
@@ -459,6 +485,10 @@ export class OpenClawAgent extends pulumi.ComponentResource {
             : undefined,
           // Linear config (only if API key provided)
           linear: linearApiKey ? { apiKey: linearApiKey } : undefined,
+          linearWebhookSecret: linearWebhookSecret || undefined,
+          linearAgentId: name,
+          linearUserUuid: linearUserUuid || undefined,
+          linearActiveActions: args.linearActiveActions,
           // GitHub token for gh CLI auth
           githubToken: githubToken || undefined,
         };
@@ -471,6 +501,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           slackBotToken: slackBotToken || undefined,
           slackAppToken: slackAppToken || undefined,
           linearApiKey: linearApiKey || undefined,
+          linearWebhookSecret: linearWebhookSecret || undefined,
           githubToken: githubToken || undefined,
         });
       });
@@ -515,12 +546,12 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     this.vpcId = vpcId;
     this.subnetId = subnetId;
     this.securityGroupId = securityGroupId;
-    this.sshPrivateKey = sshKey.privateKeyOpenssh;
+    this.sshPrivateKey = pulumi.secret(sshKey.privateKeyOpenssh);
     this.sshPublicKey = sshKey.publicKeyOpenssh;
-    this.gatewayToken = gatewayTokenValue;
+    this.gatewayToken = pulumi.secret(gatewayTokenValue);
     // Tailscale hostname includes stack name to avoid conflicts (e.g., dev-agent-pm)
     const tsHostname = `${pulumi.getStack()}-${name}`;
-    this.tailscaleUrl = pulumi.interpolate`https://${tsHostname}.${args.tailnetDnsName}/?token=${gatewayTokenValue}`;
+    this.tailscaleUrl = pulumi.secret(pulumi.interpolate`https://${tsHostname}.${args.tailnetDnsName}/?token=${gatewayTokenValue}`);
 
     // Register outputs
     this.registerOutputs({

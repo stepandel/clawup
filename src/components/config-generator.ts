@@ -10,9 +10,24 @@ export interface SlackConfigOptions {
   appToken: string;
 }
 
+export interface LinearActiveActions {
+  /** Workflow states that remove items from the queue */
+  remove?: string[];
+  /** Workflow states that add items to the queue */
+  add?: string[];
+}
+
 export interface LinearConfigOptions {
   /** Linear API key */
   apiKey: string;
+  /** Linear webhook signing secret */
+  webhookSecret?: string;
+  /** Agent ID (e.g., "agent-pm") for the agent mapping */
+  agentId?: string;
+  /** Linear user UUID for this agent */
+  agentLinearUserUuid?: string;
+  /** Active actions config (which workflow states trigger queue add/remove) */
+  activeActions?: LinearActiveActions;
 }
 
 export interface OpenClawConfigOptions {
@@ -152,18 +167,37 @@ print("Configured Slack channel with Socket Mode")
 `
     : "";
 
-  // Build Linear skill config section if credentials provided
-  const linearSkillConfig = options.linear
-    ? `
-# Configure Linear skill
-config.setdefault("skills", {})
-config["skills"].setdefault("entries", {})
-config["skills"]["entries"]["linear"] = {
+  // Build Linear plugin config section if credentials provided
+  const linearPluginConfig = options.linear
+    ? (() => {
+        const agentMapping: Record<string, string> = {};
+        if (!!options.linear.agentLinearUserUuid !== !!options.linear.agentId) {
+          throw new Error(
+            "linear.agentLinearUserUuid and linear.agentId must be provided together to build agentMapping."
+          );
+        }
+        if (options.linear.agentLinearUserUuid && options.linear.agentId) {
+          agentMapping[options.linear.agentLinearUserUuid] = options.linear.agentId;
+        }
+        const agentMappingJson = JSON.stringify(agentMapping);
+        const activeActionsJson = options.linear.activeActions
+          ? JSON.stringify(options.linear.activeActions)
+          : null;
+
+        return `
+# Configure openclaw-linear plugin
+config.setdefault("plugins", {})
+config["plugins"].setdefault("entries", {})
+config["plugins"]["entries"]["openclaw-linear"] = {
     "enabled": True,
-    "apiKey": os.environ.get("LINEAR_API_KEY", "")
+    "apiKey": os.environ.get("LINEAR_API_KEY", ""),
+    "webhookSecret": os.environ.get("LINEAR_WEBHOOK_SECRET", ""),
+    "agentMapping": ${agentMappingJson}${activeActionsJson ? `,
+    "activeActions": ${activeActionsJson}` : ""}
 }
-print("Configured Linear skill")
-`
+print("Configured openclaw-linear plugin")
+`;
+      })()
     : "";
 
   return `
@@ -202,12 +236,6 @@ else:
     }
     print("Configured environment variables: ANTHROPIC_API_KEY (API key)")
 
-# Add LINEAR_API_KEY to env if configured (required by Linear CLI)
-linear_api_key = os.environ.get("LINEAR_API_KEY", "")
-if linear_api_key:
-    config["env"]["LINEAR_API_KEY"] = linear_api_key
-    print("Added LINEAR_API_KEY to environment variables")
-
 # Configure heartbeat (proactive mode)
 config.setdefault("agents", {})
 config["agents"].setdefault("defaults", {})
@@ -216,7 +244,7 @@ config["agents"]["defaults"]["heartbeat"] = {
     "session": "main"
 }
 print("Configured heartbeat: every 1m")
-${slackChannelConfig}${linearSkillConfig}
+${slackChannelConfig}${linearPluginConfig}
 with open(config_path, "w") as f:
     json.dump(config, f, indent=2)
 

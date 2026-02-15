@@ -2,7 +2,7 @@
 
 ## Communication
 
-**Priority:** Slack > other channels. Always respond to Boss on Slack when possible.
+**Priority:** Slack > other channels. Always respond to {{OWNER_NAME}} on Slack when possible.
 
 ## Claude Code
 
@@ -19,24 +19,16 @@ Quick reference:
 
 ## Linear
 
-Ticket tracking.
+Ticket tracking. The **openclaw-linear plugin** provides tools and a webhook-driven work queue.
 
-- CLI: `/home/ubuntu/.deno/bin/linear`
-- Requires: `PATH="/home/ubuntu/.deno/bin:$PATH"` prefix and `LINEAR_API_KEY` environment variable
-- Teams: (configure your team keys)
+### Plugin Tools (primary)
 
-### Common Commands
-
-```bash
-# List your assigned tickets
-linear issue list --filter "assignee:me state:todo,in-progress"
-
-# Start working on ticket
-linear issue update <ID> --state "In Progress"
-
-# Mark done
-linear issue update <ID> --state "Done"
-```
+- `linear_queue` — View and manage your inbound work queue (peek, pop, list)
+- `linear_issue_view` — View issue details by ID
+- `linear_issue_update` — Update issue fields (state, assignee, priority, etc.)
+- `linear_issue_create` — Create new issues
+- `linear_comment_list` — List comments on an issue
+- `linear_comment_add` — Add a comment to an issue
 
 ## GitHub
 
@@ -70,7 +62,7 @@ pnpm test:e2e       # E2E tests
 1. Create feature branch: `git checkout -b feature/ticket-id-description`
 2. Make changes, commit with conventional commits
 3. Push and create PR
-4. Request review from Boss
+4. Request review from {{OWNER_NAME}}
 5. Merge after approval
 
 ---

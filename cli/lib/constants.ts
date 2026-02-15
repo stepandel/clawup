@@ -198,12 +198,33 @@ export const KEY_INSTRUCTIONS = {
   linearApiKey: {
     title: "Linear API Key",
     steps: [
-      "Create a separate Linear account for each agent:",
+      "Create a separate Linear account for each agent (used by openclaw-linear plugin):",
       "1. Invite you+agentname@domain.com to your Linear workspace",
       "   (plus-addressing forwards to your inbox — no new email needed)",
       "   Follow the link in the invite email to create the account and join the org",
       "2. Go to Settings → Security & Access → Personal API keys → \"New API key\"",
       "3. Copy the key (starts with lin_api_)",
+    ],
+  },
+  linearWebhookSecret: {
+    title: "Linear Webhook Signing Secret",
+    steps: [
+      "Create a webhook in Linear to receive issue events:",
+      "1. Go to Settings → API → Webhooks → \"New webhook\"",
+      "2. Set the URL to your agent's public webhook endpoint (shown after deploy)",
+      "3. Select the events you want to receive (e.g., Issues, Comments)",
+      "4. Copy the \"Signing secret\" shown after creating the webhook",
+      "5. This secret is shared across all agents in the fleet",
+    ],
+  },
+  linearUserUuid: {
+    title: "Linear User UUID",
+    steps: [
+      "Find the Linear user UUID for each agent account:",
+      "1. Log in to Linear as the agent's account",
+      "2. Go to Settings → Account → scroll to the bottom",
+      "3. Copy the \"User ID\" (UUID format, e.g., a1b2c3d4-...)",
+      "   This maps the Linear user to the agent so webhooks route correctly",
     ],
   },
   githubToken: {

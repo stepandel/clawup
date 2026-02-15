@@ -8,7 +8,7 @@ metadata: {"openclaw":{"emoji":"📋"}}
 
 Prepare Linear tickets so a coding agent can execute them cleanly. Five phases: **Size → Research → Context → Prompt → Assign**.
 
-Use the existing Linear skill for all API operations.
+Use the openclaw-linear plugin tools (`linear_issue_view`, `linear_issue_update`, `linear_issue_create`, `linear_comment_add`, etc.) for all API operations.
 
 ## Phase 1: Size Check
 
@@ -95,7 +95,7 @@ Add the prompt to the ticket description (not as a comment).
 
 ## Phase 5: Assign to Coding Agent
 
-After the ticket is fully prepped (has research, context, DoD, test cases, and Claude Code prompt), assign it to **Titus** (the lead engineer coding agent) using the Linear skill.
+After the ticket is fully prepped (has research, context, DoD, test cases, and Claude Code prompt), assign it to **Titus** (the lead engineer coding agent) using the `linear_issue_update` tool.
 
 When assigning sub-tickets, assign them all but note in the parent ticket which sub-ticket should be started first.
 

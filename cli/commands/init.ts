@@ -370,11 +370,15 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // Required integrations
   const integrations: string[] = ["slack", "linear", "github"];
 
+  // Shared Linear webhook secret (set after integration prompts)
+  let linearWebhookSecret: string | undefined;
+
   // Per-agent integration credentials
   const integrationCredentials: Record<string, {
     slackBotToken?: string;
     slackAppToken?: string;
     linearApiKey?: string;
+    linearUserUuid?: string;
     githubToken?: string;
   }> = {};
 
@@ -439,6 +443,43 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       handleCancel(linearKey);
 
       integrationCredentials[agent.role].linearApiKey = linearKey as string;
+    }
+
+    // Linear webhook signing secret (shared across all agents)
+    p.note(
+      KEY_INSTRUCTIONS.linearWebhookSecret.steps.join("\n"),
+      KEY_INSTRUCTIONS.linearWebhookSecret.title
+    );
+
+    const webhookSecretInput = await p.password({
+      message: "Linear webhook signing secret",
+      validate: (val) => {
+        if (!val) return "Webhook signing secret is required";
+      },
+    });
+    handleCancel(webhookSecretInput);
+    linearWebhookSecret = webhookSecretInput as string;
+
+    // Per-agent Linear user UUID (maps Linear user → agent)
+    p.note(
+      KEY_INSTRUCTIONS.linearUserUuid.steps.join("\n"),
+      KEY_INSTRUCTIONS.linearUserUuid.title
+    );
+
+    for (const agent of agents) {
+      const linearUserUuid = await p.text({
+        message: `Linear user UUID for ${agent.displayName} (${agent.role})`,
+        placeholder: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        validate: (val) => {
+          if (!val) return "Linear user UUID is required";
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
+            return "Must be a valid UUID format";
+          }
+        },
+      });
+      handleCancel(linearUserUuid);
+
+      integrationCredentials[agent.role].linearUserUuid = linearUserUuid as string;
     }
   }
 
@@ -561,11 +602,16 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   setConfig("linearTeam", basicConfig.linearTeam as string, false, cwd);
   setConfig("githubRepo", basicConfig.githubRepo as string, false, cwd);
   setConfig("defaultModel", defaultModel as string, false, cwd);
+  // Set shared Linear webhook secret
+  if (linearWebhookSecret) {
+    setConfig("linearWebhookSecret", linearWebhookSecret, true, cwd);
+  }
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
     if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true, cwd);
     if (creds.slackAppToken) setConfig(`${role}SlackAppToken`, creds.slackAppToken, true, cwd);
     if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true, cwd);
+    if (creds.linearUserUuid) setConfig(`${role}LinearUserUuid`, creds.linearUserUuid, false, cwd);
     if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true, cwd);
   }
   s.stop("Configuration saved");

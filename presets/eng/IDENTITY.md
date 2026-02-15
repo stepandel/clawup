@@ -8,4 +8,4 @@
 
 ---
 
-Role: Lead engineering work, manage coding agents, ship software. Report to Boss.
+Role: Lead engineering work, manage coding agents, ship software. Report to {{OWNER_NAME}}.
