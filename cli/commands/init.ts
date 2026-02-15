@@ -440,28 +440,40 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       handleCancel(linearKey);
 
       integrationCredentials[agent.role].linearApiKey = linearKey as string;
-    }
 
-    // Per-agent Linear user UUID (maps Linear user → agent)
-    p.note(
-      KEY_INSTRUCTIONS.linearUserUuid.steps.join("\n"),
-      KEY_INSTRUCTIONS.linearUserUuid.title
-    );
-
-    for (const agent of agents) {
-      const linearUserUuid = await p.text({
-        message: `Linear user UUID for ${agent.displayName} (${agent.role})`,
-        placeholder: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-        validate: (val) => {
-          if (!val) return "Linear user UUID is required";
-          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
-            return "Must be a valid UUID format";
-          }
-        },
-      });
-      handleCancel(linearUserUuid);
-
-      integrationCredentials[agent.role].linearUserUuid = linearUserUuid as string;
+      // Auto-fetch user UUID from Linear API
+      const s = p.spinner();
+      s.start(`Fetching Linear user ID for ${agent.displayName}...`);
+      try {
+        const res = await fetch("https://api.linear.app/graphql", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: linearKey as string,
+          },
+          body: JSON.stringify({ query: "{ viewer { id } }" }),
+        });
+        const data = (await res.json()) as { data?: { viewer?: { id?: string } } };
+        const uuid = data?.data?.viewer?.id;
+        if (!uuid) throw new Error("No user ID in response");
+        integrationCredentials[agent.role].linearUserUuid = uuid;
+        s.stop(`${agent.displayName}: ${uuid}`);
+      } catch (err) {
+        s.stop(`Could not fetch Linear user ID for ${agent.displayName}`);
+        p.log.warn(`${err instanceof Error ? err.message : String(err)}`);
+        const linearUserUuid = await p.text({
+          message: `Enter Linear user UUID manually for ${agent.displayName}`,
+          placeholder: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          validate: (val) => {
+            if (!val) return "Linear user UUID is required";
+            if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)) {
+              return "Must be a valid UUID format";
+            }
+          },
+        });
+        handleCancel(linearUserUuid);
+        integrationCredentials[agent.role].linearUserUuid = linearUserUuid as string;
+      }
     }
   }
 

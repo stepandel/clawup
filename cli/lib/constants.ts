@@ -206,16 +206,6 @@ export const KEY_INSTRUCTIONS = {
       "3. Copy the key (starts with lin_api_)",
     ],
   },
-  linearUserUuid: {
-    title: "Linear User UUID",
-    steps: [
-      "Find the Linear user UUID for each agent account:",
-      "1. Log in to Linear as the agent's account",
-      "2. Go to Settings → Account → scroll to the bottom",
-      "3. Copy the \"User ID\" (UUID format, e.g., a1b2c3d4-...)",
-      "   This maps the Linear user to the agent so webhooks route correctly",
-    ],
-  },
   githubToken: {
     title: "GitHub Token",
     steps: [
