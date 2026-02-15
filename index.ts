@@ -66,9 +66,6 @@ const userNotes = config.get("userNotes") ?? "No additional notes provided yet."
 const linearTeam = config.get("linearTeam") ?? "";
 const githubRepo = config.get("githubRepo") ?? "";
 
-// Shared Linear webhook secret (used by all agents)
-const linearWebhookSecret = config.getSecret("linearWebhookSecret");
-
 // Per-role Linear plugin activeActions (which workflow states trigger queue add/remove)
 const linearActiveActionsByRole: Record<string, LinearActiveActions> = {
   pm: { remove: ["triage", "started", "completed", "cancelled"], add: ["backlog", "unstarted"] },
@@ -80,6 +77,7 @@ const linearActiveActionsByRole: Record<string, LinearActiveActions> = {
 // Pattern: <role>SlackBotToken, <role>SlackAppToken
 const agentSlackCredentials: Record<string, { botToken?: pulumi.Output<string>; appToken?: pulumi.Output<string> }> = {};
 const agentLinearCredentials: Record<string, pulumi.Output<string> | undefined> = {};
+const agentLinearWebhookSecrets: Record<string, pulumi.Output<string> | undefined> = {};
 const agentLinearUserUuids: Record<string, string | undefined> = {};
 const agentGithubCredentials: Record<string, pulumi.Output<string> | undefined> = {};
 
@@ -96,6 +94,11 @@ for (const role of commonRoles) {
   const linearToken = config.getSecret(`${role}LinearApiKey`);
   if (linearToken) {
     agentLinearCredentials[role] = linearToken;
+  }
+
+  const linearWebhookSecret = config.getSecret(`${role}LinearWebhookSecret`);
+  if (linearWebhookSecret) {
+    agentLinearWebhookSecrets[role] = linearWebhookSecret;
   }
 
   const linearUserUuid = config.get(`${role}LinearUserUuid`);
@@ -212,6 +215,8 @@ for (const agent of manifest.agents) {
     }
     const linearToken = config.getSecret(`${role}LinearApiKey`);
     if (linearToken) agentLinearCredentials[role] = linearToken;
+    const linearWebhookSecret = config.getSecret(`${role}LinearWebhookSecret`);
+    if (linearWebhookSecret) agentLinearWebhookSecrets[role] = linearWebhookSecret;
     const linearUserUuid = config.get(`${role}LinearUserUuid`);
     if (linearUserUuid) agentLinearUserUuids[role] = linearUserUuid;
     const githubToken = config.getSecret(`${role}GithubToken`);
@@ -360,6 +365,7 @@ for (const agent of manifest.agents) {
   // Get per-agent credentials if available
   const slackCreds = agentSlackCredentials[agent.role];
   const linearApiKey = agentLinearCredentials[agent.role];
+  const linearWebhookSecret = agentLinearWebhookSecrets[agent.role];
   const linearUserUuid = agentLinearUserUuids[agent.role];
   const githubToken = agentGithubCredentials[agent.role];
 
@@ -395,7 +401,7 @@ for (const agent of manifest.agents) {
       // Linear API key (optional)
       linearApiKey,
 
-      // Linear webhook secret (shared, optional)
+      // Linear webhook secret (per-agent)
       linearWebhookSecret,
 
       // Linear user UUID (optional)
@@ -448,7 +454,7 @@ for (const agent of manifest.agents) {
       // Linear API key (optional)
       linearApiKey,
 
-      // Linear webhook secret (shared, optional)
+      // Linear webhook secret (per-agent)
       linearWebhookSecret,
 
       // Linear user UUID (optional)
