@@ -24,8 +24,6 @@ Process a ticket that has arrived in your Linear queue. Your role is to manage t
    - **Fail (< 3 attempts)** → Spawn coding agent to fix the errors and re-run.
    - **Fail (3+ attempts)** → Create a draft PR with a failure summary. Use `linear_comment_add` to post the draft PR link on the ticket.
 
-6. **Handle blocks** — If a ticket is blocked by another ticket's unmerged PR, wait. When the blocking PR merges, rebase and continue.
-
 ## Notes
 
 - Always use the ticket's coding agent prompt if one was provided during prep. Fall back to building a prompt from the description.
