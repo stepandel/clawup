@@ -10,6 +10,13 @@ export interface SlackConfigOptions {
   appToken: string;
 }
 
+export interface LinearActiveActions {
+  /** Workflow states that remove items from the queue */
+  remove?: string[];
+  /** Workflow states that add items to the queue */
+  add?: string[];
+}
+
 export interface LinearConfigOptions {
   /** Linear API key */
   apiKey: string;
@@ -19,6 +26,8 @@ export interface LinearConfigOptions {
   agentId?: string;
   /** Linear user UUID for this agent */
   agentLinearUserUuid?: string;
+  /** Active actions config (which workflow states trigger queue add/remove) */
+  activeActions?: LinearActiveActions;
 }
 
 export interface OpenClawConfigOptions {
@@ -166,6 +175,9 @@ print("Configured Slack channel with Socket Mode")
           agentMapping[options.linear.agentLinearUserUuid] = options.linear.agentId;
         }
         const agentMappingJson = JSON.stringify(agentMapping);
+        const activeActionsJson = options.linear.activeActions
+          ? JSON.stringify(options.linear.activeActions)
+          : null;
 
         return `
 # Configure openclaw-linear plugin
@@ -175,7 +187,8 @@ config["plugins"]["entries"]["openclaw-linear"] = {
     "enabled": True,
     "apiKey": os.environ.get("LINEAR_API_KEY", ""),
     "webhookSecret": os.environ.get("LINEAR_WEBHOOK_SECRET", ""),
-    "agentMapping": ${agentMappingJson}
+    "agentMapping": ${agentMappingJson}${activeActionsJson ? `,
+    "activeActions": ${activeActionsJson}` : ""}
 }
 print("Configured openclaw-linear plugin")
 `;

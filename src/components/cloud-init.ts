@@ -4,7 +4,7 @@
  */
 
 import * as zlib from "zlib";
-import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions } from "./config-generator";
+import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions, LinearActiveActions } from "./config-generator";
 
 export interface CloudInitConfig {
   /** Anthropic API key (for backward compatibility) */
@@ -51,6 +51,8 @@ export interface CloudInitConfig {
   linearAgentId?: string;
   /** Linear user UUID for this agent */
   linearUserUuid?: string;
+  /** Linear plugin activeActions config */
+  linearActiveActions?: LinearActiveActions;
   /** GitHub personal access token for gh CLI auth */
   githubToken?: string;
 }
@@ -72,6 +74,7 @@ export function generateCloudInit(config: CloudInitConfig): string {
         webhookSecret: config.linearWebhookSecret,
         agentId: config.linearAgentId,
         agentLinearUserUuid: config.linearUserUuid,
+        activeActions: config.linearActiveActions,
       }
     : undefined;
 

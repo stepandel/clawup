@@ -8,6 +8,7 @@ import * as hcloud from "@pulumi/hcloud";
 import * as tls from "@pulumi/tls";
 import * as crypto from "crypto";
 import { generateCloudInit, interpolateCloudInit, compressCloudInit, CloudInitConfig } from "./cloud-init";
+import type { LinearActiveActions } from "./config-generator";
 
 /**
  * Arguments for creating a Hetzner OpenClaw Agent
@@ -113,6 +114,11 @@ export interface HetznerOpenClawAgentArgs {
    * Linear user UUID for this agent (maps Linear user → agent)
    */
   linearUserUuid?: pulumi.Input<string>;
+
+  /**
+   * Linear plugin activeActions config (which workflow states trigger queue add/remove)
+   */
+  linearActiveActions?: LinearActiveActions;
 
   /**
    * GitHub personal access token for gh CLI authentication
@@ -318,6 +324,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
             linearWebhookSecret: linearWebhookSecret || undefined,
             linearAgentId: name,
             linearUserUuid: linearUserUuid || undefined,
+            linearActiveActions: args.linearActiveActions,
             // GitHub token for gh CLI auth
             githubToken: githubToken || undefined,
           };

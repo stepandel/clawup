@@ -16,6 +16,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { OpenClawAgent, HetznerOpenClawAgent } from "./src";
 import { SharedVpc } from "./shared-vpc";
+import type { LinearActiveActions } from "./src/components/config-generator";
 
 // -----------------------------------------------------------------------------
 // Manifest type (duplicated here to avoid importing from cli/)
@@ -67,6 +68,13 @@ const githubRepo = config.get("githubRepo") ?? "";
 
 // Shared Linear webhook secret (used by all agents)
 const linearWebhookSecret = config.getSecret("linearWebhookSecret");
+
+// Per-role Linear plugin activeActions (which workflow states trigger queue add/remove)
+const linearActiveActionsByRole: Record<string, LinearActiveActions> = {
+  pm: { remove: ["triage", "started", "completed", "cancelled"], add: ["backlog", "unstarted"] },
+  eng: { remove: ["triage", "completed", "cancelled"], add: ["backlog", "started"] },
+  tester: { remove: ["triage", "completed", "cancelled"], add: ["started"] },
+};
 
 // Per-agent Slack credentials from config/ESC
 // Pattern: <role>SlackBotToken, <role>SlackAppToken
@@ -374,6 +382,9 @@ for (const agent of manifest.agents) {
       // Linear user UUID (optional)
       linearUserUuid,
 
+      // Linear active actions (per-role queue behavior)
+      linearActiveActions: linearActiveActionsByRole[agent.role],
+
       // GitHub token (optional)
       githubToken,
 
@@ -423,6 +434,9 @@ for (const agent of manifest.agents) {
 
       // Linear user UUID (optional)
       linearUserUuid,
+
+      // Linear active actions (per-role queue behavior)
+      linearActiveActions: linearActiveActionsByRole[agent.role],
 
       // GitHub token (optional)
       githubToken,
