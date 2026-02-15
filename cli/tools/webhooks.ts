@@ -1,11 +1,15 @@
 /**
  * Webhooks Setup Tool — Configure Linear webhooks for deployed agents
  *
+ * Collects signing secrets, stores them in Pulumi config for persistence,
+ * then applies them live via SSH (no redeploy needed).
+ *
  * Platform-agnostic implementation using RuntimeAdapter.
  */
 
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
+import { SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import pc from "picocolors";
 
@@ -13,6 +17,13 @@ export interface WebhooksSetupOptions {
   /** Config name (auto-detected if only one) */
   config?: string;
 }
+
+/** SSH options for non-interactive connections */
+const SSH_OPTS = [
+  "-o", "StrictHostKeyChecking=no",
+  "-o", "UserKnownHostsFile=/dev/null",
+  "-o", "BatchMode=yes",
+];
 
 /**
  * Get stack outputs
@@ -25,6 +36,31 @@ function getStackOutputs(exec: ExecAdapter, cwd?: string): Record<string, unknow
   } catch {
     return null;
   }
+}
+
+/**
+ * Get Pulumi config value
+ */
+function getConfig(exec: ExecAdapter, key: string, cwd?: string): string | null {
+  const result = exec.capture("pulumi", ["config", "get", key], cwd);
+  return result.exitCode === 0 ? result.stdout.trim() : null;
+}
+
+/**
+ * Run a command over SSH
+ */
+function sshExec(
+  exec: ExecAdapter,
+  host: string,
+  command: string,
+): { ok: boolean; output: string } {
+  const result = exec.capture("ssh", [
+    "-o", "ConnectTimeout=15",
+    ...SSH_OPTS,
+    `${SSH_USER}@${host}`,
+    `"${command.replace(/"/g, '\\"')}"`,
+  ]);
+  return { ok: result.exitCode === 0, output: result.stdout || result.stderr };
 }
 
 /**
@@ -75,6 +111,13 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
     process.exit(1);
   }
 
+  // Get tailnet DNS name for SSH
+  const tailnetDnsName = getConfig(exec, "tailnetDnsName", cwd);
+  if (!tailnetDnsName) {
+    ui.log.error("Could not read tailnetDnsName from Pulumi config.");
+    process.exit(1);
+  }
+
   // Check if any webhook URLs exist
   const agentsWithUrls = manifest.agents.filter(
     (agent) => outputs[`${agent.role}WebhookUrl`]
@@ -98,7 +141,7 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
   );
 
   // Collect webhook secrets for each agent
-  const secrets: { role: string; secret: string }[] = [];
+  const secrets: { role: string; name: string; agentName: string; secret: string }[] = [];
 
   for (const agent of manifest.agents) {
     const webhookUrl = outputs[`${agent.role}WebhookUrl`] as string | undefined;
@@ -128,7 +171,12 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
       },
     });
 
-    secrets.push({ role: agent.role, secret: secret as string });
+    secrets.push({
+      role: agent.role,
+      name: agent.name,
+      agentName: agent.displayName,
+      secret: secret as string,
+    });
   }
 
   if (secrets.length === 0) {
@@ -137,8 +185,8 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
     return;
   }
 
-  // Store secrets in Pulumi config
-  const spinner = ui.spinner("Saving webhook secrets to Pulumi config...");
+  // Store secrets in Pulumi config (for persistence across deploys)
+  const configSpinner = ui.spinner("Saving webhook secrets to Pulumi config...");
   for (const { role, secret } of secrets) {
     exec.capture(
       "pulumi",
@@ -146,28 +194,56 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
       cwd
     );
   }
-  spinner.stop(`Saved ${secrets.length} webhook secret(s)`);
+  configSpinner.stop(`Saved ${secrets.length} webhook secret(s) to Pulumi config`);
 
-  // Ask to redeploy
-  const redeploy = await ui.confirm({
-    message: "Redeploy to apply webhook secrets?",
-  });
+  // Apply secrets live via SSH
+  const applySpinner = ui.spinner("Applying webhook secrets to running agents...");
+  let applied = 0;
+  let failed = 0;
 
-  if (redeploy) {
-    ui.log.step("Running pulumi up...");
-    console.log();
-    const exitCode = await exec.stream("pulumi", ["up", "--yes"], { cwd });
-    console.log();
+  for (const { role, name, agentName, secret } of secrets) {
+    const tsHost = tailscaleHostname(manifest.stackName, name);
+    const host = `${tsHost}.${tailnetDnsName}`;
 
-    if (exitCode !== 0) {
-      ui.log.error("Deployment failed. Check the output above for details.");
-      process.exit(1);
+    // Escape the secret for use inside jq
+    const escapedSecret = secret.replace(/'/g, "'\\''");
+    const jqCmd =
+      `jq '.plugins.entries[\\"openclaw-linear\\"].webhookSecret = \\\"${escapedSecret.replace(/\\/g, "\\\\").replace(/"/g, '\\\\\\"')}\\\"' ` +
+      `/home/${SSH_USER}/.openclaw/openclaw.json > /tmp/openclaw-patched.json && ` +
+      `mv /tmp/openclaw-patched.json /home/${SSH_USER}/.openclaw/openclaw.json`;
+
+    const patchResult = sshExec(exec, host, jqCmd);
+    if (!patchResult.ok) {
+      applySpinner.stop(`Failed to patch config on ${agentName}`);
+      ui.log.warn(`  ${agentName}: ${patchResult.output}`);
+      failed++;
+      continue;
     }
 
-    ui.outro("Webhook secrets applied! Your agents are now receiving Linear events.");
+    const restartResult = sshExec(exec, host, "systemctl --user restart openclaw-gateway");
+    if (!restartResult.ok) {
+      applySpinner.stop(`Failed to restart gateway on ${agentName}`);
+      ui.log.warn(`  ${agentName}: ${restartResult.output}`);
+      failed++;
+      continue;
+    }
+
+    applied++;
+  }
+
+  if (applied > 0 && failed === 0) {
+    applySpinner.stop(`Applied to ${applied} agent(s)`);
+  } else if (applied > 0) {
+    applySpinner.stop(`Applied to ${applied} agent(s), ${failed} failed`);
   } else {
-    ui.outro(
-      `Secrets saved. Run ${pc.cyan("agent-army deploy")} to apply them.`
+    applySpinner.stop(`Failed to apply to any agents`);
+  }
+
+  if (failed > 0) {
+    ui.log.warn(
+      `Some agents could not be reached. They will pick up the secrets on next deploy.`
     );
   }
+
+  ui.outro("Webhook setup complete!");
 };
