@@ -28,8 +28,8 @@ If the ticket has a **Slow** label or "Slow" directive in the description, compl
 
 ## Steps
 
-1. Read the ticket's labels.
+1. Read the ticket's labels using `linear_issue_view`.
 2. Match the highest-priority routing label from the table above.
 3. Run the corresponding process.
 4. Check for the Slow modifier — if present, assign to Stepan instead of the default assignee.
-5. Assign the ticket to the determined assignee.
+5. Assign the ticket to the determined assignee using `linear_issue_update`.

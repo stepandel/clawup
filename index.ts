@@ -65,10 +65,14 @@ const userNotes = config.get("userNotes") ?? "No additional notes provided yet."
 const linearTeam = config.get("linearTeam") ?? "";
 const githubRepo = config.get("githubRepo") ?? "";
 
+// Shared Linear webhook secret (used by all agents)
+const linearWebhookSecret = config.getSecret("linearWebhookSecret");
+
 // Per-agent Slack credentials from config/ESC
 // Pattern: <role>SlackBotToken, <role>SlackAppToken
 const agentSlackCredentials: Record<string, { botToken?: pulumi.Output<string>; appToken?: pulumi.Output<string> }> = {};
 const agentLinearCredentials: Record<string, pulumi.Output<string> | undefined> = {};
+const agentLinearUserUuids: Record<string, string | undefined> = {};
 const agentGithubCredentials: Record<string, pulumi.Output<string> | undefined> = {};
 
 // Common roles to check for credentials
@@ -79,12 +83,17 @@ for (const role of commonRoles) {
   if (botToken || appToken) {
     agentSlackCredentials[role] = { botToken, appToken };
   }
-  
+
   const linearToken = config.getSecret(`${role}LinearApiKey`);
   if (linearToken) {
     agentLinearCredentials[role] = linearToken;
   }
-  
+
+  const linearUserUuid = config.get(`${role}LinearUserUuid`);
+  if (linearUserUuid) {
+    agentLinearUserUuids[role] = linearUserUuid;
+  }
+
   const githubToken = config.getSecret(`${role}GithubToken`);
   if (githubToken) {
     agentGithubCredentials[role] = githubToken;
@@ -324,6 +333,7 @@ for (const agent of manifest.agents) {
   // Get per-agent credentials if available
   const slackCreds = agentSlackCredentials[agent.role];
   const linearApiKey = agentLinearCredentials[agent.role];
+  const linearUserUuid = agentLinearUserUuids[agent.role];
   const githubToken = agentGithubCredentials[agent.role];
 
   if (provider === "aws") {
@@ -357,6 +367,12 @@ for (const agent of manifest.agents) {
 
       // Linear API key (optional)
       linearApiKey,
+
+      // Linear webhook secret (shared, optional)
+      linearWebhookSecret,
+
+      // Linear user UUID (optional)
+      linearUserUuid,
 
       // GitHub token (optional)
       githubToken,
@@ -402,6 +418,12 @@ for (const agent of manifest.agents) {
       // Linear API key (optional)
       linearApiKey,
 
+      // Linear webhook secret (shared, optional)
+      linearWebhookSecret,
+
+      // Linear user UUID (optional)
+      linearUserUuid,
+
       // GitHub token (optional)
       githubToken,
 
@@ -433,4 +455,11 @@ for (const [role, outputs] of Object.entries(agentOutputs)) {
   module.exports[`${role}InstanceId`] = outputs.instanceId;
   module.exports[`${role}PublicIp`] = outputs.publicIp;
   module.exports[`${role}SshPrivateKey`] = pulumi.secret(outputs.sshPrivateKey);
+
+  // Webhook URL for Linear (derived from Tailscale Funnel public URL)
+  module.exports[`${role}WebhookUrl`] = outputs.tailscaleUrl.apply((url) => {
+    // Extract base URL (remove query params like ?token=...) and append webhook path
+    const baseUrl = url.split("?")[0].replace(/\/$/, "");
+    return `${baseUrl}/hooks/linear`;
+  });
 }

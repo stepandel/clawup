@@ -105,6 +105,16 @@ export interface HetznerOpenClawAgentArgs {
   linearApiKey?: pulumi.Input<string>;
 
   /**
+   * Linear webhook signing secret (shared across agents)
+   */
+  linearWebhookSecret?: pulumi.Input<string>;
+
+  /**
+   * Linear user UUID for this agent (maps Linear user → agent)
+   */
+  linearUserUuid?: pulumi.Input<string>;
+
+  /**
    * GitHub personal access token for gh CLI authentication
    * Must start with ghp_ or github_pat_
    */
@@ -238,6 +248,12 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     const linearApiKeyOutput = args.linearApiKey
       ? pulumi.output(args.linearApiKey)
       : pulumi.output("");
+    const linearWebhookSecretOutput = args.linearWebhookSecret
+      ? pulumi.output(args.linearWebhookSecret)
+      : pulumi.output("");
+    const linearUserUuidOutput = args.linearUserUuid
+      ? pulumi.output(args.linearUserUuid)
+      : pulumi.output("");
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
@@ -257,6 +273,8 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
         slackBotTokenOutput,
         slackAppTokenOutput,
         linearApiKeyOutput,
+        linearWebhookSecretOutput,
+        linearUserUuidOutput,
         githubTokenOutput,
       ])
       .apply(
@@ -267,6 +285,8 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
           slackBotToken,
           slackAppToken,
           linearApiKey,
+          linearWebhookSecret,
+          linearUserUuid,
           githubToken,
         ]) =>
           pulumi
@@ -295,6 +315,9 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 : undefined,
             // Linear config (only if API key provided)
             linear: linearApiKey ? { apiKey: linearApiKey } : undefined,
+            linearWebhookSecret: linearWebhookSecret || undefined,
+            linearAgentId: name,
+            linearUserUuid: linearUserUuid || undefined,
             // GitHub token for gh CLI auth
             githubToken: githubToken || undefined,
           };
@@ -307,6 +330,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 slackBotToken: slackBotToken || undefined,
                 slackAppToken: slackAppToken || undefined,
                 linearApiKey: linearApiKey || undefined,
+                linearWebhookSecret: linearWebhookSecret || undefined,
                 githubToken: githubToken || undefined,
               });
               // Compress to stay within Hetzner's 32KB user_data limit

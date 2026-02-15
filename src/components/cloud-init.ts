@@ -45,6 +45,12 @@ export interface CloudInitConfig {
   slack?: SlackConfigOptions;
   /** Linear configuration */
   linear?: LinearConfigOptions;
+  /** Linear webhook signing secret (shared across agents) */
+  linearWebhookSecret?: string;
+  /** Agent ID for Linear plugin agent mapping (e.g., "agent-pm") */
+  linearAgentId?: string;
+  /** Linear user UUID for this agent */
+  linearUserUuid?: string;
   /** GitHub personal access token for gh CLI auth */
   githubToken?: string;
 }
@@ -60,13 +66,22 @@ export function generateCloudInit(config: CloudInitConfig): string {
   const trustedProxies = config.trustedProxies ?? ["127.0.0.1"];
 
   // Generate Python config patch script
+  const linearOptions: LinearConfigOptions | undefined = config.linear
+    ? {
+        ...config.linear,
+        webhookSecret: config.linearWebhookSecret,
+        agentId: config.linearAgentId,
+        agentLinearUserUuid: config.linearUserUuid,
+      }
+    : undefined;
+
   const configPatchScript = generateConfigPatchScript({
     gatewayPort,
     gatewayToken: config.gatewayToken,
     trustedProxies,
     enableControlUi: true,
     slack: config.slack,
-    linear: config.linear,
+    linear: linearOptions,
   });
 
   // Deno + Linear CLI installation (only if Linear is configured)
@@ -127,6 +142,22 @@ GH_AUTH_SCRIPT
   // Claude Code CLI installation script
   const codingClisInstallScript = generateClaudeCodeInstallScript(config.model);
 
+  // openclaw-linear plugin install step (only if Linear is configured)
+  const linearPluginInstallScript = config.linear
+    ? `
+# Install openclaw-linear plugin
+echo "Installing openclaw-linear plugin..."
+sudo -H -u ubuntu bash -c '
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+openclaw plugins install openclaw-linear || echo "WARNING: openclaw-linear plugin install failed. Install manually with: openclaw plugins install openclaw-linear"
+'
+echo "openclaw-linear plugin installed"
+`
+    : "";
+
   // Generate workspace files injection script
   const workspaceFilesScript = generateWorkspaceFilesScript(config.workspaceFiles);
 
@@ -168,6 +199,15 @@ tailscale up --authkey="\${TAILSCALE_AUTH_KEY}" --ssh${config.tailscaleHostname 
 echo "Enabling Tailscale HTTPS proxy..."
 tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve failed. Enable HTTPS in your Tailscale admin console first."
 `;
+
+  // Tailscale Funnel section (expose webhook endpoint publicly for Linear webhooks)
+  const tailscaleFunnelSection = !config.skipTailscale && config.linear
+    ? `
+# Enable Tailscale Funnel for Linear webhook endpoint
+echo "Enabling Tailscale Funnel for webhook endpoint..."
+tailscale funnel --bg ${gatewayPort} || echo "WARNING: tailscale funnel failed. Enable Funnel in your Tailscale admin console first."
+`
+    : "";
 
   return `#!/bin/bash
 set -e
@@ -274,7 +314,7 @@ openclaw onboard --non-interactive --accept-risk \\
   --skip-skills || echo "WARNING: OpenClaw onboarding failed. Run openclaw onboard manually."
 '
 ${workspaceFilesScript}
-
+${linearPluginInstallScript}
 # Install daemon service with XDG_RUNTIME_DIR set
 echo "Installing OpenClaw daemon..."
 sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
@@ -293,10 +333,11 @@ sudo -H -u ubuntu \\
   SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN:-}" \\
   SLACK_APP_TOKEN="\${SLACK_APP_TOKEN:-}" \\
   LINEAR_API_KEY="\${LINEAR_API_KEY:-}" \\
+  LINEAR_WEBHOOK_SECRET="\${LINEAR_WEBHOOK_SECRET:-}" \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
-${tailscaleServeSection}
+${tailscaleServeSection}${tailscaleFunnelSection}
 # Run openclaw doctor to fix any missing config
 echo "Running openclaw doctor..."
 sudo -H -u ubuntu bash -c '
@@ -371,6 +412,7 @@ export function interpolateCloudInit(
     slackBotToken?: string;
     slackAppToken?: string;
     linearApiKey?: string;
+    linearWebhookSecret?: string;
     githubToken?: string;
   }
 ): string {
@@ -386,6 +428,8 @@ export function interpolateCloudInit(
   result = result.replace(/\${SLACK_APP_TOKEN}/g, values.slackAppToken ?? "");
   result = result.replace(/\${LINEAR_API_KEY:-}/g, values.linearApiKey ?? "");
   result = result.replace(/\${LINEAR_API_KEY}/g, values.linearApiKey ?? "");
+  result = result.replace(/\${LINEAR_WEBHOOK_SECRET:-}/g, values.linearWebhookSecret ?? "");
+  result = result.replace(/\${LINEAR_WEBHOOK_SECRET}/g, values.linearWebhookSecret ?? "");
   result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
 
