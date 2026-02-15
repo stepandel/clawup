@@ -22,7 +22,7 @@ Process a ticket that has arrived in your Linear queue. This is your end-to-end 
 
 5. **Run build and tests** — Auto-detect the package manager, then run `install`, `build`, `test` (and `test:e2e` if present).
    - **Pass** → Approve the PR. Use `linear_comment_add` to post a confirmation on the ticket.
-   - **Fail** → Invoke Claude Code with the ticket context, branch, error type (`build_failure` or `test_failure`), and the last 200 lines of output. Apply a minimal fix, commit as `fix: resolve <error_type> for <ticket_id>`, push, and re-run tests once.
+   - **Fail** → Invoke coding agent with the ticket context, branch, error type (`build_failure` or `test_failure`), and the last 200 lines of output. Apply a minimal fix, commit as `fix: resolve <error_type> for <ticket_id>`, push, and re-run tests once.
 
 6. **Handle persistent failure** — If tests still fail after the retry:
    - Request changes on the PR with an error summary.

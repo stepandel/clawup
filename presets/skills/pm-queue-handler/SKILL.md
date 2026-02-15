@@ -21,7 +21,7 @@ Process a ticket that has arrived in your Linear queue. This is your end-to-end 
    - Validate sizing (split oversized tickets into sub-issues)
    - Research tools, APIs, and SDKs involved
    - Enrich context by scanning the codebase
-   - Add definition of done, test cases, and a Claude Code prompt
+   - Add definition of done, test cases, and a coding agent prompt
    - Assign to the determined agent (typically Titus)
 
 5. **Confirm completion** — After prep and assignment, use `linear_queue` to pop the ticket from your queue.
