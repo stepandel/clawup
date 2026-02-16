@@ -28,6 +28,5 @@ Process a ticket that has arrived in your Linear queue. This is your end-to-end 
 
 ## Notes
 
-- If the ticket is already well-prepped (has description, DoD, context), skip straight to routing and assignment.
 - If a ticket has the **Slow** label, it gets assigned to {{OWNER_NAME}} instead of an agent — still prep it fully.
 - Sub-tickets created during splitting should all be prepped before assignment.
