@@ -199,7 +199,7 @@ print("Configured Slack channel with Socket Mode")
 # Configure openclaw-linear plugin
 config.setdefault("plugins", {})
 config["plugins"].setdefault("entries", {})
-config["plugins"]["entries"]["linear"] = {
+config["plugins"]["entries"]["openclaw-linear"] = {
     "enabled": True,
     "config": {
         "apiKey": os.environ.get("LINEAR_API_KEY", ""),
