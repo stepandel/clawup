@@ -210,6 +210,35 @@ export function deleteTailscaleDevice(
 }
 
 /**
+ * Ensure MagicDNS is enabled on the tailnet.
+ * MagicDNS requires at least one nameserver — adds Cloudflare + Google DNS if none set.
+ * Returns true if MagicDNS was newly enabled.
+ * Warns on failure instead of throwing.
+ */
+export function ensureMagicDns(apiKey: string): boolean {
+  try {
+    const dnsResp = tsApiGet(apiKey, "/tailnet/-/dns/preferences");
+    const dns = JSON.parse(dnsResp);
+    if (dns.magicDNS) return false; // already enabled
+
+    // MagicDNS requires at least one nameserver
+    const nsResp = tsApiGet(apiKey, "/tailnet/-/dns/nameservers");
+    const ns = JSON.parse(nsResp);
+    if (!ns.dns || ns.dns.length === 0) {
+      tsApiPost(apiKey, "/tailnet/-/dns/nameservers", { dns: ["1.1.1.1", "8.8.8.8"] });
+    }
+
+    tsApiPost(apiKey, "/tailnet/-/dns/preferences", { magicDNS: true });
+    return true;
+  } catch (err) {
+    console.warn(
+      `[tailscale] Could not check/enable MagicDNS: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+}
+
+/**
  * Ensure Tailscale Funnel prerequisites are configured for the tailnet.
  * 1. Enables MagicDNS (required for HTTPS certs)
  * 2. Adds funnel capability to ACL nodeAttrs for all members
@@ -223,18 +252,7 @@ export function ensureTailscaleFunnel(
   const result = { magicDns: false, funnelAcl: false };
 
   // 1. Ensure MagicDNS is enabled
-  try {
-    const dnsResp = tsApiGet(apiKey, "/tailnet/-/dns/preferences");
-    const dns = JSON.parse(dnsResp);
-    if (!dns.magicDNSEnabled) {
-      tsApiPost(apiKey, "/tailnet/-/dns/preferences", { magicDNSEnabled: true });
-      result.magicDns = true;
-    }
-  } catch (err) {
-    console.warn(
-      `[tailscale] Could not check/enable MagicDNS: ${err instanceof Error ? err.message : String(err)}`
-    );
-  }
+  result.magicDns = ensureMagicDns(apiKey);
 
   // 2. Ensure Funnel is allowed in ACL
   try {

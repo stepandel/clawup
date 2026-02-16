@@ -8,7 +8,7 @@
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
-import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureTailscaleFunnel } from "../lib/tailscale";
+import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
 import pc from "picocolors";
 
 /**
@@ -149,6 +149,13 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     }
   }
 
+  // Ensure MagicDNS is enabled (required for Tailscale hostname resolution)
+  if (tailscaleApiKey) {
+    const spinner = ui.spinner("Ensuring Tailscale MagicDNS is enabled...");
+    const magicDnsChanged = ensureMagicDns(tailscaleApiKey);
+    spinner.stop(magicDnsChanged ? "MagicDNS enabled" : "MagicDNS OK");
+  }
+
   // Ensure Tailscale Funnel prerequisites if any agent uses Linear
   const hasLinearAgents = manifest.agents.some(
     (a) => !!getConfig(exec, `${a.role}LinearApiKey`, cwd)
@@ -157,7 +164,6 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     const spinner = ui.spinner("Ensuring Tailscale Funnel prerequisites...");
     const funnel = ensureTailscaleFunnel(tailscaleApiKey);
     const changes: string[] = [];
-    if (funnel.magicDns) changes.push("MagicDNS enabled");
     if (funnel.funnelAcl) changes.push("Funnel ACL enabled");
     spinner.stop(changes.length > 0 ? changes.join(", ") : "Funnel prerequisites OK");
   }
