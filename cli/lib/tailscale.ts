@@ -208,3 +208,80 @@ export function deleteTailscaleDevice(
   );
   return false;
 }
+
+/**
+ * Ensure Tailscale Funnel prerequisites are configured for the tailnet.
+ * 1. Enables MagicDNS (required for HTTPS certs)
+ * 2. Adds funnel capability to ACL nodeAttrs for all members
+ *
+ * Returns { magicDns: boolean; funnelAcl: boolean } indicating what was changed.
+ * Warns on failure instead of throwing.
+ */
+export function ensureTailscaleFunnel(
+  apiKey: string,
+): { magicDns: boolean; funnelAcl: boolean } {
+  const result = { magicDns: false, funnelAcl: false };
+
+  // 1. Ensure MagicDNS is enabled
+  try {
+    const dnsResp = tsApiGet(apiKey, "/tailnet/-/dns/preferences");
+    const dns = JSON.parse(dnsResp);
+    if (!dns.magicDNSEnabled) {
+      tsApiPost(apiKey, "/tailnet/-/dns/preferences", { magicDNSEnabled: true });
+      result.magicDns = true;
+    }
+  } catch (err) {
+    console.warn(
+      `[tailscale] Could not check/enable MagicDNS: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  // 2. Ensure Funnel is allowed in ACL
+  try {
+    const aclResp = tsApiGet(apiKey, "/tailnet/-/acl");
+    const acl = JSON.parse(aclResp);
+
+    const nodeAttrs: Array<{ target?: string[]; attr?: string[] }> = acl.nodeAttrs ?? [];
+    const hasFunnel = nodeAttrs.some(
+      (a) => Array.isArray(a.attr) && a.attr.includes("funnel")
+    );
+
+    if (!hasFunnel) {
+      nodeAttrs.push({ target: ["autogroup:member"], attr: ["funnel"] });
+      acl.nodeAttrs = nodeAttrs;
+      tsApiPost(apiKey, "/tailnet/-/acl", acl);
+      result.funnelAcl = true;
+    }
+  } catch (err) {
+    console.warn(
+      `[tailscale] Could not check/enable Funnel ACL: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  return result;
+}
+
+/** GET a Tailscale API endpoint. Returns response body as string. */
+function tsApiGet(apiKey: string, path: string): string {
+  return execSync(
+    `curl -sf -H "Authorization: Bearer ${apiKey}" -H "Accept: application/json" "https://api.tailscale.com/api/v2${path}"`,
+    { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], timeout: 15000 }
+  );
+}
+
+/** POST JSON to a Tailscale API endpoint. Uses a temp file for the payload. */
+function tsApiPost(apiKey: string, path: string, body: unknown): string {
+  const fs = require("fs");
+  const os = require("os");
+  const nodePath = require("path");
+  const tmpFile = nodePath.join(os.tmpdir(), `ts-api-${Date.now()}.json`);
+  try {
+    fs.writeFileSync(tmpFile, JSON.stringify(body));
+    return execSync(
+      `curl -sf -X POST -H "Authorization: Bearer ${apiKey}" -H "Content-Type: application/json" -d @${tmpFile} "https://api.tailscale.com/api/v2${path}"`,
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], timeout: 15000 }
+    );
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+  }
+}

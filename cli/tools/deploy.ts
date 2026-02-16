@@ -8,7 +8,7 @@ import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapter
 import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
 import { COST_ESTIMATES, HETZNER_COST_ESTIMATES } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
-import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices } from "../lib/tailscale";
+import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureTailscaleFunnel } from "../lib/tailscale";
 import pc from "picocolors";
 
 /**
@@ -148,6 +148,19 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
         `Could not remove some devices: ${failed.join(", ")}. Check https://login.tailscale.com/admin/machines`
       );
     }
+  }
+
+  // Ensure Tailscale Funnel prerequisites if any agent uses Linear
+  const hasLinearAgents = manifest.agents.some(
+    (a) => !!getConfig(exec, `${a.role}LinearApiKey`, cwd)
+  );
+  if (hasLinearAgents && tailscaleApiKey) {
+    const spinner = ui.spinner("Ensuring Tailscale Funnel prerequisites...");
+    const funnel = ensureTailscaleFunnel(tailscaleApiKey);
+    const changes: string[] = [];
+    if (funnel.magicDns) changes.push("MagicDNS enabled");
+    if (funnel.funnelAcl) changes.push("Funnel ACL enabled");
+    spinner.stop(changes.length > 0 ? changes.join(", ") : "Funnel prerequisites OK");
   }
 
   // Deploy

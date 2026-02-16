@@ -441,7 +441,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
-
     // Combine all string outputs
     const userData = pulumi.all([
       args.tailscaleAuthKey,

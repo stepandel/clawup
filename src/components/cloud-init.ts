@@ -169,23 +169,27 @@ curl -fsSL https://tailscale.com/install.sh | sh
 tailscale up --authkey="\${TAILSCALE_AUTH_KEY}" --ssh${config.tailscaleHostname ? ` --hostname=${config.tailscaleHostname}` : ""} || echo "WARNING: Tailscale setup failed. Run 'sudo tailscale up' manually."
 `;
 
-  // Tailscale serve section (skip if funnel will be used — funnel is a superset of serve)
-  const tailscaleServeSection = config.skipTailscale || config.linear
+  // Tailscale proxy section: funnel (public access for webhooks) or serve (Tailscale-only HTTPS)
+  // When Linear is configured, enable funnel prerequisites via API, then start funnel.
+  // If funnel fails, fall back to serve so the Tailscale HTTPS proxy still works.
+  const tailscaleProxySection = config.skipTailscale
     ? ""
-    : `
+    : config.linear
+      ? `
+# Enable Tailscale Funnel for Linear webhook endpoint (public HTTPS)
+echo "Enabling Tailscale Funnel for webhook endpoint..."
+if tailscale funnel --bg ${gatewayPort}; then
+  echo "Tailscale Funnel enabled — webhook endpoint is publicly accessible"
+else
+  echo "WARNING: tailscale funnel failed — falling back to tailscale serve (webhooks will NOT work until Funnel is enabled in Tailscale admin)"
+  tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve also failed. Enable HTTPS in your Tailscale admin console."
+fi
+`
+      : `
 # Enable Tailscale HTTPS proxy (requires HTTPS to be enabled in Tailscale admin console)
 echo "Enabling Tailscale HTTPS proxy..."
 tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve failed. Enable HTTPS in your Tailscale admin console first."
 `;
-
-  // Tailscale Funnel section (expose webhook endpoint publicly for Linear webhooks)
-  const tailscaleFunnelSection = !config.skipTailscale && config.linear
-    ? `
-# Enable Tailscale Funnel for Linear webhook endpoint
-echo "Enabling Tailscale Funnel for webhook endpoint..."
-tailscale funnel --bg ${gatewayPort} || echo "WARNING: tailscale funnel failed. Enable Funnel in your Tailscale admin console first."
-`
-    : "";
 
   return `#!/bin/bash
 set -e
@@ -314,7 +318,7 @@ sudo -H -u ubuntu \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
-${tailscaleServeSection}${tailscaleFunnelSection}
+${tailscaleProxySection}
 # Run openclaw doctor to fix any missing config
 echo "Running openclaw doctor..."
 sudo -H -u ubuntu bash -c '

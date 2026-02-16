@@ -125,6 +125,7 @@ export interface HetznerOpenClawAgentArgs {
    * Must start with ghp_ or github_pat_
    */
   githubToken?: pulumi.Input<string>;
+
 }
 
 /**
@@ -263,7 +264,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
-
     // Resolve Input<> values for cloud-init config
     const gatewayPortResolved = pulumi.output(args.gatewayPort ?? 18789);
     const browserPortResolved = pulumi.output(args.browserPort ?? 18791);
