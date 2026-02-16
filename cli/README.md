@@ -134,6 +134,30 @@ agent-army config set instanceType cx32 -a titus   # Per-agent override
 agent-army config set volumeSize 50 -a scout       # Per-agent volume
 ```
 
+### `agent-army secrets set <key> <value>`
+
+Set a Pulumi secret without re-running `init`. Useful for adding or rotating API keys post-setup.
+
+Global keys: `anthropicApiKey`, `tailscaleAuthKey`, `tailscaleApiKey`, `tailnetDnsName`, `braveApiKey`
+
+Per-agent keys (use `--agent`): `slackBotToken`, `slackAppToken`, `linearApiKey`, `linearWebhookSecret`, `linearUserUuid`, `githubToken`
+
+```bash
+agent-army secrets set braveApiKey BSA_xxx
+agent-army secrets set braveApiKey BSA_xxx -c team-h3
+agent-army secrets set slackBotToken xoxb-xxx --agent eng
+agent-army secrets set githubToken ghp_xxx --agent pm -c staging
+```
+
+### `agent-army secrets list`
+
+Show which secrets are configured (values redacted).
+
+```bash
+agent-army secrets list              # Auto-detect config
+agent-army secrets list -c team-h3   # Specific config
+```
+
 ### `agent-army list`
 
 List all saved configurations.
@@ -202,6 +226,7 @@ cli/
 ├── commands/
 │   ├── init.ts         # Interactive setup wizard
 │   ├── config.ts       # View and modify config
+│   ├── secrets.ts      # Set and list Pulumi secrets
 │   ├── deploy.ts       # Deploy agents
 │   ├── redeploy.ts     # Update agents in-place
 │   ├── status.ts       # Show agent statuses
