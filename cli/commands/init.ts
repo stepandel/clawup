@@ -529,6 +529,30 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     }
   }
 
+  // Optional: Brave Search API key (shared across all agents)
+  const braveApiKeyPrompt = await p.confirm({
+    message: "Add a Brave Search API key for web search? (optional)",
+    initialValue: false,
+  });
+  handleCancel(braveApiKeyPrompt);
+
+  let braveApiKey: string | undefined;
+  if (braveApiKeyPrompt) {
+    p.note(
+      KEY_INSTRUCTIONS.braveApiKey.steps.join("\n"),
+      KEY_INSTRUCTIONS.braveApiKey.title
+    );
+
+    const braveKey = await p.password({
+      message: "Brave Search API key",
+      validate: (val) => {
+        if (!val) return "API key is required";
+      },
+    });
+    handleCancel(braveKey);
+    braveApiKey = braveKey as string;
+  }
+
   // Step 7: Show summary
   const costEstimates = basicConfig.provider === "aws" ? COST_ESTIMATES : HETZNER_COST_ESTIMATES;
   const costPerAgent = costEstimates[basicConfig.instanceType as string] ?? 30;
@@ -636,6 +660,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     if (creds.linearUserUuid) setConfig(`${role}LinearUserUuid`, creds.linearUserUuid, false, cwd);
     if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true, cwd);
   }
+  if (braveApiKey) setConfig("braveApiKey", braveApiKey, true, cwd);
   s.stop("Configuration saved");
 
   // Write manifest

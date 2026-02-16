@@ -53,6 +53,8 @@ export interface OpenClawConfigOptions {
   slack?: SlackConfigOptions;
   /** Linear configuration */
   linear?: LinearConfigOptions;
+  /** Brave Search API key for web search */
+  braveApiKey?: string;
 }
 
 export interface OpenClawConfig {
@@ -76,6 +78,9 @@ export interface OpenClawConfig {
     enabled: boolean;
   };
   model?: string;
+  web?: {
+    braveApiKey: string;
+  };
   [key: string]: unknown;
 }
 
@@ -113,6 +118,10 @@ export function generateOpenClawConfig(options: OpenClawConfigOptions): OpenClaw
 
   if (options.model) {
     config.model = options.model;
+  }
+
+  if (options.braveApiKey) {
+    config.web = { braveApiKey: options.braveApiKey };
   }
 
   // Merge custom config
@@ -258,6 +267,12 @@ config["agents"]["defaults"]["heartbeat"] = {
 }
 print("Configured heartbeat: every 1m")
 ${slackChannelConfig}${linearPluginConfig}
+# Configure web search (Brave API key) if available
+brave_api_key = os.environ.get("BRAVE_API_KEY", "")
+if brave_api_key:
+    config["web"] = {"braveApiKey": brave_api_key}
+    print("Configured web search with Brave API key")
+
 with open(config_path, "w") as f:
     json.dump(config, f, indent=2)
 

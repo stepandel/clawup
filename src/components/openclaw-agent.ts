@@ -140,6 +140,11 @@ export interface OpenClawAgentArgs {
   githubToken?: pulumi.Input<string>;
 
   /**
+   * Brave Search API key for web search
+   */
+  braveApiKey?: pulumi.Input<string>;
+
+  /**
    * CIDR blocks allowed SSH access (default: none — use Tailscale).
    * Only applies when creating a new security group (no securityGroupId provided).
    * Example: ["1.2.3.4/32"] to restrict to your IP only.
@@ -441,6 +446,9 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
+    const braveApiKeyOutput = args.braveApiKey
+      ? pulumi.output(args.braveApiKey)
+      : pulumi.output("");
     // Combine all string outputs
     const userData = pulumi.all([
       args.tailscaleAuthKey,
@@ -452,6 +460,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       linearWebhookSecretOutput,
       linearUserUuidOutput,
       githubTokenOutput,
+      braveApiKeyOutput,
     ]).apply(([
       tsAuthKey,
       apiKey,
@@ -462,6 +471,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       linearWebhookSecret,
       linearUserUuid,
       githubToken,
+      braveApiKey,
     ]) => {
         // Include stack name in Tailscale hostname to avoid conflicts across deployments
         const tsHostname = `${pulumi.getStack()}-${name}`;
@@ -490,6 +500,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           linearActiveActions: args.linearActiveActions,
           // GitHub token for gh CLI auth
           githubToken: githubToken || undefined,
+          // Brave Search API key for web search
+          braveApiKey: braveApiKey || undefined,
         };
 
         const script = generateCloudInit(cloudInitConfig);
@@ -502,6 +514,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           linearApiKey: linearApiKey || undefined,
           linearWebhookSecret: linearWebhookSecret || undefined,
           githubToken: githubToken || undefined,
+          braveApiKey: braveApiKey || undefined,
         });
       });
 

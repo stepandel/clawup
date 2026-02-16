@@ -65,6 +65,7 @@ const workingHours = config.get("workingHours") ?? "9am-6pm";
 const userNotes = config.get("userNotes") ?? "No additional notes provided yet.";
 const linearTeam = config.get("linearTeam") ?? "";
 const githubRepo = config.get("githubRepo") ?? "";
+const braveApiKey = config.getSecret("braveApiKey");
 
 // Per-role Linear plugin activeActions (which workflow states trigger queue add/remove)
 const linearActiveActionsByRole: Record<string, LinearActiveActions> = {
@@ -413,6 +414,9 @@ for (const agent of manifest.agents) {
       // GitHub token (optional)
       githubToken,
 
+      // Brave Search API key (optional, shared)
+      braveApiKey,
+
       tags: {
         ...baseTags,
         AgentRole: agent.role,
@@ -465,6 +469,9 @@ for (const agent of manifest.agents) {
 
       // GitHub token (optional)
       githubToken,
+
+      // Brave Search API key (optional, shared)
+      braveApiKey,
 
       labels: {
         ...baseTags,

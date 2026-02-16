@@ -126,6 +126,11 @@ export interface HetznerOpenClawAgentArgs {
    */
   githubToken?: pulumi.Input<string>;
 
+  /**
+   * Brave Search API key for web search
+   */
+  braveApiKey?: pulumi.Input<string>;
+
 }
 
 /**
@@ -264,6 +269,9 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
+    const braveApiKeyOutput = args.braveApiKey
+      ? pulumi.output(args.braveApiKey)
+      : pulumi.output("");
     // Resolve Input<> values for cloud-init config
     const gatewayPortResolved = pulumi.output(args.gatewayPort ?? 18789);
     const browserPortResolved = pulumi.output(args.browserPort ?? 18791);
@@ -282,6 +290,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
         linearWebhookSecretOutput,
         linearUserUuidOutput,
         githubTokenOutput,
+        braveApiKeyOutput,
       ])
       .apply(
         ([
@@ -294,6 +303,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
           linearWebhookSecret,
           linearUserUuid,
           githubToken,
+          braveApiKey,
         ]) =>
           pulumi
             .all([gatewayPortResolved, browserPortResolved, modelResolved, enableSandboxResolved])
@@ -327,6 +337,8 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
             linearActiveActions: args.linearActiveActions,
             // GitHub token for gh CLI auth
             githubToken: githubToken || undefined,
+            // Brave Search API key for web search
+            braveApiKey: braveApiKey || undefined,
           };
 
               const script = generateCloudInit(cloudInitConfig);
@@ -339,6 +351,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 linearApiKey: linearApiKey || undefined,
                 linearWebhookSecret: linearWebhookSecret || undefined,
                 githubToken: githubToken || undefined,
+                braveApiKey: braveApiKey || undefined,
               });
               // Compress to stay within Hetzner's 32KB user_data limit
               return compressCloudInit(interpolated);

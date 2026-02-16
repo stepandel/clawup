@@ -55,6 +55,8 @@ export interface CloudInitConfig {
   linearActiveActions?: LinearActiveActions;
   /** GitHub personal access token for gh CLI auth */
   githubToken?: string;
+  /** Brave Search API key for web search */
+  braveApiKey?: string;
 }
 
 /**
@@ -85,6 +87,7 @@ export function generateCloudInit(config: CloudInitConfig): string {
     enableControlUi: true,
     slack: config.slack,
     linear: linearOptions,
+    braveApiKey: config.braveApiKey,
   });
 
   // GitHub CLI installation (system-level via official apt repo)
@@ -269,6 +272,7 @@ fi
 \${SLACK_BOT_TOKEN:+echo 'export SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN}"' >> /home/ubuntu/.bashrc}
 \${SLACK_APP_TOKEN:+echo 'export SLACK_APP_TOKEN="\${SLACK_APP_TOKEN}"' >> /home/ubuntu/.bashrc}
 \${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
+\${BRAVE_API_KEY:+echo 'export BRAVE_API_KEY="\${BRAVE_API_KEY}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
 ${tailscaleSection}${ghAuthScript}
 ${codingClisInstallScript}
@@ -315,6 +319,7 @@ sudo -H -u ubuntu \\
   SLACK_APP_TOKEN="\${SLACK_APP_TOKEN:-}" \\
   LINEAR_API_KEY="\${LINEAR_API_KEY:-}" \\
   LINEAR_WEBHOOK_SECRET="\${LINEAR_WEBHOOK_SECRET:-}" \\
+  BRAVE_API_KEY="\${BRAVE_API_KEY:-}" \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
@@ -395,6 +400,7 @@ export function interpolateCloudInit(
     linearApiKey?: string;
     linearWebhookSecret?: string;
     githubToken?: string;
+    braveApiKey?: string;
   }
 ): string {
   let result = script
@@ -413,6 +419,8 @@ export function interpolateCloudInit(
   result = result.replace(/\${LINEAR_WEBHOOK_SECRET}/g, values.linearWebhookSecret ?? "");
   result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
+  result = result.replace(/\${BRAVE_API_KEY:-}/g, values.braveApiKey ?? "");
+  result = result.replace(/\${BRAVE_API_KEY}/g, values.braveApiKey ?? "");
 
   return result;
 }

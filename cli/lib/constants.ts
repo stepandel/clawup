@@ -216,6 +216,15 @@ export const KEY_INSTRUCTIONS = {
       "4. Copy the token (starts with github_pat_ or ghp_)",
     ],
   },
+  braveApiKey: {
+    title: "Brave Search API Key",
+    steps: [
+      "To get a Brave Search API key for web search:",
+      "1. Go to https://brave.com/search/api/",
+      "2. Sign up or log in to get an API key",
+      "3. Copy the key (starts with BSA)",
+    ],
+  },
   hcloudToken: {
     title: "Hetzner Cloud API Token",
     steps: [
