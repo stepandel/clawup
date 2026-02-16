@@ -7,27 +7,33 @@ Juno is the **Product Manager** of your Agent Army. She takes high-level Linear 
 
 ## What Juno Does
 
-- Monitors Linear for unrefined tickets assigned to her
+- Receives tickets via the [Linear plugin queue](/integrations/linear#linear-plugin) when they enter "Backlog" or "Unstarted"
+- Routes tickets by labels to the appropriate workflow
 - Breaks down tickets into sized, sequenced sub-tasks
 - Researches requirements and gathers context from the codebase
 - Generates implementation prompts so Titus knows exactly what to build
 - Flags tickets that are missing descriptions or acceptance criteria
-- Assigns prepped tickets to Titus and moves them to "To Do"
+- Assigns prepped tickets to Titus
 
-## Heartbeat
+## How Work Gets Triggered
 
-Juno's heartbeat fires every minute and follows a simple loop:
+Juno's work is driven by the **openclaw-linear plugin**, not polling. When a ticket moves to "Backlog" or "Unstarted" in Linear, the plugin adds it to Juno's queue and triggers the `pm-queue-handler` skill:
 
-1. **Check Linear** for assigned tickets in "Todo" or "Backlog" that haven't been prepped yet
-2. **Prep each ticket** using the `linear-ticket-prep` skill — a multi-phase workflow that sizes the ticket, researches context, and generates an implementation prompt
-3. **Flag gaps** — if any ticket is missing a description or acceptance criteria, flag it and ask the assigner for clarification
-4. **Hand off** — once a ticket is prepped, assign it to Titus and move it to "To Do"
+1. **View the ticket** — read the full ticket details, labels, and comments
+2. **Validate completeness** — if missing description or acceptance criteria, ask for clarification on the ticket
+3. **Route by labels** — use the `linear-ticket-routing` skill to determine the correct workflow based on ticket labels
+4. **Prep the ticket** — run `linear-ticket-prep` to size it, research context, enrich with definition of done and test cases, and generate a coding agent prompt
+5. **Assign and hand off** — assign the prepped ticket to Titus and pop it from the queue
+
+Juno's heartbeat (1-minute cycle) only handles bootstrap detection on first boot.
 
 ## Skills
 
 | Skill | Purpose |
 |-------|---------|
+| `pm-queue-handler` | End-to-end ticket processing — routes, preps, and assigns inbound tickets |
 | `linear-ticket-prep` | Multi-phase ticket preparation — sizing, research, context gathering, and prompt generation |
+| `linear-ticket-routing` | Routes tickets by labels to the appropriate workflow and assignee |
 
 ## Workspace Files
 
@@ -37,7 +43,7 @@ Juno's behavior is defined by workspace files injected into `~/.openclaw/workspa
 |------|-------------|
 | `SOUL.md` | Core personality — approach, values, superpowers, boundaries. Defines who Juno *is* as a PM. |
 | `IDENTITY.md` | Name, role label, emoji, avatar metadata. |
-| `HEARTBEAT.md` | The state machine logic executed every minute (described above). |
+| `HEARTBEAT.md` | Periodic checklist — bootstrap detection on first boot. |
 | `TOOLS.md` | Tool-specific notes and common commands for Juno's workflow. |
 
 She also receives the shared base files (`USER.md`, `AGENTS.md`, `BOOTSTRAP.md`) that all agents share.

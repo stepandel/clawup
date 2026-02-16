@@ -7,30 +7,33 @@ Titus is the **Engineer** of your Agent Army. He picks up prepped tickets from L
 
 ## What Titus Does
 
-- Picks up prioritized engineering tickets from Linear
-- Writes code using Claude Code on a dedicated server
+- Receives tickets via the [Linear plugin queue](/integrations/linear#linear-plugin) when they enter "Backlog" or "Started"
+- Delegates implementation to Claude Code
 - Runs typechecks, builds, and tests before opening PRs
 - Opens pull requests on GitHub and assigns Scout for review
 - Responds to PR review comments and pushes fixes
-- Manages multiple tickets in parallel with a state machine
 - Alerts the owner on Slack when stuck or hitting repeated failures
 
-## Heartbeat
+## How Work Gets Triggered
 
-Titus runs a state machine that tracks multiple tickets in parallel via `memory/agent-state.json`. His heartbeat fires every minute:
+Titus's work is driven by the **openclaw-linear plugin**. When a ticket moves to "Backlog" or "Started" in Linear, the plugin adds it to Titus's queue and triggers the `eng-queue-handler` skill:
 
-1. **Circuit breaker** — if 3+ consecutive errors have occurred, notify the owner on Slack and stop. This prevents runaway failures.
-2. **Process active work** — loop through each item in `activeWork` and act based on its state:
-   - **`AGENT_RUNNING`** — Claude Code is implementing the ticket. If stuck for 3+ cycles, comment on Linear and alert the owner. If finished, transition to `BUILD_CHECK`.
-   - **`BUILD_CHECK`** — run typecheck, build, and e2e tests. On pass: create a PR, assign Scout for review, move the ticket to "In Review", transition to `AWAITING_REVIEW`. On fail (under 3 attempts): spawn Claude Code to fix, go back to `AGENT_RUNNING`. On fail (3+ attempts): create a draft PR with the failure summary.
-   - **`AWAITING_REVIEW`** — check if the PR is merged. If yes, rebase dependent branches and remove from active work. Otherwise, do nothing.
-   - **`IDLE_BLOCKED`** — waiting on a dependency. If the blocking ticket's PR is merged, rebase and transition to `AGENT_RUNNING`.
-3. **Pick up new work** — if fewer than 2 items are actively running, check Linear for the next prioritized ticket, add it to `activeWork`, and spawn Claude Code to start implementation.
+1. **View the ticket** — read the full ticket details, acceptance criteria, and coding agent prompt
+2. **Start work** — move the ticket to "In Progress" and pop it from the queue
+3. **Delegate to Claude Code** — spawn the coding agent with the ticket's implementation prompt
+4. **Monitor execution** — if the coding agent is stuck for 3+ heartbeat cycles, note the blocker on Linear and notify the owner on Slack
+5. **Verify and ship**:
+   - **Pass** — create a PR, move ticket to "In Review", assign Scout
+   - **Fail (< 3 attempts)** — spawn coding agent to fix errors and re-run
+   - **Fail (3+ attempts)** — create a draft PR with failure summary and assign Scout
+
+Titus's heartbeat (1-minute cycle) only handles bootstrap detection on first boot.
 
 ## Skills
 
 | Skill | Purpose |
 |-------|---------|
+| `eng-queue-handler` | End-to-end ticket processing — delegates to coding agent, ships PRs |
 | `eng-ticket-workflow` | Structured ticket implementation workflow |
 | `eng-pr-tester` | PR testing workflow |
 | `pr-review-resolver` | PR review comment resolution |
@@ -43,7 +46,7 @@ Titus's behavior is defined by workspace files injected into `~/.openclaw/worksp
 |------|-------------|
 | `SOUL.md` | Core personality — approach, values, superpowers, boundaries. Defines who Titus *is* as an engineer. |
 | `IDENTITY.md` | Name, role label, emoji, avatar metadata. |
-| `HEARTBEAT.md` | The state machine logic executed every minute (described above). |
+| `HEARTBEAT.md` | Periodic checklist — bootstrap detection on first boot. |
 | `TOOLS.md` | Tool-specific notes and common commands for Titus's workflow. |
 
 He also receives the shared base files (`USER.md`, `AGENTS.md`, `BOOTSTRAP.md`) that all agents share.

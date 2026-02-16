@@ -7,28 +7,38 @@ Scout is the **QA Tester** of your Agent Army. He reviews pull requests, tests c
 
 ## What Scout Does
 
-- Monitors GitHub for PRs ready for review
-- Reviews code changes against Linear ticket acceptance criteria
+- Receives tickets via the [Linear plugin queue](/integrations/linear#linear-plugin) when they enter "Started"
+- Reviews PRs against Linear ticket acceptance criteria
 - Runs builds and test suites to validate changes
 - Auto-fixes simple build or test failures and retries
-- Files bugs back to Linear with specific gaps when requirements aren't met
-- Labels PRs as `qa-passed`, `needs-work`, or `qa-failed`
-- Resolves PR review comments by parsing, applying fixes, and pushing
+- Reports results back to Linear — approves PRs or requests changes with specific gaps
+- Resolves PR review comments by parsing, applying fixes, and pushing (via heartbeat)
 
-## Heartbeat
+## How Work Gets Triggered
 
-Scout's heartbeat fires every minute and covers two main jobs:
+Scout's work comes from two sources:
 
-1. **Resolve review comments** — scan all open PRs for unresolved review comments. For each one, use the `pr-review-resolver` skill to parse comments, apply fixes via Claude Code, and push.
-2. **Find PRs to test** — query Linear for tickets in "In Review" or "In Review by Agent" with a linked PR. Skip any ticket already tested at the same PR head commit.
-3. **Review against acceptance criteria** — for each untested ticket, check out the PR branch and review the diff against the Linear ticket's acceptance criteria. If requirements are unmet, comment on Linear with specific gaps and label `needs-work`.
-4. **Run build and tests** — auto-detect the package manager, run install, build, and test suites. On pass: comment on Linear with a checkmark and label `qa-passed`.
-5. **Auto-fix failures** — on build or test failure, invoke Claude Code with the error context to apply a minimal fix, commit, push, and re-run once. If still failing after retry, comment on Linear with the error summary and label `qa-failed`.
+### Queue Handler (Linear Plugin)
+
+When a ticket moves to "Started" in Linear, the plugin adds it to Scout's queue and triggers the `tester-queue-handler` skill:
+
+1. **View the ticket** — read acceptance criteria, definition of done, test cases, and linked PR
+2. **Find and checkout the PR** — if no PR is linked, ask the assignee to link one
+3. **Review against acceptance criteria** — if requirements are unmet, request changes on the PR with specific gaps and return
+4. **Run build and tests** — auto-detect package manager, run install, build, test (and e2e if present)
+   - **Pass** — approve the PR and confirm on the ticket
+   - **Fail** — invoke Claude Code to apply a minimal fix, re-run once
+5. **Handle persistent failure** — if still failing after retry, request changes with an error summary
+
+### Heartbeat (Polling)
+
+Scout's heartbeat fires every minute and handles **PR review comment resolution** — scanning open PRs for unresolved review comments and using the `pr-review-resolver` skill to parse comments, apply fixes via Claude Code, and push.
 
 ## Skills
 
 | Skill | Purpose |
 |-------|---------|
+| `tester-queue-handler` | End-to-end ticket verification — reviews PRs, runs tests, reports results |
 | `pr-review-resolver` | Parse PR review comments, apply fixes via Claude Code, and push |
 
 ## Workspace Files
@@ -39,7 +49,7 @@ Scout's behavior is defined by workspace files injected into `~/.openclaw/worksp
 |------|-------------|
 | `SOUL.md` | Core personality — approach, values, superpowers, boundaries. Defines who Scout *is* as a QA tester. |
 | `IDENTITY.md` | Name, role label, emoji, avatar metadata. |
-| `HEARTBEAT.md` | The state machine logic executed every minute (described above). |
+| `HEARTBEAT.md` | Periodic checklist — bootstrap detection and PR review comment resolution. |
 | `TOOLS.md` | Tool-specific notes and common commands for Scout's workflow. |
 
 He also receives the shared base files (`USER.md`, `AGENTS.md`, `BOOTSTRAP.md`) that all agents share.

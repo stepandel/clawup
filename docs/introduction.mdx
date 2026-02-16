@@ -31,7 +31,7 @@ Each agent runs on its own dedicated server with persistent storage, pre-configu
 
 1. **Configure** — Run `agent-army init` to set up your cloud provider, select agents, and connect Linear/GitHub
 2. **Deploy** — Run `agent-army deploy` to provision your team on dedicated servers
-3. **Assign work** — Point your agents at Linear tickets and they coordinate the rest. Agents don't sit idle — each one runs a [heartbeat](/architecture/agent-presets#heartbeat-logic) every minute that checks for new work, processes active tasks, and moves tickets forward
+3. **Assign work** — Move tickets through your Linear workflow and agents pick them up automatically. The [Linear plugin](/integrations/linear#linear-plugin) watches for ticket state changes and routes them into per-agent queues — each agent's [queue handler](/architecture/agent-presets#how-work-gets-triggered) processes tickets end-to-end
 4. **Monitor** — Use `agent-army status`, `ssh`, and `validate` to check on your team
 
 ## Key Features

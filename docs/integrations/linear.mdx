@@ -55,11 +55,72 @@ On each agent's server, the deploy process automatically:
 
 1. Installs **Deno** and the **Linear CLI** (`@schpet/linear-cli`)
 2. Sets `LINEAR_API_KEY` as an environment variable
-3. Configures the Linear skill in OpenClaw
+3. Installs and configures the **openclaw-linear plugin** — the webhook-driven queue system that triggers agent work
+
+## Linear Plugin
+
+The `openclaw-linear` plugin is the core mechanism that drives agent work. It's an OpenClaw extension that receives Linear webhooks, maintains per-agent ticket queues, and automatically invokes queue handler skills when tickets arrive.
+
+### How It Works
+
+1. A ticket changes state in Linear (e.g., moved to "Backlog" or "In Progress")
+2. Linear sends a webhook to the agent's endpoint
+3. The plugin evaluates per-role routing rules to decide whether to add or remove the ticket from the agent's queue
+4. When a ticket is added to the queue, the plugin automatically triggers the agent's **queue handler skill**
+
+### Queue Routing Rules
+
+Each role has rules that determine which Linear workflow states add or remove tickets from the queue:
+
+| Agent | Adds to Queue | Removes from Queue |
+|-------|--------------|-------------------|
+| **Juno** (PM) | Backlog, Unstarted | Triage, Started, Completed, Cancelled |
+| **Titus** (Eng) | Backlog, Started | Triage, Completed, Cancelled |
+| **Scout** (QA) | Started | Triage, Completed, Cancelled |
+
+For example: when a ticket moves to "Backlog", it enters both Juno's and Titus's queues. When it moves to "Started", it enters Titus's and Scout's queues (and is removed from Juno's).
+
+### Queue Handler Skills
+
+Each agent has a queue handler skill that processes tickets from their queue:
+
+- **`pm-queue-handler`** (Juno) — Routes the ticket by labels, preps it with research and context via `linear-ticket-prep`, sizes it, and assigns it to Titus
+- **`eng-queue-handler`** (Titus) — Delegates implementation to Claude Code, monitors progress, runs build/test checks, creates a PR, and assigns Scout for review
+- **`tester-queue-handler`** (Scout) — Reviews the PR against acceptance criteria, runs build/test suites, auto-fixes simple failures, and reports results
+
+These skills are not user-invocable — they're triggered automatically by the plugin when a ticket enters the queue.
+
+### Webhook Setup
+
+Each agent gets a webhook endpoint on your Tailscale network:
+
+```
+https://<stack>-<agent-name>.<tailnet>/hooks/linear
+```
+
+During `agent-army init`, the CLI collects a **Linear webhook secret** per agent. You need to register the webhook URL in Linear:
+
+1. Go to **Linear Settings** > **API** > **Webhooks**
+2. Create a webhook pointing to the agent's endpoint URL
+3. Set the secret to match what you provided during init
+4. Enable the **Issues** event type
+
+<Tip>
+You can set or rotate webhook secrets post-deploy with `agent-army secrets set linearWebhookSecret <secret> --agent <role>`.
+</Tip>
+
+### Plugin Configuration
+
+The plugin is configured automatically during deploy with:
+
+- **API key** — The agent's Linear API key
+- **Webhook secret** — For verifying incoming webhooks
+- **Agent mapping** — Maps the Linear user UUID to the OpenClaw agent ID
+- **State actions** — Per-role routing rules (which workflow states add/remove from the queue)
 
 ## How Agents Use Linear
 
-Agents use the Linear CLI to manage tickets:
+Agents use the Linear CLI and plugin tools to manage tickets:
 
 ```bash
 # List tickets assigned to the agent
@@ -79,9 +140,9 @@ linear issue create --title "Implement auth endpoint" --team ENG --parent ENG-10
 
 | Agent | How They Use Linear |
 |-------|-------------------|
-| **Juno** (PM) | Breaks down tickets into sub-tasks, sequences work, assigns to Titus/Scout, tracks overall progress |
-| **Titus** (Engineer) | Picks up assigned tickets, updates status as work progresses, marks done when PR is merged |
-| **Scout** (QA) | Checks tickets for acceptance criteria, files bugs with reproduction steps, marks verified after fixes land |
+| **Juno** (PM) | Receives tickets via queue, breaks them down into sub-tasks, preps with research and context, assigns to Titus |
+| **Titus** (Engineer) | Receives tickets via queue, delegates to Claude Code, creates PRs, assigns Scout for review |
+| **Scout** (QA) | Receives tickets via queue, reviews PRs against acceptance criteria, runs tests, reports results |
 
 ## Manifest Configuration
 

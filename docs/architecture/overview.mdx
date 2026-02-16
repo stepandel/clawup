@@ -80,14 +80,16 @@ Every agent server runs the same bootstrap script on first boot. The sequence ta
 - Enable systemd linger for the `ubuntu` user
 - Run `openclaw onboard --non-interactive --accept-risk` (local mode, gateway on loopback)
 
-### 9. Workspace Files
+### 9. Workspace Files & Skills
 
 - Inject preset files into `~/.openclaw/workspace/` (SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md, USER.md, etc.)
+- Inject skill files into `~/.openclaw/workspace/skills/` (queue handlers, ticket prep, PR workflows)
 - Files are gzipped and base64-encoded in the cloud-init script for efficiency
 
-### 10. OpenClaw Configuration
+### 10. OpenClaw Configuration & Plugins
 
 - Patch `openclaw.json` with gateway, heartbeat, sandbox, and integration settings (see below)
+- Install the **openclaw-linear plugin** (if Linear is configured) — provides webhook-driven ticket queuing
 - Install the OpenClaw daemon service
 
 ### 11. Tailscale Serve
@@ -107,7 +109,7 @@ Each agent server ends up with:
 |----------|---------|---------|
 | Docker | Latest | Sandbox code execution |
 | Node.js | 22 | Runtime for OpenClaw |
-| OpenClaw | Latest (npm) | Agent framework — gateway, heartbeat, daemon |
+| OpenClaw | Latest (npm) | Agent framework — gateway, heartbeat, plugins, daemon |
 | Claude Code | Latest | AI coding assistant |
 | GitHub CLI (`gh`) | Latest | Git operations, PR management |
 | Tailscale | Latest | Mesh VPN, SSH, HTTPS proxy |
@@ -133,7 +135,7 @@ After onboarding, the bootstrap script patches `openclaw.json` with your deploym
 }
 ```
 
-The heartbeat fires every minute, keeping agents active and processing their HEARTBEAT.md state machine logic.
+The heartbeat fires every minute in the `main` session, executing each agent's `HEARTBEAT.md` checklist. For most agents this is minimal (bootstrap detection only) — the primary work trigger is the [Linear plugin queue system](/architecture/agent-presets#how-work-gets-triggered).
 
 ### Sandbox
 
@@ -147,7 +149,7 @@ Docker-based sandbox is enabled by default (`enableSandbox: true`), providing is
 - Group policy: open
 
 **Linear** (if configured):
-- Skill entry with API key
+- **openclaw-linear plugin** installed and configured with API key, webhook secret, agent mapping, and per-role queue routing rules
 - Linear CLI available via Deno
 
 ### Environment Variables
@@ -167,7 +169,7 @@ Each agent gets workspace files injected based on its preset (`pm`, `eng`, or `t
 |------|---------|
 | `SOUL.md` | Personality, approach, core truths, superpowers, boundaries |
 | `IDENTITY.md` | Name, role, emoji, avatar |
-| `HEARTBEAT.md` | Periodic task logic — state machine for checking tickets, PRs, etc. |
+| `HEARTBEAT.md` | Periodic checklist — bootstrap detection and polling-based tasks |
 | `TOOLS.md` | Tool-specific notes and common commands |
 
 ### Shared Base Files

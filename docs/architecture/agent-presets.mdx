@@ -17,28 +17,27 @@ For full role descriptions, see the [Introduction](/introduction).
 
 ## How Agents Coordinate
 
-Agents coordinate asynchronously through Linear and GitHub — there's no direct agent-to-agent communication:
+Agents coordinate asynchronously through Linear and GitHub — there's no direct agent-to-agent communication. Work is driven by the **[openclaw-linear plugin](/integrations/linear#linear-plugin)**, which watches for Linear ticket state changes via webhooks and routes tickets into per-agent queues.
 
 ```
-Linear Ticket
+Linear Ticket (state change)
      │
      ▼
-Juno (PM) ── breaks down into sub-tasks
+openclaw-linear plugin (webhook)
+     │
+     ├── Backlog/Unstarted → Juno's queue
+     ├── Backlog/Started   → Titus's queue
+     └── Started           → Scout's queue
      │
      ▼
-Titus (Eng) ── picks up engineering tickets, opens PRs
+Queue handler skill runs automatically
      │
-     ▼
-Scout (QA) ── reviews PRs, tests changes, files bugs
-     │
-     ▼
-Titus (Eng) ── fixes bugs, iterates until approved
+     ├── Juno: preps ticket, assigns to Titus
+     ├── Titus: delegates to Claude Code, opens PR, assigns Scout
+     └── Scout: reviews PR, runs tests, reports results
 ```
 
-Each agent runs a **heartbeat** every minute that checks for new work:
-- **Juno** checks Linear for unrefined tickets to break down
-- **Titus** checks Linear for assigned engineering tickets, then checks GitHub for PR review comments
-- **Scout** checks GitHub for PRs ready for review, then checks Linear for verification tasks
+When a ticket changes state in Linear, the plugin adds or removes it from the appropriate agent's queue. Each agent has a **queue handler skill** that processes inbound tickets end-to-end.
 
 ## Workspace Files
 
@@ -50,7 +49,7 @@ Each agent's behavior is defined by workspace files injected into `~/.openclaw/w
 |------|-------------|
 | `SOUL.md` | Core personality — approach, values, superpowers, boundaries, vibe. This is who the agent *is*. |
 | `IDENTITY.md` | Name, role label, emoji, avatar. Short identification metadata. |
-| `HEARTBEAT.md` | State machine logic executed every minute. Defines what the agent checks for and how it transitions between states (idle → working → blocked → done). |
+| `HEARTBEAT.md` | Periodic checklist executed every minute. Handles bootstrap detection and any polling-based tasks not covered by the Linear plugin queue. |
 | `TOOLS.md` | Tool-specific notes and common commands. Cheat sheet for the agent's toolchain. |
 
 ### Shared Base Files
@@ -60,7 +59,7 @@ These files are shared across all presets:
 | File | What It Does |
 |------|-------------|
 | `USER.md` | Owner information — name, timezone, working hours, custom notes. Personalized from template variables. |
-| `AGENTS.md` | Operational instructions shared by all agents — memory management, safety rules, group chat etiquette, heartbeat protocol. |
+| `AGENTS.md` | Operational instructions shared by all agents — memory management, safety rules, group chat etiquette. |
 | `BOOTSTRAP.md` | First-run checklist — verifies integrations (Linear, GitHub, Claude Code) work, then deletes itself. |
 
 ### Skills
@@ -69,47 +68,42 @@ Reusable skill files provide specialized workflows:
 
 | Skill | Used By | Purpose |
 |-------|---------|---------|
+| `pm-queue-handler` | PM | Processes tickets from Juno's Linear queue — routes, preps, and assigns |
+| `eng-queue-handler` | Engineer | Processes tickets from Titus's Linear queue — delegates to coding agent, ships PRs |
+| `tester-queue-handler` | QA | Processes tickets from Scout's Linear queue — reviews PRs, runs tests, reports results |
 | `linear-ticket-prep` | PM | Multi-phase ticket preparation — sizing, research, context gathering, prompt generation |
+| `linear-ticket-routing` | PM | Routes tickets by labels to the appropriate workflow and assignee |
 | `eng-ticket-workflow` | Engineer | Structured ticket implementation workflow |
 | `eng-pr-tester` | Engineer | PR testing workflow |
-| `pr-review-resolver` | Engineer | PR review comment resolution |
+| `pr-review-resolver` | Engineer, QA | PR review comment resolution |
 
-## Heartbeat Logic
+## How Work Gets Triggered
 
-The heartbeat is the core loop that drives each agent. It fires every minute as a checklist — the agent walks through it top to bottom, takes any actions needed, then waits for the next tick. On first boot, the heartbeat detects `BOOTSTRAP.md` and runs first-time setup instead of the normal checklist — once bootstrap completes, it deletes the file and the regular heartbeat takes over.
+Agent work is primarily driven by the **[openclaw-linear plugin](/integrations/linear#linear-plugin)** — an OpenClaw extension that receives Linear webhooks, maintains per-agent ticket queues, and automatically invokes queue handler skills when tickets arrive. The heartbeat still fires every minute but serves a secondary role: bootstrap detection and polling-based tasks (like Scout's PR review resolution).
 
-The three agents have completely different heartbeats, each tailored to their role.
+### Linear Plugin Queue System
 
-### Juno (PM)
+When a ticket changes state in Linear (e.g., moved to "Backlog" or "In Progress"), the plugin's webhook handler evaluates per-role routing rules to decide whether to add or remove the ticket from each agent's queue:
 
-Juno's heartbeat is the simplest — it's focused on ticket preparation:
+| Agent | Queue Adds On | Queue Removes On |
+|-------|---------------|-----------------|
+| **Juno** (PM) | Backlog, Unstarted | Triage, Started, Completed, Cancelled |
+| **Titus** (Eng) | Backlog, Started | Triage, Completed, Cancelled |
+| **Scout** (QA) | Started | Triage, Completed, Cancelled |
 
-1. Check Linear for assigned tickets in "Todo" or "Backlog" that haven't been prepped yet
-2. For each unprepped ticket, run the `linear-ticket-prep` skill — a multi-phase workflow that sizes the ticket, researches context, and generates an implementation prompt
-3. If any ticket is missing a description or acceptance criteria, flag it and ask the assigner for clarification
-4. Once a ticket is prepped, assign it to Titus and move it to "To Do"
+When a ticket is added to an agent's queue, the plugin automatically triggers that agent's **queue handler skill**:
 
-### Titus (Eng)
+- **`pm-queue-handler`** — Routes the ticket by labels, preps it with research/context/sizing via `linear-ticket-prep`, and assigns it to Titus
+- **`eng-queue-handler`** — Delegates implementation to Claude Code, monitors progress, runs build/test checks, creates a PR, and assigns Scout for review
+- **`tester-queue-handler`** — Reviews the PR against acceptance criteria, runs build/test suites, auto-fixes simple failures, and reports results on Linear
 
-Titus runs a state machine that tracks multiple tickets in parallel via `memory/agent-state.json`:
+### Heartbeat
 
-1. **Circuit breaker** — if 3+ consecutive errors have occurred, notify the owner on Slack and stop. This prevents runaway failures
-2. **Process active work** — loop through each item in `activeWork` and act based on its state:
-   - **`AGENT_RUNNING`** — Claude Code is implementing the ticket. If stuck for 3+ cycles, comment on Linear and alert the owner. If finished, transition to `BUILD_CHECK`
-   - **`BUILD_CHECK`** — run typecheck, build, and e2e tests. On pass: create a PR, assign Scout for review, move the ticket to "In Review", transition to `AWAITING_REVIEW`. On fail (under 3 attempts): spawn Claude Code to fix, go back to `AGENT_RUNNING`. On fail (3+ attempts): create a draft PR with the failure summary
-   - **`AWAITING_REVIEW`** — check if the PR is merged. If yes, rebase dependent branches and remove from active work. Otherwise, do nothing
-   - **`IDLE_BLOCKED`** — waiting on a dependency. If the blocking ticket's PR is merged, rebase and transition to `AGENT_RUNNING`
-3. **Pick up new work** — if fewer than 2 items are actively running, check Linear for the next prioritized ticket, add it to `activeWork`, and spawn Claude Code to start implementation
+The heartbeat fires every minute and executes the agent's `HEARTBEAT.md` checklist. For most agents, this is minimal — just a bootstrap check. On first boot, the heartbeat detects `BOOTSTRAP.md` and runs first-time setup (integration verification); once bootstrap completes, the file is deleted and the regular heartbeat takes over.
 
-### Scout (QA)
+**Juno and Titus** have heartbeats that only check for bootstrap — all their work is triggered by the Linear plugin queue.
 
-Scout's heartbeat covers two jobs — resolving review comments and testing PRs:
-
-1. **Resolve review comments** — scan all open PRs for unresolved review comments. For each one, use the `pr-review-resolver` skill to parse comments, apply fixes via Claude Code, and push
-2. **Find PRs to test** — query Linear for tickets in "In Review" or "In Review by Agent" with a linked PR. Skip any ticket already tested at the same PR head commit
-3. **Review against acceptance criteria** — for each untested ticket, check out the PR branch and review the diff against the Linear ticket's acceptance criteria. If requirements are unmet, comment on Linear with specific gaps and label `needs-work`
-4. **Run build and tests** — auto-detect the package manager, run install, build, and test suites. On pass: comment on Linear with a checkmark and label `qa-passed`
-5. **Auto-fix failures** — on build or test failure, invoke Claude Code with the error context to apply a minimal fix, commit, push, and re-run once. If still failing after retry, comment on Linear with the error summary and label `qa-failed`
+**Scout** has a more active heartbeat that also handles PR review comment resolution (scanning open PRs for unresolved comments and using the `pr-review-resolver` skill to apply fixes). Queue-driven work (testing new PRs) is handled by the `tester-queue-handler` skill.
 
 ## Template Variables
 
@@ -128,7 +122,7 @@ These are set during `agent-army init` and stored in the manifest.
 
 ## Customization
 
-All preset files live in the `presets/` directory. If you clone the repo locally, you can edit any `.md` file directly — change an agent's personality, tweak its heartbeat logic, or adjust its tool notes. Your changes will be picked up on the next deploy.
+All preset files live in the `presets/` directory. If you clone the repo locally, you can edit any `.md` file directly — change an agent's personality, adjust its queue handler workflow, or tweak its tool notes. Your changes will be picked up on the next deploy.
 
 You can also customize agents in the manifest:
 
