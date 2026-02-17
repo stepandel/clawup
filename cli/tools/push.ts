@@ -15,6 +15,8 @@ import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import type { AgentDefinition } from "../types";
+import { fetchIdentitySync } from "../lib/identity";
+import * as os from "os";
 import pc from "picocolors";
 
 export interface PushOptions {
@@ -228,8 +230,8 @@ export const pushTool: ToolImplementation<PushOptions> = async (
 
     let needsRestart = false;
 
-    // 1. Push skills
-    if (doSkills) {
+    // 1. Push preset skills (skip for identity-based agents — their skills are synced in step 2)
+    if (doSkills && !agent.identity) {
       const skillsDir = path.join(presetsDir, "skills");
       if (fs.existsSync(skillsDir)) {
         // Ensure remote skills dir exists
@@ -246,10 +248,65 @@ export const pushTool: ToolImplementation<PushOptions> = async (
       }
     }
 
-    // 2. Push workspace files (role-specific preset + base AGENTS.md)
+    // 2. Push workspace files (role-specific preset, identity, or custom)
     if (doWorkspace) {
-      const presetName = agent.preset;
-      if (presetName) {
+      if (agent.identity) {
+        // Identity-based agent: fetch from identity source and sync files
+        try {
+          const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
+          const identity = fetchIdentitySync(agent.identity, identityCacheDir);
+
+          // Ensure remote workspace dir exists
+          sshExec(exec, host, `mkdir -p ${REMOTE_WORKSPACE}`);
+
+          // Write identity files to a temp dir for transfer
+          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "push-identity-"));
+
+          for (const [relPath, content] of Object.entries(identity.files)) {
+            const localFile = path.join(tmpDir, relPath);
+            fs.mkdirSync(path.dirname(localFile), { recursive: true });
+            fs.writeFileSync(localFile, content);
+          }
+
+          // Sync workspace files (non-skill files)
+          const topFiles = Object.keys(identity.files).filter(f => !f.startsWith("skills/"));
+          let wsOk = true;
+          for (const relPath of topFiles) {
+            const localFile = path.join(tmpDir, relPath);
+            const result = scpFile(exec, localFile, host, `${REMOTE_WORKSPACE}/${relPath}`);
+            if (!result.ok) {
+              console.log(`    ${pc.red("FAIL")}  workspace file ${relPath}: ${result.output.substring(0, 100)}`);
+              wsOk = false;
+              allOk = false;
+            }
+          }
+          if (wsOk) {
+            console.log(`    ${pc.green("OK")}  workspace files synced (${topFiles.length} files from identity)`);
+          }
+
+          // Sync identity skills if --skills flag
+          if (doSkills) {
+            const skillsLocalDir = path.join(tmpDir, "skills");
+            if (fs.existsSync(skillsLocalDir)) {
+              sshExec(exec, host, `mkdir -p ${REMOTE_SKILLS}`);
+              const result = rsyncDir(exec, skillsLocalDir, host, REMOTE_SKILLS);
+              if (result.ok) {
+                console.log(`    ${pc.green("OK")}  identity skills synced`);
+              } else {
+                console.log(`    ${pc.red("FAIL")}  identity skills sync failed: ${result.output.substring(0, 100)}`);
+                allOk = false;
+              }
+            }
+          }
+
+          // Cleanup temp dir
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        } catch (err) {
+          console.log(`    ${pc.red("FAIL")}  identity fetch failed: ${(err as Error).message}`);
+          allOk = false;
+        }
+      } else if (agent.preset) {
+        const presetName = agent.preset;
         const roleDir = path.join(presetsDir, presetName);
         if (fs.existsSync(roleDir)) {
           // Ensure remote workspace dir exists
@@ -290,7 +347,7 @@ export const pushTool: ToolImplementation<PushOptions> = async (
           }
         }
       } else {
-        console.log(`    ${pc.yellow("SKIP")}  no preset defined for ${agent.displayName} (custom agent)`);
+        console.log(`    ${pc.yellow("SKIP")}  no preset or identity defined for ${agent.displayName} (custom agent)`);
       }
     }
 

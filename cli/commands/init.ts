@@ -5,6 +5,9 @@
 import { execSync } from "child_process";
 import * as p from "@clack/prompts";
 import type { AgentDefinition, ArmyManifest } from "../types";
+import { fetchIdentity } from "../lib/identity";
+import * as os from "os";
+import * as path from "path";
 import {
   PRESETS,
   PROVIDERS,
@@ -253,6 +256,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     message: "How would you like to configure agents?",
     options: [
       { value: "presets", label: "Presets only", hint: "PM (Juno), Eng (Titus), Tester (Scout)" },
+      { value: "identity", label: "From identity repo", hint: "Load agent personas from a Git URL or local path" },
       { value: "custom", label: "Custom only", hint: "Define your own agents" },
       { value: "mix", label: "Mix of both", hint: "Pick presets + add custom agents" },
     ],
@@ -283,6 +287,66 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         preset: preset.preset,
         volumeSize: preset.volumeSize,
       });
+    }
+  }
+
+  // Collect identity-based agents
+  if (agentMode === "identity" || agentMode === "mix") {
+    let addMore = true;
+    const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
+
+    while (addMore) {
+      const identityUrl = await p.text({
+        message: "Identity source (Git URL or local path)",
+        placeholder: "https://github.com/org/identities#agent-name",
+        validate: (val) => {
+          if (!val.trim()) return "Identity source is required";
+        },
+      });
+      handleCancel(identityUrl);
+
+      // Validate by fetching the identity
+      const spinner = p.spinner();
+      spinner.start("Validating identity...");
+
+      try {
+        const identity = await fetchIdentity(identityUrl as string, identityCacheDir);
+        spinner.stop(
+          `Found: ${identity.manifest.displayName} (${identity.manifest.role}) — ${identity.manifest.description}`
+        );
+
+        // Allow volume size override
+        const volumeOverride = await p.text({
+          message: `Volume size in GB (default: ${identity.manifest.volumeSize})`,
+          placeholder: String(identity.manifest.volumeSize),
+          defaultValue: String(identity.manifest.volumeSize),
+          validate: (val) => {
+            const n = parseInt(val, 10);
+            if (isNaN(n) || n < 8 || n > 500) return "Must be between 8 and 500";
+          },
+        });
+        handleCancel(volumeOverride);
+
+        agents.push({
+          name: `agent-${identity.manifest.name}`,
+          displayName: identity.manifest.displayName,
+          role: identity.manifest.role,
+          preset: null,
+          identity: identityUrl as string,
+          volumeSize: parseInt(volumeOverride as string, 10),
+        });
+      } catch (err) {
+        spinner.stop(`Failed to validate identity: ${(err as Error).message}`);
+        p.log.error("Please check the URL and try again.");
+        continue; // Re-prompt
+      }
+
+      const more = await p.confirm({
+        message: "Add another identity-based agent?",
+        initialValue: false,
+      });
+      handleCancel(more);
+      addMore = more as boolean;
     }
   }
 

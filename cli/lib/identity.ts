@@ -118,6 +118,24 @@ function readFilesRecursive(dir: string, base?: string): Record<string, string> 
 }
 
 /**
+ * Validate linearRouting field structure.
+ */
+function validateLinearRouting(value: unknown): IdentityManifest["linearRouting"] {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`identity.json: "linearRouting" must be an object`);
+  }
+  const lr = value as Record<string, unknown>;
+  if (lr.add !== undefined && !Array.isArray(lr.add)) {
+    throw new Error(`identity.json: "linearRouting.add" must be an array`);
+  }
+  if (lr.remove !== undefined && !Array.isArray(lr.remove)) {
+    throw new Error(`identity.json: "linearRouting.remove" must be an array`);
+  }
+  return value as IdentityManifest["linearRouting"];
+}
+
+/**
  * Validate and parse an identity.json object.
  * Throws with descriptive errors if required fields are missing or malformed.
  */
@@ -154,7 +172,7 @@ function parseManifest(raw: unknown, sourcePath: string): IdentityManifest {
     volumeSize: obj.volumeSize as number,
     instanceType: typeof obj.instanceType === "string" ? obj.instanceType : undefined,
     skills: obj.skills as string[],
-    linearRouting: obj.linearRouting as IdentityManifest["linearRouting"],
+    linearRouting: validateLinearRouting(obj.linearRouting),
     templateVars: obj.templateVars as string[],
   };
 }

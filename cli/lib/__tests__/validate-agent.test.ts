@@ -68,9 +68,25 @@ describe("validateAgentDefinition", () => {
     expect(() => validateAgentDefinition(makeAgent({ volumeSize: -5 }))).toThrow("positive number");
   });
 
-  it("preserves deprecated soulContent/identityContent fields", () => {
-    const agent = makeAgent({ soulContent: "# Soul", identityContent: "# Identity" });
-    expect(agent.soulContent).toBe("# Soul");
-    expect(agent.identityContent).toBe("# Identity");
+  it("rejects missing required fields", () => {
+    expect(() =>
+      validateAgentDefinition({ ...makeAgent(), name: "" })
+    ).toThrow('missing required field "name"');
+
+    expect(() =>
+      validateAgentDefinition({ ...makeAgent(), displayName: "" })
+    ).toThrow('missing required field "displayName"');
+
+    expect(() =>
+      validateAgentDefinition({ ...makeAgent(), role: "" })
+    ).toThrow('missing required field "role"');
+  });
+
+  it("accepts deprecated soulContent/identityContent for custom agents", () => {
+    expect(() =>
+      validateAgentDefinition(
+        makeAgent({ preset: null, soulContent: "# Soul", identityContent: "# Identity" })
+      )
+    ).not.toThrow();
   });
 });
