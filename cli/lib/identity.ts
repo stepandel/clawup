@@ -175,7 +175,19 @@ function parseManifest(raw: unknown, sourcePath: string): IdentityManifest {
  * const id = await fetchIdentity("./identities/juno", cacheDir);
  * ```
  */
+/**
+ * Synchronous version of fetchIdentity for use in contexts that don't support async
+ * (e.g., Pulumi resource construction).
+ */
+export function fetchIdentitySync(source: string, cacheDir: string): IdentityResult {
+  return _fetchIdentity(source, cacheDir);
+}
+
 export async function fetchIdentity(source: string, cacheDir: string): Promise<IdentityResult> {
+  return _fetchIdentity(source, cacheDir);
+}
+
+function _fetchIdentity(source: string, cacheDir: string): IdentityResult {
   const parsed = parseSource(source);
   let identityDir: string;
 
