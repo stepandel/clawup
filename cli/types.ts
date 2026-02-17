@@ -108,6 +108,23 @@ export interface IdentityResult {
  * @throws Error with descriptive message if validation fails
  */
 export function validateAgentDefinition(agent: AgentDefinition): void {
+  // Validate required fields first so error messages below can reference agent.name safely
+  if (!agent.name) {
+    throw new Error(`Agent definition missing required field "name".`);
+  }
+
+  if (!agent.displayName) {
+    throw new Error(`Agent "${agent.name}" missing required field "displayName".`);
+  }
+
+  if (!agent.role) {
+    throw new Error(`Agent "${agent.name}" missing required field "role".`);
+  }
+
+  if (typeof agent.volumeSize !== "number" || agent.volumeSize <= 0) {
+    throw new Error(`Agent "${agent.name}": "volumeSize" must be a positive number.`);
+  }
+
   if (agent.preset && agent.identity) {
     throw new Error(
       `Agent "${agent.name}": "preset" and "identity" are mutually exclusive. Use one or the other.`
@@ -124,22 +141,6 @@ export function validateAgentDefinition(agent: AgentDefinition): void {
     throw new Error(
       `Agent "${agent.name}": "identityVersion" requires "identity" to be set.`
     );
-  }
-
-  if (!agent.name) {
-    throw new Error(`Agent definition missing required field "name".`);
-  }
-
-  if (!agent.displayName) {
-    throw new Error(`Agent "${agent.name}" missing required field "displayName".`);
-  }
-
-  if (!agent.role) {
-    throw new Error(`Agent "${agent.name}" missing required field "role".`);
-  }
-
-  if (typeof agent.volumeSize !== "number" || agent.volumeSize <= 0) {
-    throw new Error(`Agent "${agent.name}": "volumeSize" must be a positive number.`);
   }
 }
 

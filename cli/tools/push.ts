@@ -230,8 +230,8 @@ export const pushTool: ToolImplementation<PushOptions> = async (
 
     let needsRestart = false;
 
-    // 1. Push skills
-    if (doSkills) {
+    // 1. Push preset skills (skip for identity-based agents — their skills are synced in step 2)
+    if (doSkills && !agent.identity) {
       const skillsDir = path.join(presetsDir, "skills");
       if (fs.existsSync(skillsDir)) {
         // Ensure remote skills dir exists
