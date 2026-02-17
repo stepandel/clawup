@@ -10,15 +10,29 @@ export interface AgentDefinition {
   displayName: string;
   /** Role identifier (e.g., "pm", "eng", "tester") */
   role: string;
-  /** Preset name if using a preset, null for custom agents */
+  /** Preset name if using a preset, null for custom agents. Mutually exclusive with `identity`. */
   preset: string | null;
+  /**
+   * Git URL or local path to an identity repo/folder.
+   * Supports `repo#subfolder` syntax for mono-repos.
+   * Mutually exclusive with `preset`.
+   */
+  identity?: string;
+  /** Pin the identity to a specific Git tag or commit hash */
+  identityVersion?: string;
   /** EBS volume size in GB */
   volumeSize: number;
   /** Override instance type for this agent */
   instanceType?: string;
-  /** Custom SOUL.md content (custom agents only) */
+  /**
+   * Custom SOUL.md content (custom agents only).
+   * @deprecated Use an identity repo with a SOUL.md file instead.
+   */
   soulContent?: string;
-  /** Custom IDENTITY.md content (custom agents only) */
+  /**
+   * Custom IDENTITY.md content (custom agents only).
+   * @deprecated Use an identity repo with an IDENTITY.md file instead.
+   */
   identityContent?: string;
   /** Additional environment variables */
   envVars?: Record<string, string>;
@@ -85,6 +99,48 @@ export interface IdentityResult {
   manifest: IdentityManifest;
   /** Files keyed by relative path (e.g., "SOUL.md", "skills/pm-queue-handler/SKILL.md") */
   files: Record<string, string>;
+}
+
+/**
+ * Validate an AgentDefinition for consistency.
+ * Checks mutual exclusivity of `preset` and `identity`, and required fields.
+ *
+ * @throws Error with descriptive message if validation fails
+ */
+export function validateAgentDefinition(agent: AgentDefinition): void {
+  if (agent.preset && agent.identity) {
+    throw new Error(
+      `Agent "${agent.name}": "preset" and "identity" are mutually exclusive. Use one or the other.`
+    );
+  }
+
+  if (!agent.preset && !agent.identity && !agent.soulContent) {
+    throw new Error(
+      `Agent "${agent.name}": must specify either "preset", "identity", or custom content ("soulContent").`
+    );
+  }
+
+  if (agent.identityVersion && !agent.identity) {
+    throw new Error(
+      `Agent "${agent.name}": "identityVersion" requires "identity" to be set.`
+    );
+  }
+
+  if (!agent.name) {
+    throw new Error(`Agent definition missing required field "name".`);
+  }
+
+  if (!agent.displayName) {
+    throw new Error(`Agent "${agent.name}" missing required field "displayName".`);
+  }
+
+  if (!agent.role) {
+    throw new Error(`Agent "${agent.name}" missing required field "role".`);
+  }
+
+  if (typeof agent.volumeSize !== "number" || agent.volumeSize <= 0) {
+    throw new Error(`Agent "${agent.name}": "volumeSize" must be a positive number.`);
+  }
 }
 
 /** Result of a single prerequisite check */

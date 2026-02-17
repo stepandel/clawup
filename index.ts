@@ -27,9 +27,15 @@ interface ManifestAgent {
   displayName: string;
   role: string;
   preset: string | null;
+  /** Git URL or local path to an identity repo/folder. Mutually exclusive with `preset`. */
+  identity?: string;
+  /** Pin the identity to a specific Git tag or commit hash */
+  identityVersion?: string;
   volumeSize: number;
   instanceType?: string;
+  /** @deprecated Use an identity repo with a SOUL.md file instead. */
   soulContent?: string;
+  /** @deprecated Use an identity repo with an IDENTITY.md file instead. */
   identityContent?: string;
   envVars?: Record<string, string>;
 }
