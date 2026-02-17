@@ -33,6 +33,17 @@ export const PRESETS = {
   },
 } as const;
 
+/**
+ * Built-in identity paths for each preset role.
+ * These point to the `identities/` directory in the agent-army repo,
+ * which can also be referenced as a Git URL for remote deployments.
+ */
+export const PRESET_IDENTITY_PATHS: Record<string, string> = {
+  pm: "./identities/pm",
+  eng: "./identities/eng",
+  tester: "./identities/tester",
+};
+
 /** Map agent aliases to role keys */
 export const AGENT_ALIASES: Record<string, string> = {
   juno: "pm",
