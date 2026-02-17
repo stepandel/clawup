@@ -17,6 +17,8 @@ import * as path from "path";
 import { OpenClawAgent, HetznerOpenClawAgent } from "./src";
 import { SharedVpc } from "./shared-vpc";
 import type { LinearActiveActions } from "./src/components/config-generator";
+import { fetchIdentitySync } from "./cli/lib/identity";
+import * as os from "os";
 
 // -----------------------------------------------------------------------------
 // Manifest type (duplicated here to avoid importing from cli/)
@@ -79,6 +81,9 @@ const PRESET_EMOJIS: Record<string, string> = {
   eng: "building_construction",
   tester: "mag",
 };
+
+// Identity cache directory
+const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
 
 // Per-role Linear plugin activeActions (which workflow states trigger queue add/remove)
 const linearActiveActionsByRole: Record<string, LinearActiveActions> = {
@@ -350,28 +355,43 @@ const agentOutputs: Record<string, {
 for (const agent of manifest.agents) {
   // Build workspace files
   let workspaceFiles: Record<string, string>;
+  let agentEmoji = PRESET_EMOJIS[agent.role] ?? "";
+  let agentDisplayName = agent.displayName;
+  let agentVolumeSize = agent.volumeSize;
+  let agentLinearActiveActions = linearActiveActionsByRole[agent.role];
 
-  if (agent.preset) {
-    // Preset agent: load from presets directory
-    workspaceFiles = processTemplates(loadPresetFiles(agent.preset), {
-      OWNER_NAME: ownerName,
-      TIMEZONE: timezone,
-      WORKING_HOURS: workingHours,
-      USER_NOTES: userNotes,
-      LINEAR_TEAM: linearTeam,
-      GITHUB_REPO: githubRepo,
-    });
+  const templateVars: Record<string, string> = {
+    OWNER_NAME: ownerName,
+    TIMEZONE: timezone,
+    WORKING_HOURS: workingHours,
+    USER_NOTES: userNotes,
+    LINEAR_TEAM: linearTeam,
+    GITHUB_REPO: githubRepo,
+  };
+
+  if (agent.identity) {
+    // Identity-based agent: fetch from Git URL or local path
+    const identity = fetchIdentitySync(agent.identity, identityCacheDir);
+
+    // Identity files are the workspace files
+    workspaceFiles = processTemplates(identity.files, templateVars);
+
+    // Pull defaults from identity manifest (agent-level overrides take precedence)
+    agentEmoji = identity.manifest.emoji ?? agentEmoji;
+    agentDisplayName = agent.displayName || identity.manifest.displayName;
+    agentVolumeSize = agent.volumeSize ?? identity.manifest.volumeSize ?? 30;
+
+    // Use linearRouting from identity manifest if available
+    if (identity.manifest.linearRouting) {
+      agentLinearActiveActions = identity.manifest.linearRouting;
+    }
+  } else if (agent.preset) {
+    // Preset agent: load from presets directory (backward compat)
+    workspaceFiles = processTemplates(loadPresetFiles(agent.preset), templateVars);
   } else {
     // Custom agent: load base files + inline content from manifest
-    workspaceFiles = processTemplates(loadPresetFiles("base", "base"), {
-      OWNER_NAME: ownerName,
-      TIMEZONE: timezone,
-      WORKING_HOURS: workingHours,
-      USER_NOTES: userNotes,
-      LINEAR_TEAM: linearTeam,
-      GITHUB_REPO: githubRepo,
-    });
-    // Override base files with custom inline content if provided
+    workspaceFiles = processTemplates(loadPresetFiles("base", "base"), templateVars);
+    // Override base files with custom inline content if provided (deprecated path)
     if (agent.soulContent) workspaceFiles["SOUL.md"] = agent.soulContent;
     if (agent.identityContent) workspaceFiles["IDENTITY.md"] = agent.identityContent;
   }
@@ -390,7 +410,7 @@ for (const agent of manifest.agents) {
       tailscaleAuthKey,
       tailnetDnsName,
       instanceType: agent.instanceType ?? instanceType,
-      volumeSize: agent.volumeSize ?? 30,
+      volumeSize: agentVolumeSize ?? 30,
       model: defaultModel,
 
       // Use shared VPC
@@ -404,8 +424,8 @@ for (const agent of manifest.agents) {
       // Environment variables
       envVars: {
         AGENT_ROLE: agent.role,
-        AGENT_NAME: agent.displayName,
-        AGENT_EMOJI: PRESET_EMOJIS[agent.role] ?? "",
+        AGENT_NAME: agentDisplayName,
+        AGENT_EMOJI: agentEmoji,
         ...agent.envVars,
       },
 
@@ -423,7 +443,7 @@ for (const agent of manifest.agents) {
       linearUserUuid,
 
       // Linear active actions (per-role queue behavior)
-      linearActiveActions: linearActiveActionsByRole[agent.role],
+      linearActiveActions: agentLinearActiveActions,
 
       // GitHub token (optional)
       githubToken,
@@ -461,8 +481,8 @@ for (const agent of manifest.agents) {
       // Environment variables
       envVars: {
         AGENT_ROLE: agent.role,
-        AGENT_NAME: agent.displayName,
-        AGENT_EMOJI: PRESET_EMOJIS[agent.role] ?? "",
+        AGENT_NAME: agentDisplayName,
+        AGENT_EMOJI: agentEmoji,
         ...agent.envVars,
       },
 
@@ -480,7 +500,7 @@ for (const agent of manifest.agents) {
       linearUserUuid,
 
       // Linear active actions (per-role queue behavior)
-      linearActiveActions: linearActiveActionsByRole[agent.role],
+      linearActiveActions: agentLinearActiveActions,
 
       // GitHub token (optional)
       githubToken,
