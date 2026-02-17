@@ -9,7 +9,7 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "lint": "eslint src/**/*.ts",
-    "test": "echo \"No tests yet\"",
+    "test": "vitest run",
     "build:cli-infra": "bash scripts/bundle-infra.sh"
   },
   "keywords": [
@@ -29,7 +29,8 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
   },
   "pulumi": {
     "resource": true

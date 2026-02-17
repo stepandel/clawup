@@ -44,6 +44,49 @@ export interface ArmyManifest {
   agents: AgentDefinition[];
 }
 
+/**
+ * Manifest schema for an agent identity (identity.json).
+ * Defines the agent's persona, defaults, bundled skills, and template variables.
+ */
+export interface IdentityManifest {
+  /** Machine-readable identity name (e.g., "juno", "titus") */
+  name: string;
+  /** Human-readable display name (e.g., "Juno", "Titus") */
+  displayName: string;
+  /** Role identifier (e.g., "pm", "eng", "tester") */
+  role: string;
+  /** Emoji for the agent (GitHub shortcode, e.g., "clipboard") */
+  emoji: string;
+  /** Short description of the agent's purpose */
+  description: string;
+  /** Default EBS volume size in GB */
+  volumeSize: number;
+  /** Optional default instance type override */
+  instanceType?: string;
+  /** List of skill directory names bundled in this identity */
+  skills: string[];
+  /** Optional Linear label routing overrides */
+  linearRouting?: {
+    /** Labels to add to routed tickets */
+    add?: string[];
+    /** Labels to remove from routed tickets */
+    remove?: string[];
+  };
+  /** List of template variable names this identity uses (e.g., ["OWNER_NAME", "TIMEZONE"]) */
+  templateVars: string[];
+}
+
+/**
+ * Result returned by fetchIdentity().
+ * Contains the parsed manifest and all workspace/skill files from the identity directory.
+ */
+export interface IdentityResult {
+  /** Parsed identity.json manifest */
+  manifest: IdentityManifest;
+  /** Files keyed by relative path (e.g., "SOUL.md", "skills/pm-queue-handler/SKILL.md") */
+  files: Record<string, string>;
+}
+
 /** Result of a single prerequisite check */
 export interface PrereqResult {
   name: string;
