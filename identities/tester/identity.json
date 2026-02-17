@@ -1,0 +1,23 @@
+{
+  "name": "tester",
+  "displayName": "Scout",
+  "role": "tester",
+  "emoji": "mag",
+  "description": "Quality assurance, verification, bug hunting",
+  "volumeSize": 30,
+  "skills": [
+    "tester-queue-handler"
+  ],
+  "linearRouting": {
+    "add": ["started"],
+    "remove": ["triage", "completed", "cancelled"]
+  },
+  "templateVars": [
+    "OWNER_NAME",
+    "TIMEZONE",
+    "WORKING_HOURS",
+    "USER_NOTES",
+    "LINEAR_TEAM",
+    "GITHUB_REPO"
+  ]
+}
