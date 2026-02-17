@@ -67,6 +67,13 @@ const linearTeam = config.get("linearTeam") ?? "";
 const githubRepo = config.get("githubRepo") ?? "";
 const braveApiKey = config.getSecret("braveApiKey");
 
+// Preset emoji shortcodes for agent identity (used in Slack mentions)
+const PRESET_EMOJIS: Record<string, string> = {
+  pm: "clipboard",
+  eng: "building_construction",
+  tester: "mag",
+};
+
 // Per-role Linear plugin activeActions (which workflow states trigger queue add/remove)
 const linearActiveActionsByRole: Record<string, LinearActiveActions> = {
   pm: { remove: ["triage", "started", "completed", "cancelled"], add: ["backlog", "unstarted"] },
@@ -392,6 +399,7 @@ for (const agent of manifest.agents) {
       envVars: {
         AGENT_ROLE: agent.role,
         AGENT_NAME: agent.displayName,
+        AGENT_EMOJI: PRESET_EMOJIS[agent.role] ?? "",
         ...agent.envVars,
       },
 
@@ -448,6 +456,7 @@ for (const agent of manifest.agents) {
       envVars: {
         AGENT_ROLE: agent.role,
         AGENT_NAME: agent.displayName,
+        AGENT_EMOJI: PRESET_EMOJIS[agent.role] ?? "",
         ...agent.envVars,
       },
 

@@ -7,6 +7,7 @@ export const PRESETS = {
   pm: {
     name: "agent-pm",
     displayName: "Juno",
+    emoji: "clipboard",
     role: "pm",
     preset: "pm" as const,
     volumeSize: 30,
@@ -15,6 +16,7 @@ export const PRESETS = {
   eng: {
     name: "agent-eng",
     displayName: "Titus",
+    emoji: "building_construction",
     role: "eng",
     preset: "eng" as const,
     volumeSize: 50,
@@ -23,6 +25,7 @@ export const PRESETS = {
   tester: {
     name: "agent-tester",
     displayName: "Scout",
+    emoji: "mag",
     role: "tester",
     preset: "tester" as const,
     volumeSize: 30,
@@ -266,6 +269,7 @@ export function slackAppManifest(agentName: string): string {
       scopes: {
         bot: [
           "chat:write",
+          "chat:write.customize",
           "channels:history",
           "channels:read",
           "groups:history",

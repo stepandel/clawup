@@ -320,6 +320,8 @@ sudo -H -u ubuntu \\
   LINEAR_API_KEY="\${LINEAR_API_KEY:-}" \\
   LINEAR_WEBHOOK_SECRET="\${LINEAR_WEBHOOK_SECRET:-}" \\
   BRAVE_API_KEY="\${BRAVE_API_KEY:-}" \\
+  AGENT_NAME="${config.envVars?.AGENT_NAME ?? ""}" \\
+  AGENT_EMOJI="${config.envVars?.AGENT_EMOJI ?? ""}" \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT

@@ -267,6 +267,37 @@ config["agents"]["defaults"]["heartbeat"] = {
 }
 print("Configured heartbeat: every 1m")
 ${slackChannelConfig}${linearPluginConfig}
+# Configure agent identity for Slack mentions/tags
+agent_name = os.environ.get("AGENT_NAME", "")
+agent_emoji = os.environ.get("AGENT_EMOJI", "")
+if agent_name:
+    config.setdefault("agents", {})
+    config["agents"].setdefault("list", [])
+    # Find or create the "default" agent entry
+    default_agent = None
+    for agent in config["agents"]["list"]:
+        if agent.get("id") == "default":
+            default_agent = agent
+            break
+    if not default_agent:
+        default_agent = {"id": "default"}
+        config["agents"]["list"].append(default_agent)
+    default_agent.setdefault("identity", {})
+    default_agent["identity"]["name"] = agent_name
+    if agent_emoji:
+        default_agent["identity"]["emoji"] = agent_emoji
+    print(f"Configured agent identity: {agent_name} (:{agent_emoji}:)")
+
+    # Enable allowBots so agents can see each other's messages in shared channels
+    if "channels" in config and "slack" in config["channels"]:
+        config["channels"]["slack"]["allowBots"] = True
+        print("Enabled allowBots for Slack channel")
+
+    # Add ack reaction for visual feedback when processing messages
+    config.setdefault("messages", {})
+    config["messages"]["ackReaction"] = "eyes"
+    print("Configured ackReaction: eyes")
+
 # Configure web search (Brave API key) if available
 brave_api_key = os.environ.get("BRAVE_API_KEY", "")
 if brave_api_key:
