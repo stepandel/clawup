@@ -328,7 +328,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         handleCancel(volumeOverride);
 
         agents.push({
-          name: `agent-${identity.manifest.role}`,
+          name: `agent-${identity.manifest.name}`,
           displayName: identity.manifest.displayName,
           role: identity.manifest.role,
           preset: null,
