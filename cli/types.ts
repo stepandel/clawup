@@ -66,7 +66,7 @@ export interface ArmyManifest {
 }
 
 /**
- * Manifest schema for an agent identity (identity.json).
+ * Manifest schema for an agent identity (identity.yaml).
  * Defines the agent's persona, defaults, bundled skills, and template variables.
  */
 export interface IdentityManifest {
@@ -86,13 +86,10 @@ export interface IdentityManifest {
   instanceType?: string;
   /** List of skill directory names bundled in this identity */
   skills: string[];
-  /** Optional Linear label routing overrides */
-  linearRouting?: {
-    /** Labels to add to routed tickets */
-    add?: string[];
-    /** Labels to remove from routed tickets */
-    remove?: string[];
-  };
+  /** Recommended plugins for this identity (e.g., ["openclaw-linear"]) */
+  plugins?: string[];
+  /** Per-plugin default config (merged with user plugin config at deploy time) */
+  pluginDefaults?: Record<string, Record<string, unknown>>;
   /** List of template variable names this identity uses (e.g., ["OWNER_NAME", "TIMEZONE"]) */
   templateVars: string[];
 }
@@ -102,7 +99,7 @@ export interface IdentityManifest {
  * Contains the parsed manifest and all workspace/skill files from the identity directory.
  */
 export interface IdentityResult {
-  /** Parsed identity.json manifest */
+  /** Parsed identity manifest (identity.yaml) */
   manifest: IdentityManifest;
   /** Files keyed by relative path (e.g., "SOUL.md", "skills/pm-queue-handler/SKILL.md") */
   files: Record<string, string>;

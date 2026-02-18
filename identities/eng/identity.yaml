@@ -1,0 +1,32 @@
+name: eng
+displayName: Titus
+role: eng
+emoji: building_construction
+description: Lead engineering, coding, shipping
+volumeSize: 50
+
+plugins:
+  - openclaw-linear
+
+pluginDefaults:
+  openclaw-linear:
+    stateActions:
+      triage: remove
+      backlog: add
+      started: add
+      completed: remove
+      cancelled: remove
+
+skills:
+  - eng-queue-handler
+  - eng-ticket-workflow
+  - eng-pr-tester
+  - pr-review-resolver
+
+templateVars:
+  - OWNER_NAME
+  - TIMEZONE
+  - WORKING_HOURS
+  - USER_NOTES
+  - LINEAR_TEAM
+  - GITHUB_REPO

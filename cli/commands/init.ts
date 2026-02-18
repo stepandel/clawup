@@ -265,6 +265,8 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   handleCancel(agentMode);
 
   const agents: AgentDefinition[] = [];
+  // Track identity pluginDefaults per role for seeding plugin config files
+  const identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>> = {};
 
   // Collect preset agents
   if (agentMode === "presets" || agentMode === "mix") {
@@ -336,8 +338,13 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
           preset: null,
           identity: identityUrl as string,
           volumeSize: parseInt(volumeOverride as string, 10),
-          plugins: ["openclaw-linear"],
+          plugins: identity.manifest.plugins ?? ["openclaw-linear"],
         });
+
+        // Track identity pluginDefaults for seeding plugin config files
+        if (identity.manifest.pluginDefaults) {
+          identityPluginDefaults[identity.manifest.role] = identity.manifest.pluginDefaults;
+        }
       } catch (err) {
         spinner.stop(`Failed to validate identity: ${(err as Error).message}`);
         p.log.error("Please check the URL and try again.");
@@ -750,26 +757,40 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   saveManifest(configName, manifest);
 
   // Build and save plugin config files
-  // Collect per-agent Linear settings into the openclaw-linear plugin config
-  const linearPluginAgents: Record<string, Record<string, unknown>> = {};
+  // Collect all unique plugin names across agents
+  const allPlugins = new Set<string>();
   for (const agent of agents) {
-    if (agent.plugins?.includes("openclaw-linear")) {
-      const creds = integrationCredentials[agent.role];
-      const agentConfig: Record<string, unknown> = {
-        agentId: agent.name,
-      };
-      if (creds?.linearUserUuid) {
-        agentConfig.linearUserUuid = creds.linearUserUuid;
-      }
-      linearPluginAgents[agent.role] = agentConfig;
-    }
+    for (const p of agent.plugins ?? []) allPlugins.add(p);
   }
 
-  if (Object.keys(linearPluginAgents).length > 0) {
-    const pluginConfig: PluginConfigFile = {
-      agents: linearPluginAgents,
-    };
-    savePluginConfig(configName, "openclaw-linear", pluginConfig);
+  for (const pluginName of allPlugins) {
+    const pluginAgents: Record<string, Record<string, unknown>> = {};
+
+    for (const agent of agents) {
+      if (!agent.plugins?.includes(pluginName)) continue;
+
+      // Start with identity pluginDefaults if available
+      const defaults = identityPluginDefaults[agent.role]?.[pluginName] ?? {};
+      const agentConfig: Record<string, unknown> = {
+        ...defaults,
+        agentId: agent.name,
+      };
+
+      // Layer on user-provided config (e.g., Linear credentials from init)
+      if (pluginName === "openclaw-linear") {
+        const creds = integrationCredentials[agent.role];
+        if (creds?.linearUserUuid) {
+          agentConfig.linearUserUuid = creds.linearUserUuid;
+        }
+      }
+
+      pluginAgents[agent.role] = agentConfig;
+    }
+
+    if (Object.keys(pluginAgents).length > 0) {
+      const pluginConfig: PluginConfigFile = { agents: pluginAgents };
+      savePluginConfig(configName, pluginName, pluginConfig);
+    }
   }
 
   s.stop("Config saved");

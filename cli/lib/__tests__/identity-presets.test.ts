@@ -9,7 +9,7 @@ const cacheDir = path.join(os.tmpdir(), "identity-test-cache");
 describe("extracted identity presets", () => {
   for (const role of ["pm", "eng", "tester"]) {
     describe(role, () => {
-      it("has a valid identity.json", async () => {
+      it("has a valid identity.yaml", async () => {
         const identityPath = path.join(repoRoot, "identities", role);
         const result = await fetchIdentity(identityPath, cacheDir);
 
@@ -40,13 +40,15 @@ describe("extracted identity presets", () => {
         expect(skillFiles.length).toBeGreaterThan(0);
       });
 
-      it("has linearRouting defined", async () => {
+      it("has plugins and pluginDefaults defined", async () => {
         const identityPath = path.join(repoRoot, "identities", role);
         const result = await fetchIdentity(identityPath, cacheDir);
 
-        expect(result.manifest.linearRouting).toBeDefined();
-        expect(result.manifest.linearRouting!.add).toBeDefined();
-        expect(result.manifest.linearRouting!.remove).toBeDefined();
+        expect(result.manifest.plugins).toBeDefined();
+        expect(result.manifest.plugins!.length).toBeGreaterThan(0);
+        expect(result.manifest.pluginDefaults).toBeDefined();
+        expect(result.manifest.pluginDefaults!["openclaw-linear"]).toBeDefined();
+        expect(result.manifest.pluginDefaults!["openclaw-linear"].stateActions).toBeDefined();
       });
     });
   }

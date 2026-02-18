@@ -1,7 +1,7 @@
 /**
  * Identity loader — fetches agent identities from Git repos or local paths.
  *
- * An identity is a directory containing an `identity.json` manifest and
+ * An identity is a directory containing an `identity.yaml` manifest and
  * workspace files (SOUL.md, IDENTITY.md, skills/, etc.) that define an agent's
  * persona and capabilities.
  */
@@ -9,10 +9,11 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "fs";
 import { join, relative, resolve } from "path";
 import { createHash } from "crypto";
+import YAML from "yaml";
 import { capture } from "./exec";
 import type { IdentityManifest, IdentityResult } from "../types";
 
-/** Required fields in identity.json */
+/** Required fields in identity manifest */
 const REQUIRED_FIELDS: (keyof IdentityManifest)[] = [
   "name",
   "displayName",
@@ -118,30 +119,45 @@ function readFilesRecursive(dir: string, base?: string): Record<string, string> 
 }
 
 /**
- * Validate linearRouting field structure.
+ * Validate plugins field (optional array of strings).
  */
-function validateLinearRouting(value: unknown): IdentityManifest["linearRouting"] {
+function validatePlugins(value: unknown): string[] | undefined {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`identity.json: "linearRouting" must be an object`);
+  if (!Array.isArray(value)) {
+    throw new Error(`identity manifest: "plugins" must be an array of strings`);
   }
-  const lr = value as Record<string, unknown>;
-  if (lr.add !== undefined && !Array.isArray(lr.add)) {
-    throw new Error(`identity.json: "linearRouting.add" must be an array`);
+  for (const entry of value) {
+    if (typeof entry !== "string" || !entry) {
+      throw new Error(`identity manifest: each plugin must be a non-empty string`);
+    }
   }
-  if (lr.remove !== undefined && !Array.isArray(lr.remove)) {
-    throw new Error(`identity.json: "linearRouting.remove" must be an array`);
-  }
-  return value as IdentityManifest["linearRouting"];
+  return value as string[];
 }
 
 /**
- * Validate and parse an identity.json object.
+ * Validate pluginDefaults field (optional record of records).
+ */
+function validatePluginDefaults(value: unknown): Record<string, Record<string, unknown>> | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`identity manifest: "pluginDefaults" must be an object`);
+  }
+  const pd = value as Record<string, unknown>;
+  for (const [key, val] of Object.entries(pd)) {
+    if (typeof val !== "object" || val === null || Array.isArray(val)) {
+      throw new Error(`identity manifest: "pluginDefaults.${key}" must be an object`);
+    }
+  }
+  return value as Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Validate and parse an identity manifest object.
  * Throws with descriptive errors if required fields are missing or malformed.
  */
 function parseManifest(raw: unknown, sourcePath: string): IdentityManifest {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new Error(`identity.json at ${sourcePath} is not a valid object`);
+    throw new Error(`identity manifest at ${sourcePath} is not a valid object`);
   }
 
   const obj = raw as Record<string, unknown>;
@@ -149,19 +165,19 @@ function parseManifest(raw: unknown, sourcePath: string): IdentityManifest {
 
   if (missing.length > 0) {
     throw new Error(
-      `identity.json at ${sourcePath} is missing required fields: ${missing.join(", ")}`
+      `identity manifest at ${sourcePath} is missing required fields: ${missing.join(", ")}`
     );
   }
 
   // Type checks
-  if (typeof obj.name !== "string") throw new Error(`identity.json: "name" must be a string`);
-  if (typeof obj.displayName !== "string") throw new Error(`identity.json: "displayName" must be a string`);
-  if (typeof obj.role !== "string") throw new Error(`identity.json: "role" must be a string`);
-  if (typeof obj.emoji !== "string") throw new Error(`identity.json: "emoji" must be a string`);
-  if (typeof obj.description !== "string") throw new Error(`identity.json: "description" must be a string`);
-  if (typeof obj.volumeSize !== "number") throw new Error(`identity.json: "volumeSize" must be a number`);
-  if (!Array.isArray(obj.skills)) throw new Error(`identity.json: "skills" must be an array`);
-  if (!Array.isArray(obj.templateVars)) throw new Error(`identity.json: "templateVars" must be an array`);
+  if (typeof obj.name !== "string") throw new Error(`identity manifest: "name" must be a string`);
+  if (typeof obj.displayName !== "string") throw new Error(`identity manifest: "displayName" must be a string`);
+  if (typeof obj.role !== "string") throw new Error(`identity manifest: "role" must be a string`);
+  if (typeof obj.emoji !== "string") throw new Error(`identity manifest: "emoji" must be a string`);
+  if (typeof obj.description !== "string") throw new Error(`identity manifest: "description" must be a string`);
+  if (typeof obj.volumeSize !== "number") throw new Error(`identity manifest: "volumeSize" must be a number`);
+  if (!Array.isArray(obj.skills)) throw new Error(`identity manifest: "skills" must be an array`);
+  if (!Array.isArray(obj.templateVars)) throw new Error(`identity manifest: "templateVars" must be an array`);
 
   return {
     name: obj.name as string,
@@ -172,7 +188,8 @@ function parseManifest(raw: unknown, sourcePath: string): IdentityManifest {
     volumeSize: obj.volumeSize as number,
     instanceType: typeof obj.instanceType === "string" ? obj.instanceType : undefined,
     skills: obj.skills as string[],
-    linearRouting: validateLinearRouting(obj.linearRouting),
+    plugins: validatePlugins(obj.plugins),
+    pluginDefaults: validatePluginDefaults(obj.pluginDefaults),
     templateVars: obj.templateVars as string[],
   };
 }
@@ -221,24 +238,35 @@ function _fetchIdentity(source: string, cacheDir: string): IdentityResult {
     throw new Error(`Identity directory not found: ${identityDir}`);
   }
 
-  // Read and parse identity.json
-  const manifestPath = join(identityDir, "identity.json");
-  if (!existsSync(manifestPath)) {
-    throw new Error(`identity.json not found in ${identityDir}`);
+  // Read and parse identity manifest (prefer .yaml, fall back to .json for third-party compat)
+  const yamlPath = join(identityDir, "identity.yaml");
+  const jsonPath = join(identityDir, "identity.json");
+  let manifestPath: string;
+  let manifestFilename: string;
+
+  if (existsSync(yamlPath)) {
+    manifestPath = yamlPath;
+    manifestFilename = "identity.yaml";
+  } else if (existsSync(jsonPath)) {
+    manifestPath = jsonPath;
+    manifestFilename = "identity.json";
+  } else {
+    throw new Error(`identity.yaml not found in ${identityDir}`);
   }
 
-  let rawJson: unknown;
+  let raw: unknown;
   try {
-    rawJson = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const content = readFileSync(manifestPath, "utf-8");
+    raw = manifestFilename.endsWith(".yaml") ? YAML.parse(content) : JSON.parse(content);
   } catch (err) {
-    throw new Error(`Failed to parse identity.json in ${identityDir}: ${(err as Error).message}`);
+    throw new Error(`Failed to parse ${manifestFilename} in ${identityDir}: ${(err as Error).message}`);
   }
 
-  const manifest = parseManifest(rawJson, identityDir);
+  const manifest = parseManifest(raw, identityDir);
 
-  // Read all files (excluding identity.json itself and .git)
+  // Read all files (excluding the manifest file itself and .git)
   const allFiles = readFilesRecursive(identityDir);
-  delete allFiles["identity.json"];
+  delete allFiles[manifestFilename];
 
   return { manifest, files: allFiles };
 }

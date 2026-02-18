@@ -343,15 +343,23 @@ if (provider === "aws") {
 // -----------------------------------------------------------------------------
 
 function buildPluginsForAgent(
-  agent: ManifestAgent
+  agent: ManifestAgent,
+  identityDefaults?: Record<string, Record<string, unknown>>,
+  identityPlugins?: string[]
 ): { plugins: PluginInstallConfig[]; pluginSecrets: Record<string, pulumi.Output<string>>; enableFunnel: boolean } {
   const plugins: PluginInstallConfig[] = [];
   const pluginSecrets: Record<string, pulumi.Output<string>> = {};
   let enableFunnel = false;
 
-  for (const pluginName of agent.plugins ?? []) {
+  // Use agent's plugins, falling back to identity's recommended plugins
+  const pluginList = agent.plugins ?? identityPlugins ?? [];
+
+  for (const pluginName of pluginList) {
     const pluginCfg = pluginConfigs[pluginName];
-    const agentSection = pluginCfg?.agents?.[agent.role] ?? {};
+    const userConfig = pluginCfg?.agents?.[agent.role] ?? {};
+    const identityConfig = identityDefaults?.[pluginName] ?? {};
+    // Merge: identity defaults first, user config overrides
+    const agentSection = { ...identityConfig, ...userConfig };
     const secretMapping = PLUGIN_SECRET_ENV_VARS[pluginName] ?? {};
 
     plugins.push({
@@ -423,6 +431,10 @@ for (const agent of manifest.agents) {
     GITHUB_REPO: githubRepo,
   };
 
+  // Track identity plugin info for merging later
+  let identityPluginDefaults: Record<string, Record<string, unknown>> | undefined;
+  let identityPlugins: string[] | undefined;
+
   if (agent.identity) {
     // Identity-based agent: fetch from Git URL or local path
     const identity = fetchIdentitySync(agent.identity, identityCacheDir);
@@ -434,6 +446,10 @@ for (const agent of manifest.agents) {
     agentEmoji = identity.manifest.emoji ?? agentEmoji;
     agentDisplayName = agent.displayName || identity.manifest.displayName;
     agentVolumeSize = agent.volumeSize ?? identity.manifest.volumeSize ?? 30;
+
+    // Capture identity plugin info for merging into plugin config
+    identityPluginDefaults = identity.manifest.pluginDefaults;
+    identityPlugins = identity.manifest.plugins;
   } else if (agent.preset) {
     // Preset agent: load from presets directory (backward compat)
     workspaceFiles = processTemplates(loadPresetFiles(agent.preset), templateVars);
@@ -445,8 +461,8 @@ for (const agent of manifest.agents) {
     if (agent.identityContent) workspaceFiles["IDENTITY.md"] = agent.identityContent;
   }
 
-  // Build plugin configs for this agent
-  const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent);
+  // Build plugin configs for this agent (merge identity defaults if available)
+  const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identityPluginDefaults, identityPlugins);
 
   // Get per-agent credentials if available
   const slackCreds = agentSlackCredentials[agent.role];

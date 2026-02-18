@@ -4,7 +4,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { fetchIdentity } from "../identity";
 
-/** Helper to create a valid identity.json object */
+/** Helper to create a valid identity manifest object */
 function validManifest(overrides: Record<string, unknown> = {}) {
   return {
     name: "test-agent",
@@ -66,8 +66,9 @@ describe("fetchIdentity", () => {
     expect(result.manifest.templateVars).toEqual(["OWNER_NAME"]);
     expect(result.files["SOUL.md"]).toBe("# Soul\nI am a test agent.");
     expect(result.files["IDENTITY.md"]).toBe("# Identity\nTest identity.");
-    // identity.json itself should NOT be in files
+    // manifest file itself should NOT be in files
     expect(result.files["identity.json"]).toBeUndefined();
+    expect(result.files["identity.yaml"]).toBeUndefined();
   });
 
   it("supports subfolder syntax for local paths", async () => {
@@ -97,29 +98,90 @@ describe("fetchIdentity", () => {
   it("includes optional fields when present", async () => {
     const manifest = validManifest({
       instanceType: "t3.large",
-      linearRouting: { add: ["eng"], remove: ["pm"] },
+      plugins: ["openclaw-linear"],
+      pluginDefaults: {
+        "openclaw-linear": {
+          stateActions: { triage: "remove", backlog: "add" },
+        },
+      },
     });
     const dir = createIdentityDir(tmpDir, "optional", manifest);
 
     const result = await fetchIdentity(dir, cacheDir);
 
     expect(result.manifest.instanceType).toBe("t3.large");
-    expect(result.manifest.linearRouting).toEqual({ add: ["eng"], remove: ["pm"] });
+    expect(result.manifest.plugins).toEqual(["openclaw-linear"]);
+    expect(result.manifest.pluginDefaults).toEqual({
+      "openclaw-linear": {
+        stateActions: { triage: "remove", backlog: "add" },
+      },
+    });
   });
 
-  it("throws when identity.json is missing", async () => {
+  it("throws when identity manifest is missing", async () => {
     const dir = join(tmpDir, "empty");
     mkdirSync(dir, { recursive: true });
 
-    await expect(fetchIdentity(dir, cacheDir)).rejects.toThrow("identity.json not found");
+    await expect(fetchIdentity(dir, cacheDir)).rejects.toThrow("identity.yaml not found");
   });
 
-  it("throws when identity.json is malformed JSON", async () => {
+  it("throws when identity.json is malformed", async () => {
     const dir = join(tmpDir, "bad-json");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "identity.json"), "{ not valid json }}}");
 
     await expect(fetchIdentity(dir, cacheDir)).rejects.toThrow("Failed to parse identity.json");
+  });
+
+  it("reads identity.yaml when present", async () => {
+    const dir = join(tmpDir, "yaml-agent");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, "identity.yaml"),
+      [
+        "name: yaml-test",
+        "displayName: YAML Test",
+        "role: eng",
+        "emoji: wrench",
+        "description: A YAML test agent",
+        "volumeSize: 30",
+        "plugins:",
+        "  - openclaw-linear",
+        "skills:",
+        "  - coding",
+        "templateVars:",
+        "  - OWNER_NAME",
+      ].join("\n")
+    );
+    writeFileSync(join(dir, "SOUL.md"), "# YAML Soul");
+
+    const result = await fetchIdentity(dir, cacheDir);
+
+    expect(result.manifest.name).toBe("yaml-test");
+    expect(result.manifest.plugins).toEqual(["openclaw-linear"]);
+    expect(result.files["SOUL.md"]).toBe("# YAML Soul");
+    expect(result.files["identity.yaml"]).toBeUndefined();
+  });
+
+  it("prefers identity.yaml over identity.json", async () => {
+    const dir = join(tmpDir, "both-formats");
+    mkdirSync(dir, { recursive: true });
+    // Write both files with different names to verify YAML wins
+    writeFileSync(join(dir, "identity.yaml"), [
+      "name: from-yaml",
+      "displayName: YAML Agent",
+      "role: eng",
+      "emoji: wrench",
+      "description: From YAML",
+      "volumeSize: 30",
+      "skills: [coding]",
+      "templateVars: [OWNER_NAME]",
+    ].join("\n"));
+    writeFileSync(join(dir, "identity.json"), JSON.stringify(validManifest({ name: "from-json" })));
+
+    const result = await fetchIdentity(dir, cacheDir);
+
+    expect(result.manifest.name).toBe("from-yaml");
   });
 
   it("throws when required fields are missing", async () => {
