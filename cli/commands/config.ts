@@ -7,6 +7,7 @@
  */
 
 import * as process from "process";
+import YAML from "yaml";
 import {
   loadManifest,
   saveManifest,
@@ -150,7 +151,7 @@ export async function configShowCommand(opts: ConfigShowOptions): Promise<void> 
   }
 
   if (opts.json) {
-    console.log(JSON.stringify(manifest, null, 2));
+    console.log(YAML.stringify(manifest).trimEnd());
     return;
   }
 

@@ -10,24 +10,22 @@ export interface SlackConfigOptions {
   appToken: string;
 }
 
-export interface LinearActiveActions {
-  /** Workflow states that remove items from the queue */
-  remove?: string[];
-  /** Workflow states that add items to the queue */
-  add?: string[];
-}
-
-export interface LinearConfigOptions {
-  /** Linear API key */
-  apiKey: string;
-  /** Linear webhook signing secret */
-  webhookSecret?: string;
-  /** Agent ID (e.g., "agent-pm") for the agent mapping */
-  agentId?: string;
-  /** Linear user UUID for this agent */
-  agentLinearUserUuid?: string;
-  /** Active actions config (which workflow states trigger queue add/remove) */
-  activeActions?: LinearActiveActions;
+/**
+ * A single plugin entry for the OpenClaw config.
+ * Used to dynamically generate Python config-patch code for each plugin.
+ */
+export interface PluginEntry {
+  /** Plugin package name (e.g., "openclaw-linear") */
+  name: string;
+  /** Whether the plugin is enabled */
+  enabled: boolean;
+  /** Non-secret config for this plugin */
+  config: Record<string, unknown>;
+  /**
+   * Env var mappings for secrets: { configKey: envVarName }
+   * e.g., { "apiKey": "LINEAR_API_KEY", "webhookSecret": "LINEAR_WEBHOOK_SECRET" }
+   */
+  secretEnvVars?: Record<string, string>;
 }
 
 export interface OpenClawConfigOptions {
@@ -51,8 +49,8 @@ export interface OpenClawConfigOptions {
   customConfig?: Record<string, unknown>;
   /** Slack configuration */
   slack?: SlackConfigOptions;
-  /** Linear configuration */
-  linear?: LinearConfigOptions;
+  /** Dynamic plugin configurations */
+  plugins?: PluginEntry[];
   /** Brave Search API key for web search */
   braveApiKey?: string;
 }
@@ -140,6 +138,44 @@ export function generateOpenClawConfigJson(options: OpenClawConfigOptions): stri
 }
 
 /**
+ * Generates Python code to configure a single plugin in openclaw.json.
+ * Secrets are injected from environment variables.
+ */
+function generatePluginPython(plugin: PluginEntry): string {
+  // Build the config dict, injecting secrets from env vars
+  const configEntries: string[] = [];
+
+  // Secret env var values
+  if (plugin.secretEnvVars) {
+    for (const [configKey, envVar] of Object.entries(plugin.secretEnvVars)) {
+      configEntries.push(`        "${configKey}": os.environ.get("${envVar}", "")`);
+    }
+  }
+
+  // Non-secret config values
+  for (const [key, value] of Object.entries(plugin.config)) {
+    configEntries.push(`        "${key}": ${JSON.stringify(value)}`);
+  }
+
+  const configBlock = configEntries.length > 0
+    ? `{
+${configEntries.join(",\n")}
+    }`
+    : "{}";
+
+  return `
+# Configure ${plugin.name} plugin
+config.setdefault("plugins", {})
+config["plugins"].setdefault("entries", {})
+config["plugins"]["entries"]["${plugin.name}"] = {
+    "enabled": ${plugin.enabled ? "True" : "False"},
+    "config": ${configBlock}
+}
+print("Configured ${plugin.name} plugin")
+`;
+}
+
+/**
  * Generates Python script for modifying existing openclaw.json
  * Used in cloud-init after onboarding creates the initial config
  */
@@ -176,51 +212,10 @@ print("Configured Slack channel with Socket Mode")
 `
     : "";
 
-  // Build Linear plugin config section if credentials provided
-  const linearPluginConfig = options.linear
-    ? (() => {
-        const agentMapping: Record<string, string> = {};
-        if (!!options.linear.agentLinearUserUuid !== !!options.linear.agentId) {
-          throw new Error(
-            "linear.agentLinearUserUuid and linear.agentId must be provided together to build agentMapping."
-          );
-        }
-        if (options.linear.agentLinearUserUuid && options.linear.agentId) {
-          agentMapping[options.linear.agentLinearUserUuid] = options.linear.agentId;
-        }
-        const agentMappingJson = JSON.stringify(agentMapping);
-
-        // Transform activeActions { remove: [...], add: [...] } to
-        // stateActions { "stateName": "add"|"remove" } for the plugin schema
-        let stateActionsJson: string | null = null;
-        if (options.linear.activeActions) {
-          const stateActions: Record<string, string> = {};
-          for (const state of options.linear.activeActions.remove ?? []) {
-            stateActions[state] = "remove";
-          }
-          for (const state of options.linear.activeActions.add ?? []) {
-            stateActions[state] = "add";
-          }
-          stateActionsJson = JSON.stringify(stateActions);
-        }
-
-        return `
-# Configure openclaw-linear plugin
-config.setdefault("plugins", {})
-config["plugins"].setdefault("entries", {})
-config["plugins"]["entries"]["openclaw-linear"] = {
-    "enabled": True,
-    "config": {
-        "apiKey": os.environ.get("LINEAR_API_KEY", ""),
-        "webhookSecret": os.environ.get("LINEAR_WEBHOOK_SECRET", ""),
-        "agentMapping": ${agentMappingJson}${stateActionsJson ? `,
-        "stateActions": ${stateActionsJson}` : ""}
-    }
-}
-print("Configured openclaw-linear plugin")
-`;
-      })()
-    : "";
+  // Build dynamic plugin config sections
+  const pluginConfigs = (options.plugins ?? [])
+    .map((plugin) => generatePluginPython(plugin))
+    .join("");
 
   return `
 import json
@@ -266,7 +261,7 @@ config["agents"]["defaults"]["heartbeat"] = {
     "session": "main"
 }
 print("Configured heartbeat: every 1m")
-${slackChannelConfig}${linearPluginConfig}
+${slackChannelConfig}${pluginConfigs}
 # Configure agent identity for Slack mentions/tags
 agent_name = os.environ.get("AGENT_NAME", "")
 agent_emoji = os.environ.get("AGENT_EMOJI", "")

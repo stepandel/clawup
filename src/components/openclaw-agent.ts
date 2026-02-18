@@ -8,8 +8,7 @@ import * as aws from "@pulumi/aws";
 import * as tls from "@pulumi/tls";
 import * as crypto from "crypto";
 import * as zlib from "zlib";
-import { generateCloudInit, interpolateCloudInit, CloudInitConfig } from "./cloud-init";
-import type { LinearActiveActions } from "./config-generator";
+import { generateCloudInit, interpolateCloudInit, CloudInitConfig, PluginInstallConfig } from "./cloud-init";
 
 /**
  * Arguments for creating an OpenClaw Agent
@@ -114,24 +113,15 @@ export interface OpenClawAgentArgs {
   slackAppToken?: pulumi.Input<string>;
 
   /**
-   * Linear API key for issue tracking
+   * Plugins to install and configure on this agent
    */
-  linearApiKey?: pulumi.Input<string>;
+  plugins?: PluginInstallConfig[];
 
   /**
-   * Linear webhook signing secret (shared across agents)
+   * Resolved secret values for plugin env vars: { envVarName: pulumiOutput }
+   * e.g., { "LINEAR_API_KEY": output<string>, "LINEAR_WEBHOOK_SECRET": output<string> }
    */
-  linearWebhookSecret?: pulumi.Input<string>;
-
-  /**
-   * Linear user UUID for this agent (maps Linear user → agent)
-   */
-  linearUserUuid?: pulumi.Input<string>;
-
-  /**
-   * Linear plugin activeActions config (which workflow states trigger queue add/remove)
-   */
-  linearActiveActions?: LinearActiveActions;
+  pluginSecrets?: Record<string, pulumi.Input<string>>;
 
   /**
    * GitHub personal access token for gh CLI authentication
@@ -150,6 +140,11 @@ export interface OpenClawAgentArgs {
    * Example: ["1.2.3.4/32"] to restrict to your IP only.
    */
   allowedSshCidrs?: pulumi.Input<pulumi.Input<string>[]>;
+
+  /**
+   * Whether to enable Tailscale Funnel (public HTTPS for webhooks)
+   */
+  enableFunnel?: boolean;
 }
 
 /**
@@ -427,6 +422,10 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     );
 
     // Generate cloud-init user data
+    // Build outputs for plugin secrets
+    const pluginSecretEntries = Object.entries(args.pluginSecrets ?? {});
+    const pluginSecretOutputs = pluginSecretEntries.map(([, v]) => pulumi.output(v));
+
     // Resolve optional tokens to outputs
     const slackBotTokenOutput = args.slackBotToken
       ? pulumi.output(args.slackBotToken)
@@ -434,21 +433,13 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     const slackAppTokenOutput = args.slackAppToken
       ? pulumi.output(args.slackAppToken)
       : pulumi.output("");
-    const linearApiKeyOutput = args.linearApiKey
-      ? pulumi.output(args.linearApiKey)
-      : pulumi.output("");
-    const linearWebhookSecretOutput = args.linearWebhookSecret
-      ? pulumi.output(args.linearWebhookSecret)
-      : pulumi.output("");
-    const linearUserUuidOutput = args.linearUserUuid
-      ? pulumi.output(args.linearUserUuid)
-      : pulumi.output("");
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
     const braveApiKeyOutput = args.braveApiKey
       ? pulumi.output(args.braveApiKey)
       : pulumi.output("");
+
     // Combine all string outputs
     const userData = pulumi.all([
       args.tailscaleAuthKey,
@@ -456,25 +447,27 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       gatewayTokenValue,
       slackBotTokenOutput,
       slackAppTokenOutput,
-      linearApiKeyOutput,
-      linearWebhookSecretOutput,
-      linearUserUuidOutput,
       githubTokenOutput,
       braveApiKeyOutput,
+      ...pluginSecretOutputs,
     ]).apply(([
       tsAuthKey,
       apiKey,
       gwToken,
       slackBotToken,
       slackAppToken,
-      linearApiKey,
-      linearWebhookSecret,
-      linearUserUuid,
       githubToken,
       braveApiKey,
+      ...pluginSecretValues
     ]) => {
         // Include stack name in Tailscale hostname to avoid conflicts across deployments
         const tsHostname = `${pulumi.getStack()}-${name}`;
+
+        // Build additional secrets map from plugin secrets
+        const additionalSecrets: Record<string, string> = {};
+        pluginSecretEntries.forEach(([envVar], idx) => {
+          additionalSecrets[envVar] = pluginSecretValues[idx] as string;
+        });
 
         const cloudInitConfig: CloudInitConfig = {
           anthropicApiKey: apiKey,
@@ -492,12 +485,9 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           slack: slackBotToken && slackAppToken
             ? { botToken: slackBotToken, appToken: slackAppToken }
             : undefined,
-          // Linear config (only if API key provided)
-          linear: linearApiKey ? { apiKey: linearApiKey } : undefined,
-          linearWebhookSecret: linearWebhookSecret || undefined,
-          linearAgentId: name,
-          linearUserUuid: linearUserUuid || undefined,
-          linearActiveActions: args.linearActiveActions,
+          // Plugins
+          plugins: args.plugins,
+          enableFunnel: args.enableFunnel,
           // GitHub token for gh CLI auth
           githubToken: githubToken || undefined,
           // Brave Search API key for web search
@@ -511,10 +501,9 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           gatewayToken: gwToken,
           slackBotToken: slackBotToken || undefined,
           slackAppToken: slackAppToken || undefined,
-          linearApiKey: linearApiKey || undefined,
-          linearWebhookSecret: linearWebhookSecret || undefined,
           githubToken: githubToken || undefined,
           braveApiKey: braveApiKey || undefined,
+          additionalSecrets,
         });
       });
 

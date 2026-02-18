@@ -4,7 +4,22 @@
  */
 
 import * as zlib from "zlib";
-import { generateConfigPatchScript, SlackConfigOptions, LinearConfigOptions, LinearActiveActions } from "./config-generator";
+import { generateConfigPatchScript, SlackConfigOptions, PluginEntry } from "./config-generator";
+
+/**
+ * Config for a plugin to be installed on an agent.
+ */
+export interface PluginInstallConfig {
+  /** Plugin package name (e.g., "openclaw-linear") */
+  name: string;
+  /** Non-secret config for this plugin's agent section */
+  config?: Record<string, unknown>;
+  /**
+   * Env var mappings for secrets: { configKey: envVarName }
+   * e.g., { "apiKey": "LINEAR_API_KEY", "webhookSecret": "LINEAR_WEBHOOK_SECRET" }
+   */
+  secretEnvVars?: Record<string, string>;
+}
 
 export interface CloudInitConfig {
   /** Anthropic API key (for backward compatibility) */
@@ -43,20 +58,14 @@ export interface CloudInitConfig {
   createUbuntuUser?: boolean;
   /** Slack configuration */
   slack?: SlackConfigOptions;
-  /** Linear configuration */
-  linear?: LinearConfigOptions;
-  /** Linear webhook signing secret (shared across agents) */
-  linearWebhookSecret?: string;
-  /** Agent ID for Linear plugin agent mapping (e.g., "agent-pm") */
-  linearAgentId?: string;
-  /** Linear user UUID for this agent */
-  linearUserUuid?: string;
-  /** Linear plugin activeActions config */
-  linearActiveActions?: LinearActiveActions;
+  /** Plugins to install and configure */
+  plugins?: PluginInstallConfig[];
   /** GitHub personal access token for gh CLI auth */
   githubToken?: string;
   /** Brave Search API key for web search */
   braveApiKey?: string;
+  /** Whether to enable Tailscale Funnel (public HTTPS) instead of Serve */
+  enableFunnel?: boolean;
 }
 
 /**
@@ -69,16 +78,13 @@ export function generateCloudInit(config: CloudInitConfig): string {
   const openclawVersion = config.openclawVersion ?? "latest";
   const trustedProxies = config.trustedProxies ?? ["127.0.0.1"];
 
-  // Generate Python config patch script
-  const linearOptions: LinearConfigOptions | undefined = config.linear
-    ? {
-        ...config.linear,
-        webhookSecret: config.linearWebhookSecret ?? config.linear.webhookSecret,
-        agentId: config.linearAgentId ?? config.linear.agentId,
-        agentLinearUserUuid: config.linearUserUuid ?? config.linear.agentLinearUserUuid,
-        activeActions: config.linearActiveActions ?? config.linear.activeActions,
-      }
-    : undefined;
+  // Build PluginEntry[] for config-generator from PluginInstallConfig[]
+  const pluginEntries: PluginEntry[] = (config.plugins ?? []).map((p) => ({
+    name: p.name,
+    enabled: true,
+    config: p.config ?? {},
+    secretEnvVars: p.secretEnvVars,
+  }));
 
   const configPatchScript = generateConfigPatchScript({
     gatewayPort,
@@ -86,7 +92,7 @@ export function generateCloudInit(config: CloudInitConfig): string {
     trustedProxies,
     enableControlUi: true,
     slack: config.slack,
-    linear: linearOptions,
+    plugins: pluginEntries,
     braveApiKey: config.braveApiKey,
   });
 
@@ -123,19 +129,21 @@ GH_AUTH_SCRIPT
   // Claude Code CLI installation script
   const codingClisInstallScript = generateClaudeCodeInstallScript(config.model);
 
-  // openclaw-linear plugin install step (only if Linear is configured)
-  const linearPluginInstallScript = config.linear
+  // Dynamic plugin install steps
+  const pluginInstallScript = (config.plugins ?? []).length > 0
     ? `
-# Install openclaw-linear plugin
-echo "Installing openclaw-linear plugin..."
+# Install OpenClaw plugins
+echo "Installing plugins..."
 sudo -H -u ubuntu bash -c '
 export HOME=/home/ubuntu
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-openclaw plugins install openclaw-linear || echo "WARNING: openclaw-linear plugin install failed. Install manually with: openclaw plugins install openclaw-linear"
+${(config.plugins ?? []).map((p) =>
+  `openclaw plugins install ${p.name} || echo "WARNING: ${p.name} plugin install failed. Install manually with: openclaw plugins install ${p.name}"`
+).join("\n")}
 '
-echo "openclaw-linear plugin installed"
+echo "Plugin installation complete"
 `
     : "";
 
@@ -173,13 +181,11 @@ tailscale up --authkey="\${TAILSCALE_AUTH_KEY}" --ssh${config.tailscaleHostname 
 `;
 
   // Tailscale proxy section: funnel (public access for webhooks) or serve (Tailscale-only HTTPS)
-  // When Linear is configured, enable funnel prerequisites via API, then start funnel.
-  // If funnel fails, fall back to serve so the Tailscale HTTPS proxy still works.
   const tailscaleProxySection = config.skipTailscale
     ? ""
-    : config.linear
+    : config.enableFunnel
       ? `
-# Enable Tailscale Funnel for Linear webhook endpoint (public HTTPS)
+# Enable Tailscale Funnel for webhook endpoint (public HTTPS)
 echo "Enabling Tailscale Funnel for webhook endpoint..."
 if tailscale funnel --bg ${gatewayPort}; then
   echo "Tailscale Funnel enabled — webhook endpoint is publicly accessible"
@@ -193,6 +199,17 @@ fi
 echo "Enabling Tailscale HTTPS proxy..."
 tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve failed. Enable HTTPS in your Tailscale admin console first."
 `;
+
+  // Collect all secret env vars that need to be passed to the config-patch python script
+  const pluginSecretEnvVarExports: string[] = [];
+  for (const plugin of config.plugins ?? []) {
+    for (const envVar of Object.values(plugin.secretEnvVars ?? {})) {
+      pluginSecretEnvVarExports.push(`  ${envVar}="\${${envVar}:-}"`);
+    }
+  }
+  const pluginSecretEnvLine = pluginSecretEnvVarExports.length > 0
+    ? ` \\\n${pluginSecretEnvVarExports.join(" \\\n")}`
+    : "";
 
   return `#!/bin/bash
 set -e
@@ -299,7 +316,7 @@ openclaw onboard --non-interactive --accept-risk \\
   --skip-skills || echo "WARNING: OpenClaw onboarding failed. Run openclaw onboard manually."
 '
 ${workspaceFilesScript}
-${linearPluginInstallScript}
+${pluginInstallScript}
 # Install daemon service with XDG_RUNTIME_DIR set
 echo "Installing OpenClaw daemon..."
 sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
@@ -317,11 +334,9 @@ sudo -H -u ubuntu \\
   ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}" \\
   SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN:-}" \\
   SLACK_APP_TOKEN="\${SLACK_APP_TOKEN:-}" \\
-  LINEAR_API_KEY="\${LINEAR_API_KEY:-}" \\
-  LINEAR_WEBHOOK_SECRET="\${LINEAR_WEBHOOK_SECRET:-}" \\
   BRAVE_API_KEY="\${BRAVE_API_KEY:-}" \\
   AGENT_NAME="${config.envVars?.AGENT_NAME ?? ""}" \\
-  AGENT_EMOJI="${config.envVars?.AGENT_EMOJI ?? ""}" \\
+  AGENT_EMOJI="${config.envVars?.AGENT_EMOJI ?? ""}"${pluginSecretEnvLine} \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
@@ -388,8 +403,11 @@ function generateWorkspaceFilesScript(
 }
 
 /**
- * Interpolates environment variables in the cloud-init script
- * Call this with actual values before passing to EC2 user data
+ * Interpolates environment variables in the cloud-init script.
+ * Call this with actual values before passing to EC2 user data.
+ *
+ * Base secrets (anthropic, tailscale, gateway, slack, github, brave) are always handled.
+ * Plugin secrets are passed via the additionalSecrets map.
  */
 export function interpolateCloudInit(
   script: string,
@@ -399,10 +417,10 @@ export function interpolateCloudInit(
     gatewayToken: string;
     slackBotToken?: string;
     slackAppToken?: string;
-    linearApiKey?: string;
-    linearWebhookSecret?: string;
     githubToken?: string;
     braveApiKey?: string;
+    /** Additional secret env vars from plugins: { envVarName: value } */
+    additionalSecrets?: Record<string, string>;
   }
 ): string {
   let result = script
@@ -415,14 +433,19 @@ export function interpolateCloudInit(
   result = result.replace(/\${SLACK_BOT_TOKEN}/g, values.slackBotToken ?? "");
   result = result.replace(/\${SLACK_APP_TOKEN:-}/g, values.slackAppToken ?? "");
   result = result.replace(/\${SLACK_APP_TOKEN}/g, values.slackAppToken ?? "");
-  result = result.replace(/\${LINEAR_API_KEY:-}/g, values.linearApiKey ?? "");
-  result = result.replace(/\${LINEAR_API_KEY}/g, values.linearApiKey ?? "");
-  result = result.replace(/\${LINEAR_WEBHOOK_SECRET:-}/g, values.linearWebhookSecret ?? "");
-  result = result.replace(/\${LINEAR_WEBHOOK_SECRET}/g, values.linearWebhookSecret ?? "");
   result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
   result = result.replace(/\${BRAVE_API_KEY:-}/g, values.braveApiKey ?? "");
   result = result.replace(/\${BRAVE_API_KEY}/g, values.braveApiKey ?? "");
+
+  // Plugin-declared secret env vars
+  if (values.additionalSecrets) {
+    for (const [envVar, value] of Object.entries(values.additionalSecrets)) {
+      const escaped = value.replace(/\$/g, "$$$$");
+      result = result.replace(new RegExp(`\\$\\{${envVar}:-\\}`, "g"), escaped);
+      result = result.replace(new RegExp(`\\$\\{${envVar}\\}`, "g"), escaped);
+    }
+  }
 
   return result;
 }

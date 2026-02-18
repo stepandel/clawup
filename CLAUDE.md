@@ -38,11 +38,14 @@ agent-army/
 
 ## Key Concepts
 
-### Manifest (agent-army.json)
+### Manifest (agent-army.yaml)
 The manifest is the source of truth for deployments. Created by `agent-army init`, it defines:
 - Stack name, cloud provider, region, instance type
 - Owner info (name, timezone, working hours)
-- Agent definitions (preset or custom)
+- Agent definitions (preset, identity, or custom)
+- Per-agent plugin list (e.g., `plugins: [openclaw-linear]`)
+
+Plugin configs are stored separately at `~/.agent-army/configs/<stack>/plugins/<plugin>.yaml`.
 
 ### Pulumi Stack
 Infrastructure is managed via Pulumi. Secrets (API keys, tokens) are stored encrypted in Pulumi config, not in the manifest.
@@ -108,8 +111,10 @@ pnpm build             # Production build
 |------|---------|
 | `cli/commands/init.ts` | Interactive setup wizard (largest command) |
 | `cli/lib/constants.ts` | Presets, regions, instance types, key instructions |
-| `src/components/cloud-init.ts` | Cloud-init script generation |
-| `index.ts` | Main Pulumi program that reads manifest |
+| `cli/lib/config.ts` | Load/save YAML manifests and plugin configs |
+| `src/components/cloud-init.ts` | Cloud-init script generation (dynamic plugin support) |
+| `src/components/config-generator.ts` | OpenClaw config builder (dynamic plugin entries) |
+| `index.ts` | Main Pulumi program that reads agent-army.yaml manifest |
 | `web/src/lib/deploy.ts` | Pulumi Automation API runner |
 
 ## Testing
@@ -158,7 +163,7 @@ Currently minimal test coverage. When adding tests:
 
 ## Troubleshooting
 
-### "agent-army.json not found"
+### "agent-army.yaml not found"
 Run `agent-army init` first, or ensure you're in the project root.
 
 ### Pulumi stack conflicts

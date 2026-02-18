@@ -85,12 +85,12 @@ export function ensureWorkspace(): { ok: boolean; error?: string } {
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
   // Preserve user state files across re-sync
-  const preservePatterns = ["Pulumi.*.yaml", "agent-army.json"];
+  const preservePatterns = ["Pulumi.*.yaml", "agent-army.yaml"];
   const preserved = new Map<string, Buffer>();
   for (const pattern of preservePatterns) {
     // Simple glob: Pulumi.*.yaml
     const files = fs.readdirSync(WORKSPACE_DIR).filter((f) => {
-      if (pattern === "agent-army.json") return f === "agent-army.json";
+      if (pattern === "agent-army.yaml") return f === "agent-army.yaml";
       // Match Pulumi.<stack>.yaml but not Pulumi.yaml itself
       return f.startsWith("Pulumi.") && f.endsWith(".yaml") && f !== "Pulumi.yaml";
     });

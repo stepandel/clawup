@@ -26,7 +26,8 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "tailwind-merge": "^3.4.0",
-    "tailwindcss": "^4.1.18"
+    "tailwindcss": "^4.1.18",
+    "yaml": "^2.7.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",

@@ -1,22 +1,23 @@
 /**
  * Agent Army - Data-Driven Multi-Agent Pulumi Stack
  *
- * Reads agent-army.json manifest to dynamically deploy OpenClaw agents.
+ * Reads agent-army.yaml manifest to dynamically deploy OpenClaw agents.
  * The manifest is created by `agent-army init` and serves as the single
  * source of truth for the agent fleet configuration.
  *
  * All agents share a single VPC for cost optimization.
- * Each agent loads role-specific workspace files from presets.
+ * Each agent loads workspace files from identity repos or presets.
  * Secrets are pulled from Pulumi config (set by CLI or ESC).
+ * Plugin configs are loaded from ~/.agent-army/configs/<stack>/plugins/.
  */
 
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as fs from "fs";
 import * as path from "path";
-import { OpenClawAgent, HetznerOpenClawAgent } from "./src";
+import YAML from "yaml";
+import { OpenClawAgent, HetznerOpenClawAgent, PluginInstallConfig } from "./src";
 import { SharedVpc } from "./shared-vpc";
-import type { LinearActiveActions } from "./src/components/config-generator";
 import { fetchIdentitySync } from "./cli/lib/identity";
 import * as os from "os";
 
@@ -40,6 +41,8 @@ interface ManifestAgent {
   /** @deprecated Use an identity repo with an IDENTITY.md file instead. */
   identityContent?: string;
   envVars?: Record<string, string>;
+  /** Plugin names to install on this agent */
+  plugins?: string[];
 }
 
 interface Manifest {
@@ -55,6 +58,22 @@ interface Manifest {
   githubRepo?: string;
   agents: ManifestAgent[];
 }
+
+/** Plugin config file shape */
+interface PluginConfigFile {
+  agents: Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Known plugin secret env var mappings.
+ * Maps plugin name → { configKey: envVarName }.
+ */
+const PLUGIN_SECRET_ENV_VARS: Record<string, Record<string, string>> = {
+  "openclaw-linear": {
+    apiKey: "LINEAR_API_KEY",
+    webhookSecret: "LINEAR_WEBHOOK_SECRET",
+  },
+};
 
 // -----------------------------------------------------------------------------
 // Configuration from Pulumi Config / ESC
@@ -75,29 +94,12 @@ const linearTeam = config.get("linearTeam") ?? "";
 const githubRepo = config.get("githubRepo") ?? "";
 const braveApiKey = config.getSecret("braveApiKey");
 
-// Preset emoji shortcodes for agent identity (used in Slack mentions)
-const PRESET_EMOJIS: Record<string, string> = {
-  pm: "clipboard",
-  eng: "building_construction",
-  tester: "mag",
-};
-
 // Identity cache directory
 const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
-
-// Per-role Linear plugin activeActions (which workflow states trigger queue add/remove)
-const linearActiveActionsByRole: Record<string, LinearActiveActions> = {
-  pm: { remove: ["triage", "started", "completed", "cancelled"], add: ["backlog", "unstarted"] },
-  eng: { remove: ["triage", "completed", "cancelled"], add: ["backlog", "started"] },
-  tester: { remove: ["triage", "completed", "cancelled"], add: ["started"] },
-};
 
 // Per-agent Slack credentials from config/ESC
 // Pattern: <role>SlackBotToken, <role>SlackAppToken
 const agentSlackCredentials: Record<string, { botToken?: pulumi.Output<string>; appToken?: pulumi.Output<string> }> = {};
-const agentLinearCredentials: Record<string, pulumi.Output<string> | undefined> = {};
-const agentLinearWebhookSecrets: Record<string, pulumi.Output<string> | undefined> = {};
-const agentLinearUserUuids: Record<string, string | undefined> = {};
 const agentGithubCredentials: Record<string, pulumi.Output<string> | undefined> = {};
 
 // Common roles to check for credentials
@@ -108,21 +110,6 @@ for (const role of commonRoles) {
   const appToken = config.getSecret(`${role}SlackAppToken`);
   if (botToken || appToken) {
     agentSlackCredentials[role] = { botToken, appToken };
-  }
-
-  const linearToken = config.getSecret(`${role}LinearApiKey`);
-  if (linearToken) {
-    agentLinearCredentials[role] = linearToken;
-  }
-
-  const linearWebhookSecret = config.getSecret(`${role}LinearWebhookSecret`);
-  if (linearWebhookSecret) {
-    agentLinearWebhookSecrets[role] = linearWebhookSecret;
-  }
-
-  const linearUserUuid = config.get(`${role}LinearUserUuid`);
-  if (linearUserUuid) {
-    agentLinearUserUuids[role] = linearUserUuid;
   }
 
   const githubToken = config.getSecret(`${role}GithubToken`);
@@ -210,18 +197,35 @@ function processTemplates(
 }
 
 // -----------------------------------------------------------------------------
-// Load Manifest
+// Load Manifest (YAML)
 // -----------------------------------------------------------------------------
 
 // __dirname is dist/ when running compiled JS, so go up to project root
-const manifestPath = path.join(__dirname, "..", "agent-army.json");
+const manifestPath = path.join(__dirname, "..", "agent-army.yaml");
 if (!fs.existsSync(manifestPath)) {
   throw new Error(
-    "agent-army.json not found. Run `agent-army init` to create it."
+    "agent-army.yaml not found. Run `agent-army init` to create it."
   );
 }
 
-const manifest: Manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+const manifest: Manifest = YAML.parse(fs.readFileSync(manifestPath, "utf-8"));
+
+// Load plugin configs from ~/.agent-army/configs/<stackName>/plugins/
+const pluginConfigsDir = path.join(os.homedir(), ".agent-army", "configs", manifest.stackName, "plugins");
+const pluginConfigs: Record<string, PluginConfigFile> = {};
+if (fs.existsSync(pluginConfigsDir)) {
+  for (const file of fs.readdirSync(pluginConfigsDir)) {
+    if (file.endsWith(".yaml")) {
+      const pluginName = file.replace(/\.yaml$/, "");
+      try {
+        const raw = fs.readFileSync(path.join(pluginConfigsDir, file), "utf-8");
+        pluginConfigs[pluginName] = YAML.parse(raw) as PluginConfigFile;
+      } catch (err) {
+        pulumi.log.warn(`Failed to load plugin config '${pluginName}': ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+}
 
 // Load credentials for any custom roles not in commonRoles
 for (const agent of manifest.agents) {
@@ -232,12 +236,6 @@ for (const agent of manifest.agents) {
     if (botToken || appToken) {
       agentSlackCredentials[role] = { botToken, appToken };
     }
-    const linearToken = config.getSecret(`${role}LinearApiKey`);
-    if (linearToken) agentLinearCredentials[role] = linearToken;
-    const linearWebhookSecret = config.getSecret(`${role}LinearWebhookSecret`);
-    if (linearWebhookSecret) agentLinearWebhookSecrets[role] = linearWebhookSecret;
-    const linearUserUuid = config.get(`${role}LinearUserUuid`);
-    if (linearUserUuid) agentLinearUserUuids[role] = linearUserUuid;
     const githubToken = config.getSecret(`${role}GithubToken`);
     if (githubToken) agentGithubCredentials[role] = githubToken;
   }
@@ -341,6 +339,63 @@ if (provider === "aws") {
 // Hetzner reads hcloud:token automatically from Pulumi config — no explicit provider needed
 
 // -----------------------------------------------------------------------------
+// Helper: Build PluginInstallConfig[] for an agent
+// -----------------------------------------------------------------------------
+
+function buildPluginsForAgent(
+  agent: ManifestAgent
+): { plugins: PluginInstallConfig[]; pluginSecrets: Record<string, pulumi.Output<string>>; enableFunnel: boolean } {
+  const plugins: PluginInstallConfig[] = [];
+  const pluginSecrets: Record<string, pulumi.Output<string>> = {};
+  let enableFunnel = false;
+
+  for (const pluginName of agent.plugins ?? []) {
+    const pluginCfg = pluginConfigs[pluginName];
+    const agentSection = pluginCfg?.agents?.[agent.role] ?? {};
+    const secretMapping = PLUGIN_SECRET_ENV_VARS[pluginName] ?? {};
+
+    plugins.push({
+      name: pluginName,
+      config: agentSection,
+      secretEnvVars: Object.keys(secretMapping).length > 0 ? secretMapping : undefined,
+    });
+
+    // Collect secret outputs from Pulumi config
+    for (const [, envVar] of Object.entries(secretMapping)) {
+      if (!pluginSecrets[envVar]) {
+        // Derive Pulumi config key from role + env var pattern
+        // e.g., LINEAR_API_KEY → <role>LinearApiKey
+        const secret = config.getSecret(`${agent.role}${envVarToConfigKey(envVar)}`);
+        if (secret) {
+          pluginSecrets[envVar] = secret;
+        }
+      }
+    }
+
+    // Enable funnel if the plugin needs webhooks (openclaw-linear uses webhooks)
+    if (pluginName === "openclaw-linear") {
+      enableFunnel = true;
+    }
+  }
+
+  return { plugins, pluginSecrets, enableFunnel };
+}
+
+/**
+ * Convert an env var name to a Pulumi config key suffix.
+ * e.g., LINEAR_API_KEY → LinearApiKey, LINEAR_WEBHOOK_SECRET → LinearWebhookSecret
+ */
+function envVarToConfigKey(envVar: string): string {
+  // Strip the common prefix (e.g., "LINEAR_") and convert to camelCase
+  // LINEAR_API_KEY → LinearApiKey
+  return envVar
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+// -----------------------------------------------------------------------------
 // Dynamic Agent Deployments
 // -----------------------------------------------------------------------------
 
@@ -355,10 +410,9 @@ const agentOutputs: Record<string, {
 for (const agent of manifest.agents) {
   // Build workspace files
   let workspaceFiles: Record<string, string>;
-  let agentEmoji = PRESET_EMOJIS[agent.role] ?? "";
+  let agentEmoji = "";
   let agentDisplayName = agent.displayName;
   let agentVolumeSize = agent.volumeSize;
-  let agentLinearActiveActions = linearActiveActionsByRole[agent.role];
 
   const templateVars: Record<string, string> = {
     OWNER_NAME: ownerName,
@@ -380,11 +434,6 @@ for (const agent of manifest.agents) {
     agentEmoji = identity.manifest.emoji ?? agentEmoji;
     agentDisplayName = agent.displayName || identity.manifest.displayName;
     agentVolumeSize = agent.volumeSize ?? identity.manifest.volumeSize ?? 30;
-
-    // Use linearRouting from identity manifest if available
-    if (identity.manifest.linearRouting) {
-      agentLinearActiveActions = identity.manifest.linearRouting;
-    }
   } else if (agent.preset) {
     // Preset agent: load from presets directory (backward compat)
     workspaceFiles = processTemplates(loadPresetFiles(agent.preset), templateVars);
@@ -396,11 +445,11 @@ for (const agent of manifest.agents) {
     if (agent.identityContent) workspaceFiles["IDENTITY.md"] = agent.identityContent;
   }
 
+  // Build plugin configs for this agent
+  const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent);
+
   // Get per-agent credentials if available
   const slackCreds = agentSlackCredentials[agent.role];
-  const linearApiKey = agentLinearCredentials[agent.role];
-  const linearWebhookSecret = agentLinearWebhookSecrets[agent.role];
-  const linearUserUuid = agentLinearUserUuids[agent.role];
   const githubToken = agentGithubCredentials[agent.role];
 
   if (provider === "aws") {
@@ -433,17 +482,10 @@ for (const agent of manifest.agents) {
       slackBotToken: slackCreds?.botToken,
       slackAppToken: slackCreds?.appToken,
 
-      // Linear API key (optional)
-      linearApiKey,
-
-      // Linear webhook secret (per-agent)
-      linearWebhookSecret,
-
-      // Linear user UUID (optional)
-      linearUserUuid,
-
-      // Linear active actions (per-role queue behavior)
-      linearActiveActions: agentLinearActiveActions,
+      // Plugins
+      plugins,
+      pluginSecrets,
+      enableFunnel,
 
       // GitHub token (optional)
       githubToken,
@@ -490,17 +532,10 @@ for (const agent of manifest.agents) {
       slackBotToken: slackCreds?.botToken,
       slackAppToken: slackCreds?.appToken,
 
-      // Linear API key (optional)
-      linearApiKey,
-
-      // Linear webhook secret (per-agent)
-      linearWebhookSecret,
-
-      // Linear user UUID (optional)
-      linearUserUuid,
-
-      // Linear active actions (per-role queue behavior)
-      linearActiveActions: agentLinearActiveActions,
+      // Plugins
+      plugins,
+      pluginSecrets,
+      enableFunnel,
 
       // GitHub token (optional)
       githubToken,
@@ -537,7 +572,7 @@ for (const [role, outputs] of Object.entries(agentOutputs)) {
   module.exports[`${role}PublicIp`] = outputs.publicIp;
   module.exports[`${role}SshPrivateKey`] = pulumi.secret(outputs.sshPrivateKey);
 
-  // Webhook URL for Linear (derived from Tailscale Funnel public URL)
+  // Webhook URL for plugins that need it (derived from Tailscale Funnel public URL)
   module.exports[`${role}WebhookUrl`] = outputs.tailscaleUrl.apply((url) => {
     // Extract base URL (remove query params like ?token=...) and append webhook path
     const baseUrl = url.split("?")[0].replace(/\/$/, "");

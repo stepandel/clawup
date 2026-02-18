@@ -157,9 +157,9 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
     spinner.stop(magicDnsChanged ? "MagicDNS enabled" : "MagicDNS OK");
   }
 
-  // Ensure Tailscale Funnel prerequisites if any agent uses Linear
+  // Ensure Tailscale Funnel prerequisites if any agent uses openclaw-linear plugin
   const hasLinearAgents = manifest.agents.some(
-    (a) => !!getConfig(exec, `${a.role}LinearApiKey`, cwd)
+    (a) => a.plugins?.includes("openclaw-linear")
   );
   if (hasLinearAgents && tailscaleApiKey) {
     const spinner = ui.spinner("Ensuring Tailscale Funnel prerequisites...");

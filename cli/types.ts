@@ -36,9 +36,16 @@ export interface AgentDefinition {
   identityContent?: string;
   /** Additional environment variables */
   envVars?: Record<string, string>;
+  /** Plugin names to install on this agent (e.g., ["openclaw-linear"]) */
+  plugins?: string[];
 }
 
-/** The agent-army.json manifest */
+/** Per-plugin configuration file stored at ~/.agent-army/configs/<stack>/plugins/<plugin>.yaml */
+export interface PluginConfigFile {
+  agents: Record<string, Record<string, unknown>>;
+}
+
+/** The agent-army.yaml manifest */
 export interface ArmyManifest {
   stackName: string;
   provider: "aws" | "hetzner";
@@ -141,6 +148,17 @@ export function validateAgentDefinition(agent: AgentDefinition): void {
     throw new Error(
       `Agent "${agent.name}": "identityVersion" requires "identity" to be set.`
     );
+  }
+
+  if (agent.plugins !== undefined) {
+    if (!Array.isArray(agent.plugins)) {
+      throw new Error(`Agent "${agent.name}": "plugins" must be an array of strings.`);
+    }
+    for (const p of agent.plugins) {
+      if (typeof p !== "string" || !p) {
+        throw new Error(`Agent "${agent.name}": each plugin must be a non-empty string.`);
+      }
+    }
   }
 }
 

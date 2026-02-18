@@ -3,7 +3,7 @@
  */
 
 import * as p from "@clack/prompts";
-import { loadManifest, resolveConfigName, checkAndMigrateLegacy } from "../lib/config";
+import { loadManifest, resolveConfigName } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
@@ -25,9 +25,6 @@ export async function sshCommand(agentNameOrAlias: string, commandArgs: string[]
     exitWithError(wsResult.error ?? "Failed to set up workspace.");
   }
   const cwd = getWorkspaceDir();
-
-  // Check for legacy config and offer migration
-  await checkAndMigrateLegacy();
 
   // Resolve config name
   let configName: string;

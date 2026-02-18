@@ -89,4 +89,28 @@ describe("validateAgentDefinition", () => {
       )
     ).not.toThrow();
   });
+
+  it("accepts a valid plugins array", () => {
+    expect(() =>
+      validateAgentDefinition(makeAgent({ plugins: ["openclaw-linear"] }))
+    ).not.toThrow();
+  });
+
+  it("accepts an empty plugins array", () => {
+    expect(() =>
+      validateAgentDefinition(makeAgent({ plugins: [] }))
+    ).not.toThrow();
+  });
+
+  it("rejects non-string plugin entries", () => {
+    expect(() =>
+      validateAgentDefinition(makeAgent({ plugins: ["openclaw-linear", "" as string] }))
+    ).toThrow("non-empty string");
+  });
+
+  it("accepts agent without plugins field", () => {
+    expect(() =>
+      validateAgentDefinition(makeAgent())
+    ).not.toThrow();
+  });
 });

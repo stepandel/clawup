@@ -5,9 +5,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import * as readline from "readline";
-import type { ArmyManifest } from "../types";
-import { CONFIG_DIR, MANIFEST_FILE } from "./constants";
+import YAML from "yaml";
+import type { ArmyManifest, PluginConfigFile } from "../types";
+import { CONFIG_DIR, MANIFEST_FILE, PLUGINS_DIR } from "./constants";
 
 /**
  * Get the configs directory path (~/.agent-army/configs/)
@@ -30,102 +30,17 @@ export function ensureConfigsDir(): void {
  * Get the path to a config file by name
  */
 export function configPath(name: string): string {
-  return path.join(configsDir(), `${name}.json`);
+  return path.join(configsDir(), `${name}.yaml`);
 }
 
 /**
- * Get the legacy manifest path (./agent-army.json in CWD)
- */
-export function legacyManifestPath(): string {
-  return path.join(process.cwd(), MANIFEST_FILE);
-}
-
-/**
- * Copy a named config to agent-army.json so the Pulumi program can read it.
+ * Copy a named config to agent-army.yaml so the Pulumi program can read it.
  * When projectDir is provided, writes there instead of process.cwd().
  */
 export function syncManifestToProject(name: string, projectDir?: string): void {
   const src = configPath(name);
   const dest = path.join(projectDir ?? process.cwd(), MANIFEST_FILE);
   fs.copyFileSync(src, dest);
-}
-
-/**
- * Check if a legacy manifest exists in CWD
- */
-export function legacyManifestExists(): boolean {
-  return fs.existsSync(legacyManifestPath());
-}
-
-/**
- * Load a legacy manifest from CWD
- */
-export function loadLegacyManifest(): ArmyManifest | null {
-  const filePath = legacyManifestPath();
-  if (!fs.existsSync(filePath)) return null;
-
-  try {
-    const raw = fs.readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as ArmyManifest;
-  } catch (err) {
-    console.warn(`[config] Failed to load legacy manifest at ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
-    return null;
-  }
-}
-
-/**
- * Prompt user for yes/no confirmation
- */
-async function confirm(message: string): Promise<boolean> {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(`${message} [y/N] `, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
-    });
-  });
-}
-
-/**
- * Check for legacy manifest and offer migration.
- * Returns the migrated config name if migration occurred, null otherwise.
- */
-export async function checkAndMigrateLegacy(): Promise<string | null> {
-  if (!legacyManifestExists()) return null;
-
-  const legacy = loadLegacyManifest();
-  if (!legacy) return null;
-
-  console.log(
-    `\nFound legacy config at ${legacyManifestPath()}`
-  );
-  console.log(`  Stack: ${legacy.stackName}`);
-  console.log(`  Region: ${legacy.region}`);
-  console.log(`  Agents: ${legacy.agents.length}`);
-
-  const shouldMigrate = await confirm(
-    "\nMigrate this config to ~/.agent-army/configs/?"
-  );
-
-  if (!shouldMigrate) {
-    return null;
-  }
-
-  const configName = legacy.stackName;
-  saveManifest(configName, legacy);
-  console.log(`\nMigrated to: ${configPath(configName)}`);
-
-  const shouldDelete = await confirm("Delete the old ./agent-army.json file?");
-  if (shouldDelete) {
-    fs.unlinkSync(legacyManifestPath());
-    console.log("Deleted legacy config.");
-  }
-
-  return configName;
 }
 
 /**
@@ -144,7 +59,7 @@ export function loadManifest(name: string): ArmyManifest | null {
 
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as ArmyManifest;
+    return YAML.parse(raw) as ArmyManifest;
   } catch (err) {
     console.warn(`[config] Failed to load manifest '${name}' at ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -157,7 +72,7 @@ export function loadManifest(name: string): ArmyManifest | null {
 export function saveManifest(name: string, manifest: ArmyManifest): void {
   ensureConfigsDir();
   const filePath = configPath(name);
-  fs.writeFileSync(filePath, JSON.stringify(manifest, null, 2) + "\n", "utf-8");
+  fs.writeFileSync(filePath, YAML.stringify(manifest), "utf-8");
 }
 
 /**
@@ -169,8 +84,8 @@ export function listManifests(): string[] {
 
   return fs
     .readdirSync(dir)
-    .filter((f) => f.endsWith(".json"))
-    .map((f) => f.replace(/\.json$/, ""))
+    .filter((f) => f.endsWith(".yaml"))
+    .map((f) => f.replace(/\.yaml$/, ""))
     .sort();
 }
 
@@ -219,4 +134,50 @@ export function resolveConfigName(name?: string): string {
   throw new Error(
     `Multiple configs found. Specify one with --config:\n  ${configs.join("\n  ")}`
   );
+}
+
+// ---------------------------------------------------------------------------
+// Plugin config helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the plugins directory for a stack (~/.agent-army/configs/<stackName>/plugins/)
+ */
+export function pluginsDir(stackName: string): string {
+  return path.join(configsDir(), stackName, PLUGINS_DIR);
+}
+
+/**
+ * Ensure the plugins directory exists for a stack
+ */
+export function ensurePluginsDir(stackName: string): void {
+  const dir = pluginsDir(stackName);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}
+
+/**
+ * Load a plugin config file. Returns null if not found or invalid.
+ */
+export function loadPluginConfig(stackName: string, pluginName: string): PluginConfigFile | null {
+  const filePath = path.join(pluginsDir(stackName), `${pluginName}.yaml`);
+  if (!fs.existsSync(filePath)) return null;
+
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    return YAML.parse(raw) as PluginConfigFile;
+  } catch (err) {
+    console.warn(`[config] Failed to load plugin config '${pluginName}' for stack '${stackName}': ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
+/**
+ * Save a plugin config file
+ */
+export function savePluginConfig(stackName: string, pluginName: string, data: PluginConfigFile): void {
+  ensurePluginsDir(stackName);
+  const filePath = path.join(pluginsDir(stackName), `${pluginName}.yaml`);
+  fs.writeFileSync(filePath, YAML.stringify(data), "utf-8");
 }

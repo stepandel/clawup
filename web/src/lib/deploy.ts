@@ -5,6 +5,7 @@
 
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
+import YAML from "yaml";
 
 /**
  * Run a Pulumi deployment asynchronously.
@@ -44,8 +45,8 @@ export async function runDeployment(deploymentId: string): Promise<void> {
     appendLog(`Provider: ${deployment.credential.provider}`);
     appendLog(`Stack: ${deployment.stackName}`);
 
-    // Parse manifest
-    const manifest = JSON.parse(deployment.manifest);
+    // Parse manifest (supports both YAML and JSON)
+    const manifest = YAML.parse(deployment.manifest);
     appendLog(`Agents: ${manifest.agents?.map((a: { displayName: string }) => a.displayName).join(", ")}`);
 
     // Import Pulumi Automation API

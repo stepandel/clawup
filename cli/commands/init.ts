@@ -24,7 +24,8 @@ import {
 } from "../lib/constants";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
-import { saveManifest } from "../lib/config";
+import { saveManifest, savePluginConfig } from "../lib/config";
+import type { PluginConfigFile } from "../types";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, handleCancel, exitWithError, formatCost, formatAgentList } from "../lib/ui";
 
@@ -286,6 +287,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         role: preset.role,
         preset: preset.preset,
         volumeSize: preset.volumeSize,
+        plugins: ["openclaw-linear"],
       });
     }
   }
@@ -334,6 +336,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
           preset: null,
           identity: identityUrl as string,
           volumeSize: parseInt(volumeOverride as string, 10),
+          plugins: ["openclaw-linear"],
         });
       } catch (err) {
         spinner.stop(`Failed to validate identity: ${(err as Error).message}`);
@@ -410,6 +413,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         role: customAgent.role,
         preset: null,
         volumeSize: parseInt(customAgent.volumeSize, 10),
+        plugins: ["openclaw-linear"],
       };
       if (customAgent.soulContent) {
         agentDef.soulContent = customAgent.soulContent;
@@ -729,7 +733,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   // Write manifest
   const configName = basicConfig.stackName as string;
-  s.start(`Writing config to ~/.agent-army/configs/${configName}.json...`);
+  s.start(`Writing config to ~/.agent-army/configs/${configName}.yaml...`);
   const manifest: ArmyManifest = {
     stackName: configName,
     provider: basicConfig.provider as "aws" | "hetzner",
@@ -744,6 +748,30 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     agents,
   };
   saveManifest(configName, manifest);
+
+  // Build and save plugin config files
+  // Collect per-agent Linear settings into the openclaw-linear plugin config
+  const linearPluginAgents: Record<string, Record<string, unknown>> = {};
+  for (const agent of agents) {
+    if (agent.plugins?.includes("openclaw-linear")) {
+      const creds = integrationCredentials[agent.role];
+      const agentConfig: Record<string, unknown> = {
+        agentId: agent.name,
+      };
+      if (creds?.linearUserUuid) {
+        agentConfig.linearUserUuid = creds.linearUserUuid;
+      }
+      linearPluginAgents[agent.role] = agentConfig;
+    }
+  }
+
+  if (Object.keys(linearPluginAgents).length > 0) {
+    const pluginConfig: PluginConfigFile = {
+      agents: linearPluginAgents,
+    };
+    savePluginConfig(configName, "openclaw-linear", pluginConfig);
+  }
+
   s.stop("Config saved");
 
   if (opts.deploy) {

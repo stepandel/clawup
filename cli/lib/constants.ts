@@ -128,10 +128,13 @@ export const HETZNER_COST_ESTIMATES: Record<string, number> = {
 };
 
 /** Manifest filename */
-export const MANIFEST_FILE = "agent-army.json";
+export const MANIFEST_FILE = "agent-army.yaml";
 
 /** Config directory under home (~/.agent-army/configs/) */
 export const CONFIG_DIR = ".agent-army/configs";
+
+/** Plugins config subdirectory name */
+export const PLUGINS_DIR = "plugins";
 
 /**
  * Supported model providers with their API key prefixes and available models
