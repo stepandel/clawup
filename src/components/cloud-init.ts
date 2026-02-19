@@ -60,10 +60,10 @@ export interface CloudInitConfig {
   createUbuntuUser?: boolean;
   /** Plugins to install and configure */
   plugins?: PluginInstallConfig[];
-  /** GitHub personal access token for gh CLI auth */
-  githubToken?: string;
-  /** Brave Search API key for web search */
-  braveApiKey?: string;
+  /** Resolved dep entries to install */
+  deps?: { name: string; installScript: string; postInstallScript: string; secrets: Record<string, { envVar: string }> }[];
+  /** Resolved dep secret values merged into additionalSecrets for interpolation */
+  depSecrets?: Record<string, string>;
   /** Whether to enable Tailscale Funnel (public HTTPS) instead of Serve */
   enableFunnel?: boolean;
   /** Public skill slugs to install via `clawhub install` */
@@ -88,44 +88,34 @@ export function generateCloudInit(config: CloudInitConfig): string {
     secretEnvVars: p.secretEnvVars,
   }));
 
+  // Extract braveApiKey from depSecrets for config-generator (special case)
+  const braveApiKey = config.depSecrets?.["BRAVE_API_KEY"];
+
   const configPatchScript = generateConfigPatchScript({
     gatewayPort,
     gatewayToken: config.gatewayToken,
     trustedProxies,
     enableControlUi: true,
     plugins: pluginEntries,
-    braveApiKey: config.braveApiKey,
+    braveApiKey: braveApiKey,
   });
 
-  // GitHub CLI installation (system-level via official apt repo)
-  const ghCliInstallScript = `
-# Install GitHub CLI
-echo "Installing GitHub CLI..."
-type -p curl >/dev/null || apt-get install -y curl
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-apt-get update
-apt-get install -y gh
-echo "GitHub CLI installed: $(gh --version | head -n1)"
-`;
+  // Dynamic dep installation scripts (runs as root)
+  const depInstallScript = (config.deps ?? [])
+    .filter(d => d.installScript)
+    .map(d => d.installScript)
+    .join("\n");
 
-  // GitHub CLI authentication (only if token provided)
-  const ghAuthScript = config.githubToken
-    ? `
-# Authenticate GitHub CLI for ubuntu user
-echo "Authenticating GitHub CLI..."
-sudo -u ubuntu bash << 'GH_AUTH_SCRIPT'
-if echo "\${GITHUB_TOKEN}" | gh auth login --with-token 2>&1; then
-  gh auth setup-git
-  echo "✅ GitHub CLI authenticated successfully"
-else
-  echo "⚠️  GitHub CLI authentication failed (token may need additional scopes like 'read:org')"
-  echo "   You can authenticate manually later with: gh auth login"
-fi
-GH_AUTH_SCRIPT
-`
-    : "";
+  // Dynamic dep post-install scripts (runs as ubuntu user)
+  const depPostInstallScript = (config.deps ?? [])
+    .filter(d => d.postInstallScript)
+    .map(d => `
+# Post-install: ${d.name}
+sudo -u ubuntu bash << 'DEP_POST_INSTALL'
+${d.postInstallScript}
+DEP_POST_INSTALL
+`)
+    .join("\n");
 
   // Claude Code CLI installation script
   const codingClisInstallScript = generateClaudeCodeInstallScript(config.model);
@@ -265,7 +255,7 @@ systemctl enable docker
 systemctl start docker
 ${createUserSection}
 usermod -aG docker ubuntu
-${ghCliInstallScript}
+${depInstallScript}
 
 # Install NVM and Node.js for ubuntu user
 echo "Installing Node.js $NODE_VERSION via NVM..."
@@ -310,10 +300,12 @@ ${(config.plugins ?? [])
     .flatMap((p) => Object.values(p.secretEnvVars ?? {}))
     .map((envVar) => `\\\${${envVar}:+echo 'export ${envVar}="\\\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
     .join("\n")}
-\${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
-\${BRAVE_API_KEY:+echo 'export BRAVE_API_KEY="\${BRAVE_API_KEY}"' >> /home/ubuntu/.bashrc}
+${(config.deps ?? [])
+    .flatMap(d => Object.values(d.secrets).map(s => s.envVar))
+    .map(envVar => `\\\${${envVar}:+echo 'export ${envVar}="\\\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
+    .join("\n")}
 ${additionalEnvVars}
-${tailscaleSection}${ghAuthScript}
+${tailscaleSection}${depPostInstallScript}
 ${codingClisInstallScript}
 
 # Enable systemd linger for ubuntu user (required for user services to run at boot)
@@ -355,7 +347,7 @@ echo "Configuring OpenClaw gateway..."
 sudo -H -u ubuntu \\
   GATEWAY_TOKEN="\${GATEWAY_TOKEN}" \\
   ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}" \\
-  BRAVE_API_KEY="\${BRAVE_API_KEY:-}" \\
+  BRAVE_API_KEY="${braveApiKey ?? ""}" \\
   AGENT_NAME="${config.envVars?.AGENT_NAME ?? ""}" \\
   AGENT_EMOJI="${config.envVars?.AGENT_EMOJI ?? ""}"${pluginSecretEnvLine} \\
   python3 << 'PYTHON_SCRIPT'
@@ -436,9 +428,7 @@ export function interpolateCloudInit(
     anthropicApiKey: string;
     tailscaleAuthKey: string;
     gatewayToken: string;
-    githubToken?: string;
-    braveApiKey?: string;
-    /** Additional secret env vars from plugins: { envVarName: value } */
+    /** Additional secret env vars from plugins and deps: { envVarName: value } */
     additionalSecrets?: Record<string, string>;
   }
 ): string {
@@ -447,13 +437,7 @@ export function interpolateCloudInit(
     .replace(/\${TAILSCALE_AUTH_KEY}/g, values.tailscaleAuthKey)
     .replace(/\${GATEWAY_TOKEN}/g, values.gatewayToken);
 
-  // Optional tokens - replace with empty string if not provided
-  result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
-  result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
-  result = result.replace(/\${BRAVE_API_KEY:-}/g, values.braveApiKey ?? "");
-  result = result.replace(/\${BRAVE_API_KEY}/g, values.braveApiKey ?? "");
-
-  // Plugin-declared secret env vars (includes Slack tokens, Linear keys, etc.)
+  // Plugin and dep secret env vars (includes Slack tokens, Linear keys, GitHub token, etc.)
   if (values.additionalSecrets) {
     for (const [envVar, value] of Object.entries(values.additionalSecrets)) {
       const escaped = value.replace(/\$/g, "$$$$");

@@ -22,6 +22,7 @@ import { fetchIdentitySync } from "./cli/lib/identity";
 import { PRESET_TO_IDENTITY } from "./cli/lib/constants";
 import { classifySkills } from "./cli/lib/skills";
 import { PLUGIN_REGISTRY } from "./cli/lib/plugin-registry";
+import { resolveDeps, collectDepSecrets } from "./cli/lib/deps";
 import * as os from "os";
 
 // -----------------------------------------------------------------------------
@@ -46,6 +47,8 @@ interface ManifestAgent {
   envVars?: Record<string, string>;
   /** Plugin names to install on this agent */
   plugins?: string[];
+  /** Dep names for this agent (e.g., ["gh", "brave-search"]) */
+  deps?: string[];
 }
 
 interface Manifest {
@@ -84,22 +87,10 @@ const workingHours = config.get("workingHours") ?? "9am-6pm";
 const userNotes = config.get("userNotes") ?? "No additional notes provided yet.";
 const linearTeam = config.get("linearTeam") ?? "";
 const githubRepo = config.get("githubRepo") ?? "";
-const braveApiKey = config.getSecret("braveApiKey");
 
 // Identity cache directory
 const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
 
-const agentGithubCredentials: Record<string, pulumi.Output<string> | undefined> = {};
-
-// Common roles to check for GitHub credentials
-// Note: custom roles are handled below after manifest is loaded
-const commonRoles = ["pm", "eng", "tester"];
-for (const role of commonRoles) {
-  const githubToken = config.getSecret(`${role}GithubToken`);
-  if (githubToken) {
-    agentGithubCredentials[role] = githubToken;
-  }
-}
 
 /**
  * Process template placeholders in workspace files
@@ -152,14 +143,6 @@ if (fs.existsSync(pluginConfigsDir)) {
         pulumi.log.warn(`Failed to load plugin config '${pluginName}': ${err instanceof Error ? err.message : String(err)}`);
       }
     }
-  }
-}
-
-// Load GitHub credentials for any custom roles not in commonRoles
-for (const agent of manifest.agents) {
-  if (!commonRoles.includes(agent.role)) {
-    const githubToken = config.getSecret(`${agent.role}GithubToken`);
-    if (githubToken) agentGithubCredentials[agent.role] = githubToken;
   }
 }
 
@@ -356,9 +339,10 @@ for (const agent of manifest.agents) {
     GITHUB_REPO: githubRepo,
   };
 
-  // Track identity plugin info for merging later
+  // Track identity plugin/dep info for merging later
   let identityPluginDefaults: Record<string, Record<string, unknown>> | undefined;
   let identityPlugins: string[] | undefined;
+  let identityDeps: string[] | undefined;
 
   // Resolve identity source: explicit identity, legacy preset mapping, or custom
   const identitySource = agent.identity ?? (agent.preset ? PRESET_TO_IDENTITY[agent.preset] : undefined);
@@ -378,6 +362,7 @@ for (const agent of manifest.agents) {
     // Capture identity plugin info for merging into plugin config
     identityPluginDefaults = identity.manifest.pluginDefaults;
     identityPlugins = identity.manifest.plugins;
+    identityDeps = identity.manifest.deps;
 
     // Extract public (clawhub) skills from identity manifest
     const { public: publicSkills } = classifySkills(identity.manifest.skills);
@@ -392,8 +377,29 @@ for (const agent of manifest.agents) {
   // Build plugin configs for this agent (merge identity defaults if available)
   const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identityPluginDefaults, identityPlugins);
 
-  // Get per-agent GitHub credentials if available
-  const githubToken = agentGithubCredentials[agent.role];
+  // Resolve deps: agent manifest overrides identity defaults
+  const depNames = agent.deps ?? identityDeps ?? [];
+  const resolvedDeps = resolveDeps(depNames);
+  const depEntries = resolvedDeps.map(d => ({
+    name: d.name,
+    installScript: d.entry.installScript,
+    postInstallScript: d.entry.postInstallScript,
+    secrets: Object.fromEntries(
+      Object.entries(d.entry.secrets).map(([k, v]) => [k, { envVar: v.envVar }])
+    ),
+  }));
+
+  // Collect dep secrets from Pulumi config (scope-aware)
+  const depSecretDefs = collectDepSecrets(resolvedDeps);
+  const depSecrets: Record<string, pulumi.Output<string>> = {};
+  for (const def of depSecretDefs) {
+    const secret = def.scope === "agent"
+      ? config.getSecret(`${agent.role}${def.configKeySuffix}`)
+      : config.getSecret(`${def.configKeySuffix.charAt(0).toLowerCase()}${def.configKeySuffix.slice(1)}`);
+    if (secret) {
+      depSecrets[def.envVar] = secret;
+    }
+  }
 
   if (provider === "aws") {
     // AWS path: create OpenClawAgent with VPC args
@@ -429,11 +435,9 @@ for (const agent of manifest.agents) {
       // Public skills from clawhub
       clawhubSkills: clawhubSkillSlugs,
 
-      // GitHub token (optional)
-      githubToken,
-
-      // Brave Search API key (optional, shared)
-      braveApiKey,
+      // Deps
+      deps: depEntries,
+      depSecrets,
 
       tags: {
         ...baseTags,
@@ -478,11 +482,9 @@ for (const agent of manifest.agents) {
       // Public skills from clawhub
       clawhubSkills: clawhubSkillSlugs,
 
-      // GitHub token (optional)
-      githubToken,
-
-      // Brave Search API key (optional, shared)
-      braveApiKey,
+      // Deps
+      deps: depEntries,
+      depSecrets,
 
       labels: {
         ...baseTags,

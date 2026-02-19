@@ -17,6 +17,7 @@ import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import type { AgentDefinition } from "../types";
 import { fetchIdentitySync } from "../lib/identity";
 import { classifySkills } from "../lib/skills";
+import { resolveDeps } from "../lib/deps";
 import * as os from "os";
 import pc from "picocolors";
 
@@ -267,6 +268,22 @@ export const pushTool: ToolImplementation<PushOptions> = async (
             } else {
               console.log(`    ${pc.red("FAIL")}  clawhub skill ${skill.slug}: ${result.output.substring(0, 100)}`);
               allOk = false;
+            }
+          }
+
+          // Run dep post-install scripts (e.g., gh auth)
+          if (identity.manifest.deps?.length) {
+            const resolved = resolveDeps(identity.manifest.deps);
+            for (const dep of resolved) {
+              if (!dep.entry.postInstallScript) continue;
+              const cmd = dep.entry.postInstallScript;
+              const result = sshExec(exec, host, cmd);
+              if (result.ok) {
+                console.log(`    ${pc.green("OK")}  dep post-install: ${dep.name}`);
+              } else {
+                console.log(`    ${pc.red("FAIL")}  dep post-install ${dep.name}: ${result.output.substring(0, 100)}`);
+                allOk = false;
+              }
             }
           }
         }

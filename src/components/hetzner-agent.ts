@@ -100,15 +100,14 @@ export interface HetznerOpenClawAgentArgs {
   pluginSecrets?: Record<string, pulumi.Input<string>>;
 
   /**
-   * GitHub personal access token for gh CLI authentication
-   * Must start with ghp_ or github_pat_
+   * Resolved deps from the dep registry
    */
-  githubToken?: pulumi.Input<string>;
+  deps?: { name: string; installScript: string; postInstallScript: string; secrets: Record<string, { envVar: string }> }[];
 
   /**
-   * Brave Search API key for web search
+   * Dep secret Pulumi outputs: { envVarName: pulumiOutput }
    */
-  braveApiKey?: pulumi.Input<string>;
+  depSecrets?: Record<string, pulumi.Input<string>>;
 
   /**
    * Whether to enable Tailscale Funnel (public HTTPS for webhooks)
@@ -242,13 +241,9 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     const pluginSecretEntries = Object.entries(args.pluginSecrets ?? {});
     const pluginSecretOutputs = pluginSecretEntries.map(([, v]) => pulumi.output(v));
 
-    // Resolve optional tokens to outputs
-    const githubTokenOutput = args.githubToken
-      ? pulumi.output(args.githubToken)
-      : pulumi.output("");
-    const braveApiKeyOutput = args.braveApiKey
-      ? pulumi.output(args.braveApiKey)
-      : pulumi.output("");
+    // Build outputs for dep secrets
+    const depSecretEntries = Object.entries(args.depSecrets ?? {});
+    const depSecretOutputs = depSecretEntries.map(([, v]) => pulumi.output(v));
 
     // Resolve Input<> values for cloud-init config
     const gatewayPortResolved = pulumi.output(args.gatewayPort ?? 18789);
@@ -262,18 +257,15 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
         args.tailscaleAuthKey,
         args.anthropicApiKey,
         gatewayTokenValue,
-        githubTokenOutput,
-        braveApiKeyOutput,
         ...pluginSecretOutputs,
+        ...depSecretOutputs,
       ])
       .apply(
         ([
           tsAuthKey,
           apiKey,
           gwToken,
-          githubToken,
-          braveApiKey,
-          ...pluginSecretValues
+          ...secretValues
         ]) =>
           pulumi
             .all([gatewayPortResolved, browserPortResolved, modelResolved, enableSandboxResolved])
@@ -281,10 +273,13 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
               // Include stack name in Tailscale hostname to avoid conflicts across deployments
               const tsHostname = `${pulumi.getStack()}-${name}`;
 
-              // Build additional secrets map from plugin secrets
+              // Build additional secrets map from plugin secrets + dep secrets
               const additionalSecrets: Record<string, string> = {};
               pluginSecretEntries.forEach(([envVar], idx) => {
-                additionalSecrets[envVar] = pluginSecretValues[idx] as string;
+                additionalSecrets[envVar] = secretValues[idx] as string;
+              });
+              depSecretEntries.forEach(([envVar], idx) => {
+                additionalSecrets[envVar] = secretValues[pluginSecretEntries.length + idx] as string;
               });
 
               const cloudInitConfig: CloudInitConfig = {
@@ -304,10 +299,9 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 plugins: args.plugins,
                 enableFunnel: args.enableFunnel,
                 clawhubSkills: args.clawhubSkills,
-                // GitHub token for gh CLI auth
-                githubToken: githubToken || undefined,
-                // Brave Search API key for web search
-                braveApiKey: braveApiKey || undefined,
+                // Deps
+                deps: args.deps,
+                depSecrets: additionalSecrets,
               };
 
               const script = generateCloudInit(cloudInitConfig);
@@ -315,8 +309,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 anthropicApiKey: apiKey,
                 tailscaleAuthKey: tsAuthKey,
                 gatewayToken: gwToken,
-                githubToken: githubToken || undefined,
-                braveApiKey: braveApiKey || undefined,
                 additionalSecrets,
               });
               // Compress to stay within Hetzner's 32KB user_data limit

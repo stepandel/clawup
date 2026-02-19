@@ -38,6 +38,8 @@ export interface AgentDefinition {
   envVars?: Record<string, string>;
   /** Plugin names to install on this agent (e.g., ["openclaw-linear"]) */
   plugins?: string[];
+  /** Dep names for this agent (e.g., ["gh", "brave-search"]) */
+  deps?: string[];
 }
 
 /** Per-plugin configuration file stored at ~/.agent-army/configs/<stack>/plugins/<plugin>.yaml */
@@ -92,6 +94,8 @@ export interface IdentityManifest {
   skills: string[];
   /** Recommended plugins for this identity (e.g., ["openclaw-linear"]) */
   plugins?: string[];
+  /** Recommended deps for this identity (e.g., ["gh", "brave-search"]) */
+  deps?: string[];
   /** Per-plugin default config (merged with user plugin config at deploy time) */
   pluginDefaults?: Record<string, Record<string, unknown>>;
   /** List of template variable names this identity uses (e.g., ["OWNER_NAME", "TIMEZONE"]) */
