@@ -6,7 +6,7 @@
  * source of truth for the agent fleet configuration.
  *
  * All agents share a single VPC for cost optimization.
- * Each agent loads workspace files from identity repos or presets.
+ * Each agent loads workspace files from identity repos.
  * Secrets are pulled from Pulumi config (set by CLI or ESC).
  * Plugin configs are loaded from ~/.agent-army/configs/<stack>/plugins/.
  */
@@ -118,60 +118,15 @@ for (const role of commonRoles) {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Helper: Load preset workspace files from disk
-// -----------------------------------------------------------------------------
-
-function loadPresetFiles(presetDir: string, baseDir: string = "base"): Record<string, string> {
-  const files: Record<string, string> = {};
-  const presetsPath = path.join(__dirname, "..", "presets");
-
-  // Load base files first
-  const basePath = path.join(presetsPath, baseDir);
-  if (fs.existsSync(basePath)) {
-    for (const filename of fs.readdirSync(basePath)) {
-      const filePath = path.join(basePath, filename);
-      if (fs.statSync(filePath).isFile()) {
-        // Remove .tpl extension if present (template files)
-        const outputName = filename.replace(/\.tpl$/, "");
-        files[outputName] = fs.readFileSync(filePath, "utf-8");
-      }
-    }
-  }
-
-  // Load role-specific files (override base)
-  const rolePath = path.join(presetsPath, presetDir);
-  if (fs.existsSync(rolePath)) {
-    for (const filename of fs.readdirSync(rolePath)) {
-      const filePath = path.join(rolePath, filename);
-      if (fs.statSync(filePath).isFile()) {
-        // Remove .tpl extension if present (template files)
-        const outputName = filename.replace(/\.tpl$/, "");
-        files[outputName] = fs.readFileSync(filePath, "utf-8");
-      }
-    }
-  }
-
-  // Load shared skills from presets/skills/
-  const skillsPath = path.join(presetsPath, "skills");
-  if (fs.existsSync(skillsPath)) {
-    for (const skillDir of fs.readdirSync(skillsPath)) {
-      const skillDirPath = path.join(skillsPath, skillDir);
-      if (fs.statSync(skillDirPath).isDirectory()) {
-        for (const filename of fs.readdirSync(skillDirPath)) {
-          const filePath = path.join(skillDirPath, filename);
-          if (fs.statSync(filePath).isFile()) {
-            // Remove .tpl extension if present (template files)
-            const outputName = filename.replace(/\.tpl$/, "");
-            files[`skills/${skillDir}/${outputName}`] = fs.readFileSync(filePath, "utf-8");
-          }
-        }
-      }
-    }
-  }
-
-  return files;
-}
+/**
+ * Legacy preset → identity path mapping for backward compatibility.
+ * Existing manifests with `preset: "pm"` are converted to identity loading.
+ */
+const PRESET_TO_IDENTITY: Record<string, string> = {
+  pm: "./identities/pm",
+  eng: "./identities/eng",
+  tester: "./identities/tester",
+};
 
 /**
  * Process template placeholders in workspace files
@@ -435,9 +390,12 @@ for (const agent of manifest.agents) {
   let identityPluginDefaults: Record<string, Record<string, unknown>> | undefined;
   let identityPlugins: string[] | undefined;
 
-  if (agent.identity) {
-    // Identity-based agent: fetch from Git URL or local path
-    const identity = fetchIdentitySync(agent.identity, identityCacheDir);
+  // Resolve identity source: explicit identity, legacy preset mapping, or custom
+  const identitySource = agent.identity ?? (agent.preset ? PRESET_TO_IDENTITY[agent.preset] : undefined);
+
+  if (identitySource) {
+    // Identity-based agent (or legacy preset converted to identity)
+    const identity = fetchIdentitySync(identitySource, identityCacheDir);
 
     // Identity files are the workspace files
     workspaceFiles = processTemplates(identity.files, templateVars);
@@ -450,13 +408,9 @@ for (const agent of manifest.agents) {
     // Capture identity plugin info for merging into plugin config
     identityPluginDefaults = identity.manifest.pluginDefaults;
     identityPlugins = identity.manifest.plugins;
-  } else if (agent.preset) {
-    // Preset agent: load from presets directory (backward compat)
-    workspaceFiles = processTemplates(loadPresetFiles(agent.preset), templateVars);
   } else {
-    // Custom agent: load base files + inline content from manifest
-    workspaceFiles = processTemplates(loadPresetFiles("base", "base"), templateVars);
-    // Override base files with custom inline content if provided (deprecated path)
+    // Custom agent with inline content (no identity)
+    workspaceFiles = {};
     if (agent.soulContent) workspaceFiles["SOUL.md"] = agent.soulContent;
     if (agent.identityContent) workspaceFiles["IDENTITY.md"] = agent.identityContent;
   }

@@ -20,9 +20,9 @@ import * as os from "os";
 import pc from "picocolors";
 
 export interface PushOptions {
-  /** Sync presets/skills/ to remote workspace */
+  /** Sync skills to remote workspace */
   skills?: boolean;
-  /** Sync role-specific preset files + base AGENTS.md to remote workspace */
+  /** Sync workspace files to remote agents */
   workspace?: boolean;
   /** Remove remote memory/ dir and MEMORY.md */
   memoryReset?: boolean;
@@ -101,23 +101,13 @@ function scpFile(
 }
 
 /**
- * Resolve the presets directory.
- * Dev mode: repo root is 3 levels up from cli/dist/tools/
- * Installed mode: presets are bundled under cli/presets/ (via infra)
+ * Legacy preset → identity path mapping for backward compatibility.
  */
-function resolvePresetsDir(): string {
-  // From cli/dist/tools/push.js → repo root → presets/
-  const devPath = path.resolve(__dirname, "..", "..", "..", "presets");
-  if (fs.existsSync(devPath)) return devPath;
-
-  // Fallback: check next to the infra dir (installed mode)
-  const installedPath = path.resolve(__dirname, "..", "..", "presets");
-  if (fs.existsSync(installedPath)) return installedPath;
-
-  throw new Error(
-    `Presets directory not found. Searched:\n  ${devPath}\n  ${installedPath}`
-  );
-}
+const PRESET_TO_IDENTITY: Record<string, string> = {
+  pm: "./identities/pm",
+  eng: "./identities/eng",
+  tester: "./identities/tester",
+};
 
 /**
  * Resolve an agent query (name, role, alias, displayName) against the manifest.
@@ -183,14 +173,6 @@ export const pushTool: ToolImplementation<PushOptions> = async (
   const doSkills = options.skills || noFlags;
   const doWorkspace = options.workspace || noFlags;
 
-  // Resolve presets directory
-  let presetsDir: string;
-  try {
-    presetsDir = resolvePresetsDir();
-  } catch (err) {
-    throw new Error((err as Error).message);
-  }
-
   // Determine target agents
   let targetAgents = manifest.agents;
   if (options.agent) {
@@ -230,45 +212,29 @@ export const pushTool: ToolImplementation<PushOptions> = async (
 
     let needsRestart = false;
 
-    // 1. Push preset skills (skip for identity-based agents — their skills are synced in step 2)
-    if (doSkills && !agent.identity) {
-      const skillsDir = path.join(presetsDir, "skills");
-      if (fs.existsSync(skillsDir)) {
-        // Ensure remote skills dir exists
-        sshExec(exec, host, `mkdir -p ${REMOTE_SKILLS}`);
-        const result = rsyncDir(exec, skillsDir, host, REMOTE_SKILLS);
-        if (result.ok) {
-          console.log(`    ${pc.green("OK")}  skills synced`);
-        } else {
-          console.log(`    ${pc.red("FAIL")}  skills sync failed: ${result.output.substring(0, 100)}`);
-          allOk = false;
+    // Resolve identity source (explicit identity or legacy preset mapping)
+    const identitySource = agent.identity ?? (agent.preset ? PRESET_TO_IDENTITY[agent.preset] : undefined);
+
+    // 1. Push workspace files and skills (unified via identity system)
+    if ((doWorkspace || doSkills) && identitySource) {
+      try {
+        const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
+        const identity = fetchIdentitySync(identitySource, identityCacheDir);
+
+        // Ensure remote workspace dir exists
+        sshExec(exec, host, `mkdir -p ${REMOTE_WORKSPACE}`);
+
+        // Write identity files to a temp dir for transfer
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "push-identity-"));
+
+        for (const [relPath, content] of Object.entries(identity.files)) {
+          const localFile = path.join(tmpDir, relPath);
+          fs.mkdirSync(path.dirname(localFile), { recursive: true });
+          fs.writeFileSync(localFile, content);
         }
-      } else {
-        console.log(`    ${pc.yellow("SKIP")}  no skills directory found at ${skillsDir}`);
-      }
-    }
 
-    // 2. Push workspace files (role-specific preset, identity, or custom)
-    if (doWorkspace) {
-      if (agent.identity) {
-        // Identity-based agent: fetch from identity source and sync files
-        try {
-          const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
-          const identity = fetchIdentitySync(agent.identity, identityCacheDir);
-
-          // Ensure remote workspace dir exists
-          sshExec(exec, host, `mkdir -p ${REMOTE_WORKSPACE}`);
-
-          // Write identity files to a temp dir for transfer
-          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "push-identity-"));
-
-          for (const [relPath, content] of Object.entries(identity.files)) {
-            const localFile = path.join(tmpDir, relPath);
-            fs.mkdirSync(path.dirname(localFile), { recursive: true });
-            fs.writeFileSync(localFile, content);
-          }
-
-          // Sync workspace files (non-skill files)
+        // Sync workspace files (non-skill files)
+        if (doWorkspace) {
           const topFiles = Object.keys(identity.files).filter(f => !f.startsWith("skills/"));
           let wsOk = true;
           for (const relPath of topFiles) {
@@ -281,74 +247,33 @@ export const pushTool: ToolImplementation<PushOptions> = async (
             }
           }
           if (wsOk) {
-            console.log(`    ${pc.green("OK")}  workspace files synced (${topFiles.length} files from identity)`);
+            console.log(`    ${pc.green("OK")}  workspace files synced (${topFiles.length} files)`);
           }
-
-          // Sync identity skills if --skills flag
-          if (doSkills) {
-            const skillsLocalDir = path.join(tmpDir, "skills");
-            if (fs.existsSync(skillsLocalDir)) {
-              sshExec(exec, host, `mkdir -p ${REMOTE_SKILLS}`);
-              const result = rsyncDir(exec, skillsLocalDir, host, REMOTE_SKILLS);
-              if (result.ok) {
-                console.log(`    ${pc.green("OK")}  identity skills synced`);
-              } else {
-                console.log(`    ${pc.red("FAIL")}  identity skills sync failed: ${result.output.substring(0, 100)}`);
-                allOk = false;
-              }
-            }
-          }
-
-          // Cleanup temp dir
-          fs.rmSync(tmpDir, { recursive: true, force: true });
-        } catch (err) {
-          console.log(`    ${pc.red("FAIL")}  identity fetch failed: ${(err as Error).message}`);
-          allOk = false;
         }
-      } else if (agent.preset) {
-        const presetName = agent.preset;
-        const roleDir = path.join(presetsDir, presetName);
-        if (fs.existsSync(roleDir)) {
-          // Ensure remote workspace dir exists
-          sshExec(exec, host, `mkdir -p ${REMOTE_WORKSPACE}`);
 
-          // Sync role-specific files (SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md, etc.)
-          const roleFiles = fs.readdirSync(roleDir).filter(
-            (f) => fs.statSync(path.join(roleDir, f)).isFile()
-          );
-          let wsOk = true;
-          for (const file of roleFiles) {
-            const localFile = path.join(roleDir, file);
-            // Remove .tpl extension for remote name
-            const remoteName = file.replace(/\.tpl$/, "");
-            const result = scpFile(exec, localFile, host, `${REMOTE_WORKSPACE}/${remoteName}`);
-            if (!result.ok) {
-              console.log(`    ${pc.red("FAIL")}  workspace file ${file}: ${result.output.substring(0, 100)}`);
-              wsOk = false;
+        // Sync skills
+        if (doSkills) {
+          const skillsLocalDir = path.join(tmpDir, "skills");
+          if (fs.existsSync(skillsLocalDir)) {
+            sshExec(exec, host, `mkdir -p ${REMOTE_SKILLS}`);
+            const result = rsyncDir(exec, skillsLocalDir, host, REMOTE_SKILLS);
+            if (result.ok) {
+              console.log(`    ${pc.green("OK")}  skills synced`);
+            } else {
+              console.log(`    ${pc.red("FAIL")}  skills sync failed: ${result.output.substring(0, 100)}`);
               allOk = false;
             }
           }
-          if (wsOk) {
-            console.log(`    ${pc.green("OK")}  workspace files synced (${roleFiles.length} files from ${presetName}/)`);
-          }
-        } else {
-          console.log(`    ${pc.yellow("SKIP")}  preset directory not found: ${roleDir}`);
         }
 
-        // Sync base AGENTS.md
-        const agentsMd = path.join(presetsDir, "base", "AGENTS.md");
-        if (fs.existsSync(agentsMd)) {
-          const result = scpFile(exec, agentsMd, host, `${REMOTE_WORKSPACE}/AGENTS.md`);
-          if (result.ok) {
-            console.log(`    ${pc.green("OK")}  AGENTS.md synced`);
-          } else {
-            console.log(`    ${pc.red("FAIL")}  AGENTS.md sync failed: ${result.output.substring(0, 100)}`);
-            allOk = false;
-          }
-        }
-      } else {
-        console.log(`    ${pc.yellow("SKIP")}  no preset or identity defined for ${agent.displayName} (custom agent)`);
+        // Cleanup temp dir
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch (err) {
+        console.log(`    ${pc.red("FAIL")}  identity fetch failed: ${(err as Error).message}`);
+        allOk = false;
       }
+    } else if ((doWorkspace || doSkills) && !identitySource) {
+      console.log(`    ${pc.yellow("SKIP")}  no identity defined for ${agent.displayName} (custom agent)`);
     }
 
     // 3. Memory reset

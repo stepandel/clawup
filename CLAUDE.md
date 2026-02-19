@@ -25,12 +25,10 @@ agent-army/
 │       ├── app/            # App router pages & API routes
 │       ├── components/     # React components (shadcn/ui)
 │       └── lib/            # Server utilities (prisma, auth, crypto)
-├── presets/                # Agent role definitions
-│   ├── base/               # Shared workspace files (AGENTS.md, BOOTSTRAP.md)
-│   ├── pm/                 # Juno - Product Manager
+├── identities/             # Built-in agent identities (self-contained)
+│   ├── pm/                 # Juno - Product Manager (identity.yaml + workspace files + skills)
 │   ├── eng/                # Titus - Engineer
-│   ├── tester/             # Scout - QA
-│   └── skills/             # Reusable agent skills
+│   └── tester/             # Scout - QA
 ├── index.ts                # Main Pulumi stack program
 ├── shared-vpc.ts           # AWS VPC component
 └── docs/                   # Mintlify documentation
@@ -42,7 +40,7 @@ agent-army/
 The manifest is the source of truth for deployments. Created by `agent-army init`, it defines:
 - Stack name, cloud provider, region, instance type
 - Owner info (name, timezone, working hours)
-- Agent definitions (preset, identity, or custom)
+- Agent definitions (identity-based or custom)
 - Per-agent plugin list (e.g., `plugins: [openclaw-linear]`)
 
 Plugin configs are stored separately at `~/.agent-army/configs/<stack>/plugins/<plugin>.yaml`.
@@ -110,7 +108,7 @@ pnpm build             # Production build
 | File | Purpose |
 |------|---------|
 | `cli/commands/init.ts` | Interactive setup wizard (largest command) |
-| `cli/lib/constants.ts` | Presets, regions, instance types, key instructions |
+| `cli/lib/constants.ts` | Built-in identities, regions, instance types, key instructions |
 | `cli/lib/config.ts` | Load/save YAML manifests and plugin configs |
 | `src/components/cloud-init.ts` | Cloud-init script generation (dynamic plugin support) |
 | `src/components/config-generator.ts` | OpenClaw config builder (dynamic plugin entries) |
@@ -131,10 +129,12 @@ Currently minimal test coverage. When adding tests:
 
 ## Common Tasks
 
-### Adding a New Preset Agent
-1. Create directory in `presets/<role>/`
-2. Add SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md
-3. Register in `cli/lib/constants.ts` PRESETS object
+### Adding a New Built-in Agent Identity
+1. Create directory in `identities/<role>/`
+2. Add identity.yaml with name, role, plugins, pluginDefaults, skills, templateVars
+3. Add workspace files: SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md, AGENTS.md, BOOTSTRAP.md, USER.md
+4. Add skills under `skills/<skill-name>/SKILL.md`
+5. Register in `cli/lib/constants.ts` BUILT_IN_IDENTITIES
 
 ### Adding a New CLI Command
 1. Create `cli/commands/<name>.ts`

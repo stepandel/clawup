@@ -2,43 +2,35 @@
  * Constants, preset definitions, aliases, and defaults
  */
 
-/** Available preset agents */
-export const PRESETS = {
+/**
+ * Built-in agent identities.
+ * Each entry points to a self-contained identity directory under `identities/`.
+ * The identity.yaml inside provides displayName, role, volumeSize, plugins, etc.
+ */
+export const BUILT_IN_IDENTITIES: Record<string, { path: string; label: string; hint: string }> = {
   pm: {
-    name: "agent-pm",
-    displayName: "Juno",
-    emoji: "clipboard",
-    role: "pm",
-    preset: "pm" as const,
-    volumeSize: 30,
-    description: "Break down tickets, research, plan and sequence work, track progress, unblock teams",
+    path: "./identities/pm",
+    label: "Juno (PM)",
+    hint: "Break down tickets, research, plan and sequence work, track progress, unblock teams",
   },
   eng: {
-    name: "agent-eng",
-    displayName: "Titus",
-    emoji: "building_construction",
-    role: "eng",
-    preset: "eng" as const,
-    volumeSize: 50,
-    description: "Lead engineering, coding, shipping",
+    path: "./identities/eng",
+    label: "Titus (Engineer)",
+    hint: "Lead engineering, coding, shipping",
   },
   tester: {
-    name: "agent-tester",
-    displayName: "Scout",
-    emoji: "mag",
-    role: "tester",
-    preset: "tester" as const,
-    volumeSize: 30,
-    description: "Quality assurance, verification, bug hunting",
+    path: "./identities/tester",
+    label: "Scout (QA)",
+    hint: "Quality assurance, verification, bug hunting",
   },
-} as const;
+};
 
 /**
- * Built-in identity paths for each preset role.
- * These point to the `identities/` directory in the agent-army repo,
- * which can also be referenced as a Git URL for remote deployments.
+ * Map legacy preset names to identity paths for backward compatibility.
+ * Existing manifests with `preset: "pm"` are converted to identity-based loading at runtime.
+ * @deprecated Use BUILT_IN_IDENTITIES instead.
  */
-export const PRESET_IDENTITY_PATHS: Record<string, string> = {
+export const PRESET_TO_IDENTITY: Record<string, string> = {
   pm: "./identities/pm",
   eng: "./identities/eng",
   tester: "./identities/tester",

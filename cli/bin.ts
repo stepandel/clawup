@@ -89,8 +89,8 @@ program
 program
   .command("push")
   .description("Push workspace files, skills, and config to running agents")
-  .option("--skills", "Sync presets/skills/ to remote workspace")
-  .option("--workspace", "Sync role-specific preset files + base AGENTS.md")
+  .option("--skills", "Sync skills to remote workspace")
+  .option("--workspace", "Sync workspace files from identity")
   .option("--memory-reset", "Remove remote memory/ dir and MEMORY.md")
   .option("--openclaw", "Upgrade openclaw to latest + restart gateway")
   .option("--config-push", "Copy local openclaw.json to remote + restart gateway")

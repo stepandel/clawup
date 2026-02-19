@@ -9,7 +9,7 @@ import { fetchIdentity } from "../lib/identity";
 import * as os from "os";
 import * as path from "path";
 import {
-  PRESETS,
+  BUILT_IN_IDENTITIES,
   PROVIDERS,
   AWS_REGIONS,
   HETZNER_LOCATIONS,
@@ -256,10 +256,10 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   const agentMode = await p.select({
     message: "How would you like to configure agents?",
     options: [
-      { value: "presets", label: "Presets only", hint: "PM (Juno), Eng (Titus), Tester (Scout)" },
+      { value: "built-in", label: "Built-in agents", hint: "PM (Juno), Eng (Titus), QA (Scout)" },
       { value: "identity", label: "From identity repo", hint: "Load agent personas from a Git URL or local path" },
       { value: "custom", label: "Custom only", hint: "Define your own agents" },
-      { value: "mix", label: "Mix of both", hint: "Pick presets + add custom agents" },
+      { value: "mix", label: "Mix of both", hint: "Pick built-in + add custom agents" },
     ],
   });
   handleCancel(agentMode);
@@ -267,37 +267,43 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   const agents: AgentDefinition[] = [];
   // Track identity pluginDefaults per role for seeding plugin config files
   const identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>> = {};
+  const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
 
-  // Collect preset agents
-  if (agentMode === "presets" || agentMode === "mix") {
-    const selectedPresets = await p.multiselect({
-      message: "Select preset agents",
-      options: Object.entries(PRESETS).map(([key, preset]) => ({
+  // Collect built-in agents (loaded via identity system)
+  if (agentMode === "built-in" || agentMode === "mix") {
+    const selectedBuiltIns = await p.multiselect({
+      message: "Select agents",
+      options: Object.entries(BUILT_IN_IDENTITIES).map(([key, entry]) => ({
         value: key,
-        label: `${preset.displayName} (${preset.role})`,
-        hint: preset.description,
+        label: entry.label,
+        hint: entry.hint,
       })),
-      required: agentMode === "presets",
+      required: agentMode === "built-in",
     });
-    handleCancel(selectedPresets);
+    handleCancel(selectedBuiltIns);
 
-    for (const key of selectedPresets as string[]) {
-      const preset = PRESETS[key as keyof typeof PRESETS];
+    for (const key of selectedBuiltIns as string[]) {
+      const entry = BUILT_IN_IDENTITIES[key];
+      const identity = await fetchIdentity(entry.path, identityCacheDir);
       agents.push({
-        name: preset.name,
-        displayName: preset.displayName,
-        role: preset.role,
-        preset: preset.preset,
-        volumeSize: preset.volumeSize,
-        plugins: ["openclaw-linear"],
+        name: `agent-${identity.manifest.name}`,
+        displayName: identity.manifest.displayName,
+        role: identity.manifest.role,
+        preset: null,
+        identity: entry.path,
+        volumeSize: identity.manifest.volumeSize,
+        plugins: identity.manifest.plugins ?? ["openclaw-linear"],
       });
+
+      if (identity.manifest.pluginDefaults) {
+        identityPluginDefaults[identity.manifest.role] = identity.manifest.pluginDefaults;
+      }
     }
   }
 
   // Collect identity-based agents
   if (agentMode === "identity" || agentMode === "mix") {
     let addMore = true;
-    const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
 
     while (addMore) {
       const identityUrl = await p.text({
