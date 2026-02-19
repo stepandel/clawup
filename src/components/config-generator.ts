@@ -3,13 +3,6 @@
  * Builds the openclaw.json configuration file content
  */
 
-export interface SlackConfigOptions {
-  /** Slack bot token (xoxb-...) */
-  botToken: string;
-  /** Slack app token for Socket Mode (xapp-...) */
-  appToken: string;
-}
-
 /**
  * A single plugin entry for the OpenClaw config.
  * Used to dynamically generate Python config-patch code for each plugin.
@@ -47,8 +40,6 @@ export interface OpenClawConfigOptions {
   workspaceFiles?: Record<string, string>;
   /** Custom configuration overrides */
   customConfig?: Record<string, unknown>;
-  /** Slack configuration */
-  slack?: SlackConfigOptions;
   /** Dynamic plugin configurations */
   plugins?: PluginEntry[];
   /** Brave Search API key for web search */
@@ -140,8 +131,15 @@ export function generateOpenClawConfigJson(options: OpenClawConfigOptions): stri
 /**
  * Generates Python code to configure a single plugin in openclaw.json.
  * Secrets are injected from environment variables.
+ *
+ * Slack is special-cased: it writes to config["channels"]["slack"] (channel config)
+ * AND config["plugins"]["entries"]["slack"] (plugin entry).
  */
 function generatePluginPython(plugin: PluginEntry): string {
+  if (plugin.name === "slack") {
+    return generateSlackPluginPython(plugin);
+  }
+
   // Build the config dict, injecting secrets from env vars
   const configEntries: string[] = [];
 
@@ -176,6 +174,47 @@ print("Configured ${plugin.name} plugin")
 }
 
 /**
+ * Generates Python code for Slack channel + plugin configuration.
+ * Slack writes to config["channels"]["slack"] with secrets from env vars
+ * and non-secret config from plugin defaults, plus enables the plugin entry.
+ */
+function generateSlackPluginPython(plugin: PluginEntry): string {
+  // Build channel config entries from non-secret plugin config
+  const channelEntries: string[] = [];
+
+  // Secret env var values (botToken, appToken)
+  if (plugin.secretEnvVars) {
+    for (const [configKey, envVar] of Object.entries(plugin.secretEnvVars)) {
+      channelEntries.push(`    "${configKey}": os.environ.get("${envVar}", "")`);
+    }
+  }
+
+  // Non-secret config values (mode, userTokenReadOnly, groupPolicy, dm, etc.)
+  for (const [key, value] of Object.entries(plugin.config)) {
+    channelEntries.push(`    "${key}": ${JSON.stringify(value)}`);
+  }
+
+  // Add enabled: True
+  channelEntries.push(`    "enabled": True`);
+
+  const channelBlock = channelEntries.length > 0
+    ? `{
+${channelEntries.join(",\n")}
+}`
+    : "{}";
+
+  return `
+# Configure Slack channel (Socket Mode) and plugin
+config.setdefault("channels", {})
+config["channels"]["slack"] = ${channelBlock}
+config.setdefault("plugins", {})
+config["plugins"].setdefault("entries", {})
+config["plugins"]["entries"]["slack"] = {"enabled": ${plugin.enabled ? "True" : "False"}}
+print("Configured Slack channel with Socket Mode")
+`;
+}
+
+/**
  * Generates Python script for modifying existing openclaw.json
  * Used in cloud-init after onboarding creates the initial config
  */
@@ -184,33 +223,6 @@ export function generateConfigPatchScript(options: OpenClawConfigOptions): strin
     trustedProxies: options.trustedProxies ?? ["127.0.0.1"],
     enableControlUi: options.enableControlUi ?? true,
   };
-
-  // Build Slack channel config section if credentials provided
-  const slackChannelConfig = options.slack
-    ? `
-# Configure Slack channel (Socket Mode)
-config.setdefault("channels", {})
-config["channels"]["slack"] = {
-    "mode": "socket",
-    "enabled": True,
-    "botToken": os.environ.get("SLACK_BOT_TOKEN", ""),
-    "appToken": os.environ.get("SLACK_APP_TOKEN", ""),
-    "userTokenReadOnly": True,
-    "groupPolicy": "open",
-    "dm": {
-        "enabled": True,
-        "policy": "open",
-        "allowFrom": ["*"]
-    }
-}
-
-# Enable Slack plugin
-config.setdefault("plugins", {})
-config["plugins"].setdefault("entries", {})
-config["plugins"]["entries"]["slack"] = {"enabled": True}
-print("Configured Slack channel with Socket Mode")
-`
-    : "";
 
   // Build dynamic plugin config sections
   const pluginConfigs = (options.plugins ?? [])
@@ -261,7 +273,7 @@ config["agents"]["defaults"]["heartbeat"] = {
     "session": "main"
 }
 print("Configured heartbeat: every 1m")
-${slackChannelConfig}${pluginConfigs}
+${pluginConfigs}
 # Configure agent identity for Slack mentions/tags
 agent_name = os.environ.get("AGENT_NAME", "")
 agent_emoji = os.environ.get("AGENT_EMOJI", "")

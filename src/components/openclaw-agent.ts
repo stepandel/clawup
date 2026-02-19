@@ -103,16 +103,6 @@ export interface OpenClawAgentArgs {
   region?: pulumi.Input<string>;
 
   /**
-   * Slack bot token (xoxb-...) for Socket Mode
-   */
-  slackBotToken?: pulumi.Input<string>;
-
-  /**
-   * Slack app token (xapp-...) for Socket Mode
-   */
-  slackAppToken?: pulumi.Input<string>;
-
-  /**
    * Plugins to install and configure on this agent
    */
   plugins?: PluginInstallConfig[];
@@ -427,12 +417,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     const pluginSecretOutputs = pluginSecretEntries.map(([, v]) => pulumi.output(v));
 
     // Resolve optional tokens to outputs
-    const slackBotTokenOutput = args.slackBotToken
-      ? pulumi.output(args.slackBotToken)
-      : pulumi.output("");
-    const slackAppTokenOutput = args.slackAppToken
-      ? pulumi.output(args.slackAppToken)
-      : pulumi.output("");
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
@@ -445,8 +429,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       args.tailscaleAuthKey,
       args.anthropicApiKey,
       gatewayTokenValue,
-      slackBotTokenOutput,
-      slackAppTokenOutput,
       githubTokenOutput,
       braveApiKeyOutput,
       ...pluginSecretOutputs,
@@ -454,8 +436,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       tsAuthKey,
       apiKey,
       gwToken,
-      slackBotToken,
-      slackAppToken,
       githubToken,
       braveApiKey,
       ...pluginSecretValues
@@ -481,10 +461,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           workspaceFiles: args.workspaceFiles,
           envVars: args.envVars,
           postSetupCommands: args.postSetupCommands,
-          // Slack config (only if both tokens provided)
-          slack: slackBotToken && slackAppToken
-            ? { botToken: slackBotToken, appToken: slackAppToken }
-            : undefined,
           // Plugins
           plugins: args.plugins,
           enableFunnel: args.enableFunnel,
@@ -499,8 +475,6 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           anthropicApiKey: apiKey,
           tailscaleAuthKey: tsAuthKey,
           gatewayToken: gwToken,
-          slackBotToken: slackBotToken || undefined,
-          slackAppToken: slackAppToken || undefined,
           githubToken: githubToken || undefined,
           braveApiKey: braveApiKey || undefined,
           additionalSecrets,

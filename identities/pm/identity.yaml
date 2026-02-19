@@ -7,6 +7,7 @@ volumeSize: 30
 
 plugins:
   - openclaw-linear
+  - slack
 
 pluginDefaults:
   openclaw-linear:
@@ -17,6 +18,15 @@ pluginDefaults:
       started: remove
       completed: remove
       cancelled: remove
+  slack:
+    mode: socket
+    userTokenReadOnly: true
+    groupPolicy: open
+    dm:
+      enabled: true
+      policy: open
+      allowFrom:
+        - "*"
 
 skills:
   - linear-ticket-prep

@@ -90,16 +90,6 @@ export interface HetznerOpenClawAgentArgs {
   postSetupCommands?: string[];
 
   /**
-   * Slack bot token (xoxb-...) for Socket Mode
-   */
-  slackBotToken?: pulumi.Input<string>;
-
-  /**
-   * Slack app token (xapp-...) for Socket Mode
-   */
-  slackAppToken?: pulumi.Input<string>;
-
-  /**
    * Plugins to install and configure on this agent
    */
   plugins?: PluginInstallConfig[];
@@ -248,12 +238,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     const pluginSecretOutputs = pluginSecretEntries.map(([, v]) => pulumi.output(v));
 
     // Resolve optional tokens to outputs
-    const slackBotTokenOutput = args.slackBotToken
-      ? pulumi.output(args.slackBotToken)
-      : pulumi.output("");
-    const slackAppTokenOutput = args.slackAppToken
-      ? pulumi.output(args.slackAppToken)
-      : pulumi.output("");
     const githubTokenOutput = args.githubToken
       ? pulumi.output(args.githubToken)
       : pulumi.output("");
@@ -273,8 +257,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
         args.tailscaleAuthKey,
         args.anthropicApiKey,
         gatewayTokenValue,
-        slackBotTokenOutput,
-        slackAppTokenOutput,
         githubTokenOutput,
         braveApiKeyOutput,
         ...pluginSecretOutputs,
@@ -284,8 +266,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
           tsAuthKey,
           apiKey,
           gwToken,
-          slackBotToken,
-          slackAppToken,
           githubToken,
           braveApiKey,
           ...pluginSecretValues
@@ -315,11 +295,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 envVars: args.envVars,
                 postSetupCommands: args.postSetupCommands,
                 createUbuntuUser: true, // Hetzner images don't have ubuntu user by default
-                // Slack config (only if both tokens provided)
-                slack:
-                  slackBotToken && slackAppToken
-                    ? { botToken: slackBotToken, appToken: slackAppToken }
-                    : undefined,
                 // Plugins
                 plugins: args.plugins,
                 enableFunnel: args.enableFunnel,
@@ -334,8 +309,6 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 anthropicApiKey: apiKey,
                 tailscaleAuthKey: tsAuthKey,
                 gatewayToken: gwToken,
-                slackBotToken: slackBotToken || undefined,
-                slackAppToken: slackAppToken || undefined,
                 githubToken: githubToken || undefined,
                 braveApiKey: braveApiKey || undefined,
                 additionalSecrets,

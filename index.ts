@@ -19,6 +19,7 @@ import YAML from "yaml";
 import { OpenClawAgent, HetznerOpenClawAgent, PluginInstallConfig } from "./src";
 import { SharedVpc } from "./shared-vpc";
 import { fetchIdentitySync } from "./cli/lib/identity";
+import { PLUGIN_REGISTRY } from "./cli/lib/plugin-registry";
 import * as os from "os";
 
 // -----------------------------------------------------------------------------
@@ -64,17 +65,6 @@ interface PluginConfigFile {
   agents: Record<string, Record<string, unknown>>;
 }
 
-/**
- * Known plugin secret env var mappings.
- * Maps plugin name → { configKey: envVarName }.
- */
-const PLUGIN_SECRET_ENV_VARS: Record<string, Record<string, string>> = {
-  "openclaw-linear": {
-    apiKey: "LINEAR_API_KEY",
-    webhookSecret: "LINEAR_WEBHOOK_SECRET",
-  },
-};
-
 // -----------------------------------------------------------------------------
 // Configuration from Pulumi Config / ESC
 // -----------------------------------------------------------------------------
@@ -97,21 +87,12 @@ const braveApiKey = config.getSecret("braveApiKey");
 // Identity cache directory
 const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
 
-// Per-agent Slack credentials from config/ESC
-// Pattern: <role>SlackBotToken, <role>SlackAppToken
-const agentSlackCredentials: Record<string, { botToken?: pulumi.Output<string>; appToken?: pulumi.Output<string> }> = {};
 const agentGithubCredentials: Record<string, pulumi.Output<string> | undefined> = {};
 
-// Common roles to check for credentials
+// Common roles to check for GitHub credentials
 // Note: custom roles are handled below after manifest is loaded
 const commonRoles = ["pm", "eng", "tester"];
 for (const role of commonRoles) {
-  const botToken = config.getSecret(`${role}SlackBotToken`);
-  const appToken = config.getSecret(`${role}SlackAppToken`);
-  if (botToken || appToken) {
-    agentSlackCredentials[role] = { botToken, appToken };
-  }
-
   const githubToken = config.getSecret(`${role}GithubToken`);
   if (githubToken) {
     agentGithubCredentials[role] = githubToken;
@@ -182,17 +163,11 @@ if (fs.existsSync(pluginConfigsDir)) {
   }
 }
 
-// Load credentials for any custom roles not in commonRoles
+// Load GitHub credentials for any custom roles not in commonRoles
 for (const agent of manifest.agents) {
   if (!commonRoles.includes(agent.role)) {
-    const role = agent.role;
-    const botToken = config.getSecret(`${role}SlackBotToken`);
-    const appToken = config.getSecret(`${role}SlackAppToken`);
-    if (botToken || appToken) {
-      agentSlackCredentials[role] = { botToken, appToken };
-    }
-    const githubToken = config.getSecret(`${role}GithubToken`);
-    if (githubToken) agentGithubCredentials[role] = githubToken;
+    const githubToken = config.getSecret(`${agent.role}GithubToken`);
+    if (githubToken) agentGithubCredentials[agent.role] = githubToken;
   }
 }
 
@@ -315,19 +290,21 @@ function buildPluginsForAgent(
     const identityConfig = identityDefaults?.[pluginName] ?? {};
     // Merge: identity defaults first, user config overrides
     const agentSection = { ...identityConfig, ...userConfig };
-    const secretMapping = PLUGIN_SECRET_ENV_VARS[pluginName] ?? {};
+    const registryEntry = PLUGIN_REGISTRY[pluginName];
+    const secretMapping = registryEntry?.secretEnvVars ?? {};
 
     plugins.push({
       name: pluginName,
       config: agentSection,
       secretEnvVars: Object.keys(secretMapping).length > 0 ? secretMapping : undefined,
+      installable: registryEntry?.installable ?? true,
     });
 
     // Collect secret outputs from Pulumi config
     for (const [, envVar] of Object.entries(secretMapping)) {
       if (!pluginSecrets[envVar]) {
         // Derive Pulumi config key from role + env var pattern
-        // e.g., LINEAR_API_KEY → <role>LinearApiKey
+        // e.g., LINEAR_API_KEY → <role>LinearApiKey, SLACK_BOT_TOKEN → <role>SlackBotToken
         const secret = config.getSecret(`${agent.role}${envVarToConfigKey(envVar)}`);
         if (secret) {
           pluginSecrets[envVar] = secret;
@@ -335,8 +312,8 @@ function buildPluginsForAgent(
       }
     }
 
-    // Enable funnel if the plugin needs webhooks (openclaw-linear uses webhooks)
-    if (pluginName === "openclaw-linear") {
+    // Enable funnel if the plugin needs webhooks
+    if (registryEntry?.needsFunnel) {
       enableFunnel = true;
     }
   }
@@ -418,8 +395,7 @@ for (const agent of manifest.agents) {
   // Build plugin configs for this agent (merge identity defaults if available)
   const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identityPluginDefaults, identityPlugins);
 
-  // Get per-agent credentials if available
-  const slackCreds = agentSlackCredentials[agent.role];
+  // Get per-agent GitHub credentials if available
   const githubToken = agentGithubCredentials[agent.role];
 
   if (provider === "aws") {
@@ -447,10 +423,6 @@ for (const agent of manifest.agents) {
         AGENT_EMOJI: agentEmoji,
         ...agent.envVars,
       },
-
-      // Slack credentials (optional)
-      slackBotToken: slackCreds?.botToken,
-      slackAppToken: slackCreds?.appToken,
 
       // Plugins
       plugins,
@@ -497,10 +469,6 @@ for (const agent of manifest.agents) {
         AGENT_EMOJI: agentEmoji,
         ...agent.envVars,
       },
-
-      // Slack credentials (optional)
-      slackBotToken: slackCreds?.botToken,
-      slackAppToken: slackCreds?.appToken,
 
       // Plugins
       plugins,

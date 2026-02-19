@@ -7,6 +7,7 @@ volumeSize: 30
 
 plugins:
   - openclaw-linear
+  - slack
 
 pluginDefaults:
   openclaw-linear:
@@ -15,6 +16,15 @@ pluginDefaults:
       started: add
       completed: remove
       cancelled: remove
+  slack:
+    mode: socket
+    userTokenReadOnly: true
+    groupPolicy: open
+    dm:
+      enabled: true
+      policy: open
+      allowFrom:
+        - "*"
 
 skills:
   - tester-queue-handler

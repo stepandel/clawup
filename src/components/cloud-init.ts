@@ -4,7 +4,7 @@
  */
 
 import * as zlib from "zlib";
-import { generateConfigPatchScript, SlackConfigOptions, PluginEntry } from "./config-generator";
+import { generateConfigPatchScript, PluginEntry } from "./config-generator";
 
 /**
  * Config for a plugin to be installed on an agent.
@@ -19,6 +19,8 @@ export interface PluginInstallConfig {
    * e.g., { "apiKey": "LINEAR_API_KEY", "webhookSecret": "LINEAR_WEBHOOK_SECRET" }
    */
   secretEnvVars?: Record<string, string>;
+  /** false for built-in plugins like Slack that don't need `openclaw plugins install` */
+  installable?: boolean;
 }
 
 export interface CloudInitConfig {
@@ -56,8 +58,6 @@ export interface CloudInitConfig {
   skipTailscale?: boolean;
   /** Create ubuntu user (for Hetzner which uses root) */
   createUbuntuUser?: boolean;
-  /** Slack configuration */
-  slack?: SlackConfigOptions;
   /** Plugins to install and configure */
   plugins?: PluginInstallConfig[];
   /** GitHub personal access token for gh CLI auth */
@@ -91,7 +91,6 @@ export function generateCloudInit(config: CloudInitConfig): string {
     gatewayToken: config.gatewayToken,
     trustedProxies,
     enableControlUi: true,
-    slack: config.slack,
     plugins: pluginEntries,
     braveApiKey: config.braveApiKey,
   });
@@ -129,8 +128,9 @@ GH_AUTH_SCRIPT
   // Claude Code CLI installation script
   const codingClisInstallScript = generateClaudeCodeInstallScript(config.model);
 
-  // Dynamic plugin install steps
-  const pluginInstallScript = (config.plugins ?? []).length > 0
+  // Dynamic plugin install steps (only for installable plugins)
+  const installablePlugins = (config.plugins ?? []).filter((p) => p.installable !== false);
+  const pluginInstallScript = installablePlugins.length > 0
     ? `
 # Install OpenClaw plugins
 echo "Installing plugins..."
@@ -139,7 +139,7 @@ export HOME=/home/ubuntu
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-${(config.plugins ?? []).map((p) =>
+${installablePlugins.map((p) =>
   `openclaw plugins install ${p.name} || echo "WARNING: ${p.name} plugin install failed. Install manually with: openclaw plugins install ${p.name}"`
 ).join("\n")}
 '
@@ -286,8 +286,10 @@ else
   echo 'export ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}"' >> /home/ubuntu/.bashrc
   echo "Detected API key, exporting as ANTHROPIC_API_KEY"
 fi
-\${SLACK_BOT_TOKEN:+echo 'export SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN}"' >> /home/ubuntu/.bashrc}
-\${SLACK_APP_TOKEN:+echo 'export SLACK_APP_TOKEN="\${SLACK_APP_TOKEN}"' >> /home/ubuntu/.bashrc}
+${(config.plugins ?? [])
+    .flatMap((p) => Object.values(p.secretEnvVars ?? {}))
+    .map((envVar) => `\\\${${envVar}:+echo 'export ${envVar}="\\\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
+    .join("\n")}
 \${GITHUB_TOKEN:+echo 'export GITHUB_TOKEN="\${GITHUB_TOKEN}"' >> /home/ubuntu/.bashrc}
 \${BRAVE_API_KEY:+echo 'export BRAVE_API_KEY="\${BRAVE_API_KEY}"' >> /home/ubuntu/.bashrc}
 ${additionalEnvVars}
@@ -332,8 +334,6 @@ echo "Configuring OpenClaw gateway..."
 sudo -H -u ubuntu \\
   GATEWAY_TOKEN="\${GATEWAY_TOKEN}" \\
   ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}" \\
-  SLACK_BOT_TOKEN="\${SLACK_BOT_TOKEN:-}" \\
-  SLACK_APP_TOKEN="\${SLACK_APP_TOKEN:-}" \\
   BRAVE_API_KEY="\${BRAVE_API_KEY:-}" \\
   AGENT_NAME="${config.envVars?.AGENT_NAME ?? ""}" \\
   AGENT_EMOJI="${config.envVars?.AGENT_EMOJI ?? ""}"${pluginSecretEnvLine} \\
@@ -415,8 +415,6 @@ export function interpolateCloudInit(
     anthropicApiKey: string;
     tailscaleAuthKey: string;
     gatewayToken: string;
-    slackBotToken?: string;
-    slackAppToken?: string;
     githubToken?: string;
     braveApiKey?: string;
     /** Additional secret env vars from plugins: { envVarName: value } */
@@ -429,16 +427,12 @@ export function interpolateCloudInit(
     .replace(/\${GATEWAY_TOKEN}/g, values.gatewayToken);
 
   // Optional tokens - replace with empty string if not provided
-  result = result.replace(/\${SLACK_BOT_TOKEN:-}/g, values.slackBotToken ?? "");
-  result = result.replace(/\${SLACK_BOT_TOKEN}/g, values.slackBotToken ?? "");
-  result = result.replace(/\${SLACK_APP_TOKEN:-}/g, values.slackAppToken ?? "");
-  result = result.replace(/\${SLACK_APP_TOKEN}/g, values.slackAppToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN:-}/g, values.githubToken ?? "");
   result = result.replace(/\${GITHUB_TOKEN}/g, values.githubToken ?? "");
   result = result.replace(/\${BRAVE_API_KEY:-}/g, values.braveApiKey ?? "");
   result = result.replace(/\${BRAVE_API_KEY}/g, values.braveApiKey ?? "");
 
-  // Plugin-declared secret env vars
+  // Plugin-declared secret env vars (includes Slack tokens, Linear keys, etc.)
   if (values.additionalSecrets) {
     for (const [envVar, value] of Object.entries(values.additionalSecrets)) {
       const escaped = value.replace(/\$/g, "$$$$");

@@ -450,12 +450,13 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   p.log.step("Configure integrations");
 
   // Required integrations
-  const integrations: string[] = ["slack", "linear", "github"];
+  const integrations: string[] = ["linear", "github"];
+
+  // Check if any agent uses the Slack plugin
+  const hasSlackPlugin = agents.some((a) => a.plugins?.includes("slack"));
 
   // Per-agent integration credentials
   const integrationCredentials: Record<string, {
-    slackBotToken?: string;
-    slackAppToken?: string;
     linearApiKey?: string;
     linearWebhookSecret?: string;
     linearUserUuid?: string;
@@ -466,13 +467,17 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     integrationCredentials[agent.role] = {};
   }
 
-  if (integrations.includes("slack")) {
+  // Slack credentials — driven by plugin presence
+  const slackCredentials: Record<string, { botToken: string; appToken: string }> = {};
+  if (hasSlackPlugin) {
     p.note(
       KEY_INSTRUCTIONS.slackCredentials.steps.join("\n"),
       KEY_INSTRUCTIONS.slackCredentials.title
     );
 
     for (const agent of agents) {
+      if (!agent.plugins?.includes("slack")) continue;
+
       // Copy manifest to clipboard for easy paste into Slack
       const manifest = slackAppManifest(agent.displayName);
       try {
@@ -502,8 +507,10 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       });
       handleCancel(appToken);
 
-      integrationCredentials[agent.role].slackBotToken = botToken as string;
-      integrationCredentials[agent.role].slackAppToken = appToken as string;
+      slackCredentials[agent.role] = {
+        botToken: botToken as string,
+        appToken: appToken as string,
+      };
     }
   }
 
@@ -642,12 +649,14 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     return sum + agentCost;
   }, 0);
 
-  const integrationNames = integrations.map(i => {
-    if (i === "slack") return "Slack";
-    if (i === "linear") return "Linear";
-    if (i === "github") return "GitHub CLI";
-    return i;
-  });
+  const integrationNames = [
+    ...(hasSlackPlugin ? ["Slack"] : []),
+    ...integrations.map(i => {
+      if (i === "linear") return "Linear";
+      if (i === "github") return "GitHub CLI";
+      return i;
+    }),
+  ];
 
   const providerLabel = basicConfig.provider === "aws" ? "AWS" : "Hetzner";
   const regionLabel = basicConfig.provider === "aws" ? "Region" : "Location";
@@ -734,12 +743,15 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   setConfig("defaultModel", defaultModel as string, false, cwd);
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
-    if (creds.slackBotToken) setConfig(`${role}SlackBotToken`, creds.slackBotToken, true, cwd);
-    if (creds.slackAppToken) setConfig(`${role}SlackAppToken`, creds.slackAppToken, true, cwd);
     if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true, cwd);
     if (creds.linearWebhookSecret) setConfig(`${role}LinearWebhookSecret`, creds.linearWebhookSecret, true, cwd);
     if (creds.linearUserUuid) setConfig(`${role}LinearUserUuid`, creds.linearUserUuid, false, cwd);
     if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true, cwd);
+  }
+  // Set per-agent Slack credentials (driven by plugin presence)
+  for (const [role, creds] of Object.entries(slackCredentials)) {
+    setConfig(`${role}SlackBotToken`, creds.botToken, true, cwd);
+    setConfig(`${role}SlackAppToken`, creds.appToken, true, cwd);
   }
   if (braveApiKey) setConfig("braveApiKey", braveApiKey, true, cwd);
   s.stop("Configuration saved");
