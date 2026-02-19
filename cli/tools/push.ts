@@ -16,6 +16,7 @@ import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import type { AgentDefinition } from "../types";
 import { fetchIdentitySync } from "../lib/identity";
+import { classifySkills } from "../lib/skills";
 import * as os from "os";
 import pc from "picocolors";
 
@@ -252,6 +253,19 @@ export const pushTool: ToolImplementation<PushOptions> = async (
               console.log(`    ${pc.green("OK")}  skills synced`);
             } else {
               console.log(`    ${pc.red("FAIL")}  skills sync failed: ${result.output.substring(0, 100)}`);
+              allOk = false;
+            }
+          }
+
+          // Install public skills via clawhub
+          const { public: publicSkills } = classifySkills(identity.manifest.skills);
+          for (const skill of publicSkills) {
+            const cmd = `export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && clawhub install ${skill.slug}`;
+            const result = sshExec(exec, host, cmd);
+            if (result.ok) {
+              console.log(`    ${pc.green("OK")}  clawhub skill installed: ${skill.slug}`);
+            } else {
+              console.log(`    ${pc.red("FAIL")}  clawhub skill ${skill.slug}: ${result.output.substring(0, 100)}`);
               allOk = false;
             }
           }

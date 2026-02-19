@@ -84,7 +84,11 @@ export interface IdentityManifest {
   volumeSize: number;
   /** Optional default instance type override */
   instanceType?: string;
-  /** List of skill directory names bundled in this identity */
+  /**
+   * List of skill identifiers for this identity.
+   * Plain names (e.g., "pm-queue-handler") are private skills from the skills/ directory.
+   * Prefixed names (e.g., "clawhub:my-skill") are public skills installed via clawhub.
+   */
   skills: string[];
   /** Recommended plugins for this identity (e.g., ["openclaw-linear"]) */
   plugins?: string[];

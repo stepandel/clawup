@@ -20,6 +20,7 @@ import { OpenClawAgent, HetznerOpenClawAgent, PluginInstallConfig } from "./src"
 import { SharedVpc } from "./shared-vpc";
 import { fetchIdentitySync } from "./cli/lib/identity";
 import { PRESET_TO_IDENTITY } from "./cli/lib/constants";
+import { classifySkills } from "./cli/lib/skills";
 import { PLUGIN_REGISTRY } from "./cli/lib/plugin-registry";
 import * as os from "os";
 
@@ -341,6 +342,7 @@ const agentOutputs: Record<string, {
 for (const agent of manifest.agents) {
   // Build workspace files
   let workspaceFiles: Record<string, string>;
+  let clawhubSkillSlugs: string[] = [];
   let agentEmoji = "";
   let agentDisplayName = agent.displayName;
   let agentVolumeSize = agent.volumeSize;
@@ -376,6 +378,10 @@ for (const agent of manifest.agents) {
     // Capture identity plugin info for merging into plugin config
     identityPluginDefaults = identity.manifest.pluginDefaults;
     identityPlugins = identity.manifest.plugins;
+
+    // Extract public (clawhub) skills from identity manifest
+    const { public: publicSkills } = classifySkills(identity.manifest.skills);
+    clawhubSkillSlugs = publicSkills.map((s) => s.slug);
   } else {
     // Custom agent with inline content (no identity)
     workspaceFiles = {};
@@ -419,6 +425,9 @@ for (const agent of manifest.agents) {
       plugins,
       pluginSecrets,
       enableFunnel,
+
+      // Public skills from clawhub
+      clawhubSkills: clawhubSkillSlugs,
 
       // GitHub token (optional)
       githubToken,
@@ -465,6 +474,9 @@ for (const agent of manifest.agents) {
       plugins,
       pluginSecrets,
       enableFunnel,
+
+      // Public skills from clawhub
+      clawhubSkills: clawhubSkillSlugs,
 
       // GitHub token (optional)
       githubToken,

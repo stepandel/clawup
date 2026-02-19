@@ -66,6 +66,8 @@ export interface CloudInitConfig {
   braveApiKey?: string;
   /** Whether to enable Tailscale Funnel (public HTTPS) instead of Serve */
   enableFunnel?: boolean;
+  /** Public skill slugs to install via `clawhub install` */
+  clawhubSkills?: string[];
 }
 
 /**
@@ -144,6 +146,24 @@ ${installablePlugins.map((p) =>
 ).join("\n")}
 '
 echo "Plugin installation complete"
+`
+    : "";
+
+  // Dynamic clawhub skill install steps
+  const clawhubSkillsScript = (config.clawhubSkills ?? []).length > 0
+    ? `
+# Install public skills from clawhub
+echo "Installing clawhub skills..."
+sudo -H -u ubuntu bash -c '
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+${(config.clawhubSkills ?? []).map((slug) =>
+  `clawhub install ${slug} || echo "WARNING: clawhub skill ${slug} install failed."`,
+).join("\n")}
+'
+echo "Clawhub skills installation complete"
 `
     : "";
 
@@ -319,6 +339,7 @@ openclaw onboard --non-interactive --accept-risk \\
 '
 ${workspaceFilesScript}
 ${pluginInstallScript}
+${clawhubSkillsScript}
 # Install daemon service with XDG_RUNTIME_DIR set
 echo "Installing OpenClaw daemon..."
 sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '

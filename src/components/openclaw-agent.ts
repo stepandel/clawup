@@ -135,6 +135,11 @@ export interface OpenClawAgentArgs {
    * Whether to enable Tailscale Funnel (public HTTPS for webhooks)
    */
   enableFunnel?: boolean;
+
+  /**
+   * Public skill slugs to install via `clawhub install`
+   */
+  clawhubSkills?: string[];
 }
 
 /**
@@ -464,6 +469,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           // Plugins
           plugins: args.plugins,
           enableFunnel: args.enableFunnel,
+          clawhubSkills: args.clawhubSkills,
           // GitHub token for gh CLI auth
           githubToken: githubToken || undefined,
           // Brave Search API key for web search
