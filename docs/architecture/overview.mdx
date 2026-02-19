@@ -10,16 +10,16 @@ Agent Army uses [Pulumi](https://pulumi.com) to provision cloud infrastructure a
 When you run `agent-army deploy`, here's what happens:
 
 ```
-agent-army.yaml         Pulumi Stack          Cloud Provider
-   (Manifest)    ────▶  (TypeScript)   ────▶  (AWS / Hetzner)
-                              │
-                              ▼
-                     Per-agent resources:
-                     • Server (Ubuntu 24.04)
-                     • Security group / firewall
-                     • SSH keypair
-                     • Gateway token
-                     • Cloud-init script
+agent-army.yaml              Pulumi Stack          Cloud Provider
+   (Manifest)          ────▶  (TypeScript)   ────▶  (AWS / Hetzner)
+        │                          │
+        ▼                          ▼
+identity.yaml            Per-agent resources:
+  (Per-agent)            • Server (Ubuntu 24.04)
+  • Model config         • Security group / firewall
+  • Plugins & deps       • SSH keypair
+  • Skills               • Gateway token
+  • Workspace files      • Cloud-init script
 ```
 
 1. **Load manifest** — The CLI reads your `agent-army.yaml` config and shows a deployment summary.
