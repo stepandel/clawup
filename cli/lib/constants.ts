@@ -4,22 +4,22 @@
 
 /**
  * Built-in agent identities.
- * Each entry points to a self-contained identity directory under `identities/`.
+ * Each entry points to a subfolder in the army-identities Git repo.
  * The identity.yaml inside provides displayName, role, volumeSize, plugins, etc.
  */
 export const BUILT_IN_IDENTITIES: Record<string, { path: string; label: string; hint: string }> = {
   pm: {
-    path: "./identities/pm",
+    path: "https://github.com/stepandel/army-identities#pm",
     label: "Juno (PM)",
     hint: "Break down tickets, research, plan and sequence work, track progress, unblock teams",
   },
   eng: {
-    path: "./identities/eng",
+    path: "https://github.com/stepandel/army-identities#eng",
     label: "Titus (Engineer)",
     hint: "Lead engineering, coding, shipping",
   },
   tester: {
-    path: "./identities/tester",
+    path: "https://github.com/stepandel/army-identities#tester",
     label: "Scout (QA)",
     hint: "Quality assurance, verification, bug hunting",
   },
@@ -31,9 +31,9 @@ export const BUILT_IN_IDENTITIES: Record<string, { path: string; label: string; 
  * @deprecated Use BUILT_IN_IDENTITIES instead.
  */
 export const PRESET_TO_IDENTITY: Record<string, string> = {
-  pm: "./identities/pm",
-  eng: "./identities/eng",
-  tester: "./identities/tester",
+  pm: "https://github.com/stepandel/army-identities#pm",
+  eng: "https://github.com/stepandel/army-identities#eng",
+  tester: "https://github.com/stepandel/army-identities#tester",
 };
 
 /** Map agent aliases to role keys */

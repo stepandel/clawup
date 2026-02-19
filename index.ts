@@ -19,6 +19,7 @@ import YAML from "yaml";
 import { OpenClawAgent, HetznerOpenClawAgent, PluginInstallConfig } from "./src";
 import { SharedVpc } from "./shared-vpc";
 import { fetchIdentitySync } from "./cli/lib/identity";
+import { PRESET_TO_IDENTITY } from "./cli/lib/constants";
 import { PLUGIN_REGISTRY } from "./cli/lib/plugin-registry";
 import * as os from "os";
 
@@ -98,16 +99,6 @@ for (const role of commonRoles) {
     agentGithubCredentials[role] = githubToken;
   }
 }
-
-/**
- * Legacy preset → identity path mapping for backward compatibility.
- * Existing manifests with `preset: "pm"` are converted to identity loading.
- */
-const PRESET_TO_IDENTITY: Record<string, string> = {
-  pm: "./identities/pm",
-  eng: "./identities/eng",
-  tester: "./identities/tester",
-};
 
 /**
  * Process template placeholders in workspace files

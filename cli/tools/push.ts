@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
-import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
+import { AGENT_ALIASES, PRESET_TO_IDENTITY, SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import type { AgentDefinition } from "../types";
@@ -99,15 +99,6 @@ function scpFile(
   ]);
   return { ok: result.exitCode === 0, output: result.stdout || result.stderr };
 }
-
-/**
- * Legacy preset → identity path mapping for backward compatibility.
- */
-const PRESET_TO_IDENTITY: Record<string, string> = {
-  pm: "./identities/pm",
-  eng: "./identities/eng",
-  tester: "./identities/tester",
-};
 
 /**
  * Resolve an agent query (name, role, alias, displayName) against the manifest.

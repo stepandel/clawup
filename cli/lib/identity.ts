@@ -28,17 +28,31 @@ const REQUIRED_FIELDS: (keyof IdentityManifest)[] = [
 /**
  * Parse a source string into its components.
  * Supports:
- *   - Local paths: `./identities/juno`, `/abs/path/to/identity`
- *   - Git URLs: `https://github.com/org/repo`
- *   - Git URLs with subfolder: `https://github.com/org/repo#subfolder`
+ *   - Local paths: `./my-identity`, `/abs/path/to/identity`
+ *   - Git HTTPS URLs: `https://github.com/org/repo#subfolder`
+ *   - Git SSH URLs: `git@github.com:org/repo#subfolder`
  */
 function parseSource(source: string): { type: "local"; path: string } | { type: "git"; url: string; subfolder?: string } {
-  // Local path — starts with `.`, `/`, or doesn't look like a URL
-  if (source.startsWith(".") || source.startsWith("/") || !source.includes("://")) {
+  // Local path — starts with `.` or `/`
+  if (source.startsWith(".") || source.startsWith("/")) {
     return { type: "local", path: source };
   }
 
-  // Git URL — optionally with #subfolder
+  // SSH-style Git URL (git@host:org/repo or user@host:path)
+  if (source.startsWith("git@") || /^[\w.-]+@[\w.-]+:/.test(source)) {
+    return parseGitUrl(source);
+  }
+
+  // HTTPS Git URL — contains ://
+  if (source.includes("://")) {
+    return parseGitUrl(source);
+  }
+
+  // Fallback: treat as local path
+  return { type: "local", path: source };
+}
+
+function parseGitUrl(source: string): { type: "git"; url: string; subfolder?: string } {
   const hashIdx = source.indexOf("#");
   if (hashIdx === -1) {
     return { type: "git", url: source };
@@ -203,11 +217,11 @@ function parseManifest(raw: unknown, sourcePath: string): IdentityManifest {
  *
  * @example
  * ```ts
- * // From a Git mono-repo
- * const id = await fetchIdentity("https://github.com/org/identities#juno", cacheDir);
+ * // From a Git repo with subfolder
+ * const id = await fetchIdentity("https://github.com/org/identities#pm", cacheDir);
  *
  * // From a local path
- * const id = await fetchIdentity("./identities/juno", cacheDir);
+ * const id = await fetchIdentity("./my-identity", cacheDir);
  * ```
  */
 /**
