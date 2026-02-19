@@ -58,6 +58,16 @@ export interface OpenClawAgentArgs {
   model?: pulumi.Input<string>;
 
   /**
+   * Backup/fallback model (e.g., "anthropic/claude-sonnet-4-5")
+   */
+  backupModel?: pulumi.Input<string>;
+
+  /**
+   * Coding agent CLI name (e.g., "claude-code", "codex", "amp")
+   */
+  codingAgent?: string;
+
+  /**
    * Enable Docker sandbox for code execution (default: true)
    */
   enableSandbox?: pulumi.Input<boolean>;
@@ -456,6 +466,8 @@ export class OpenClawAgent extends pulumi.ComponentResource {
           gatewayPort: gatewayPort as number,
           browserPort: browserPort as number,
           model: model as string,
+          backupModel: args.backupModel as string | undefined,
+          codingAgent: args.codingAgent,
           enableSandbox: enableSandbox as boolean,
           tailscaleHostname: tsHostname,
           workspaceFiles: args.workspaceFiles,

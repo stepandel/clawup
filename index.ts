@@ -80,7 +80,6 @@ const anthropicApiKey = config.requireSecret("anthropicApiKey");
 const tailscaleAuthKey = config.requireSecret("tailscaleAuthKey");
 const tailnetDnsName = config.require("tailnetDnsName");
 const instanceType = config.get("instanceType") ?? "t3.medium";
-const defaultModel = config.get("defaultModel") ?? "anthropic/claude-opus-4-6";
 const ownerName = config.get("ownerName") ?? "Boss";
 const timezone = config.get("timezone") ?? "PST (America/Los_Angeles)";
 const workingHours = config.get("workingHours") ?? "9am-6pm";
@@ -344,6 +343,11 @@ for (const agent of manifest.agents) {
   let identityPlugins: string[] | undefined;
   let identityDeps: string[] | undefined;
 
+  // Per-agent model/codingAgent from identity (with hardcoded defaults for custom agents)
+  let identityModel: string | undefined;
+  let identityBackupModel: string | undefined;
+  let identityCodingAgent: string | undefined;
+
   // Resolve identity source: explicit identity, legacy preset mapping, or custom
   const identitySource = agent.identity ?? (agent.preset ? PRESET_TO_IDENTITY[agent.preset] : undefined);
 
@@ -364,6 +368,11 @@ for (const agent of manifest.agents) {
     identityPlugins = identity.manifest.plugins;
     identityDeps = identity.manifest.deps;
 
+    // Capture model/codingAgent from identity
+    identityModel = identity.manifest.model;
+    identityBackupModel = identity.manifest.backupModel;
+    identityCodingAgent = identity.manifest.codingAgent;
+
     // Extract public (clawhub) skills from identity manifest
     const { public: publicSkills } = classifySkills(identity.manifest.skills);
     clawhubSkillSlugs = publicSkills.map((s) => s.slug);
@@ -376,6 +385,11 @@ for (const agent of manifest.agents) {
 
   // Build plugin configs for this agent (merge identity defaults if available)
   const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identityPluginDefaults, identityPlugins);
+
+  // Resolve model/codingAgent: identity values with hardcoded defaults for custom agents
+  const agentModel = identityModel ?? "anthropic/claude-opus-4-6";
+  const agentBackupModel = identityBackupModel;
+  const agentCodingAgent = identityCodingAgent ?? "claude-code";
 
   // Resolve deps: agent manifest overrides identity defaults
   const depNames = agent.deps ?? identityDeps ?? [];
@@ -409,7 +423,9 @@ for (const agent of manifest.agents) {
       tailnetDnsName,
       instanceType: agent.instanceType ?? instanceType,
       volumeSize: agentVolumeSize ?? 30,
-      model: defaultModel,
+      model: agentModel,
+      backupModel: agentBackupModel,
+      codingAgent: agentCodingAgent,
 
       // Use shared VPC
       vpcId: sharedVpc!.vpcId,
@@ -461,7 +477,9 @@ for (const agent of manifest.agents) {
       tailnetDnsName,
       serverType: agent.instanceType ?? instanceType,
       location: manifest.region,
-      model: defaultModel,
+      model: agentModel,
+      backupModel: agentBackupModel,
+      codingAgent: agentCodingAgent,
 
       // Workspace files
       workspaceFiles,

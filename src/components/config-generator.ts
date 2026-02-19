@@ -3,6 +3,8 @@
  * Builds the openclaw.json configuration file content
  */
 
+import { CODING_AGENT_REGISTRY } from "../../cli/lib/coding-agent-registry";
+
 /**
  * A single plugin entry for the OpenClaw config.
  * Used to dynamically generate Python config-patch code for each plugin.
@@ -30,6 +32,10 @@ export interface OpenClawConfigOptions {
   gatewayToken: string;
   /** Default AI model (default: anthropic/claude-sonnet-4-5) */
   model?: string;
+  /** Backup/fallback model (e.g., "anthropic/claude-sonnet-4-5") */
+  backupModel?: string;
+  /** Coding agent CLI name (e.g., "claude-code"). Defaults to "claude-code". */
+  codingAgent?: string;
   /** Enable Docker sandbox (default: true) */
   enableSandbox?: boolean;
   /** Trusted proxy IPs for Tailscale Serve (default: ["127.0.0.1"]) */
@@ -105,9 +111,7 @@ export function generateOpenClawConfig(options: OpenClawConfigOptions): OpenClaw
     };
   }
 
-  if (options.model) {
-    config.model = options.model;
-  }
+  // Note: model config is now handled in generateConfigPatchScript() via agents.defaults.model
 
   if (options.braveApiKey) {
     config.web = { braveApiKey: options.braveApiKey };
@@ -224,6 +228,17 @@ export function generateConfigPatchScript(options: OpenClawConfigOptions): strin
     enableControlUi: options.enableControlUi ?? true,
   };
 
+  // Build model config (primary + optional fallbacks)
+  const model = options.model ?? "anthropic/claude-opus-4-6";
+  const backupModel = options.backupModel;
+
+  // Build cliBackends config from coding agent registry
+  const codingAgentName = options.codingAgent ?? "claude-code";
+  const codingAgentEntry = CODING_AGENT_REGISTRY[codingAgentName];
+  const cliBackendsJson = codingAgentEntry
+    ? JSON.stringify({ "claude-cli": codingAgentEntry.cliBackend })
+    : "{}";
+
   // Build dynamic plugin config sections
   const pluginConfigs = (options.plugins ?? [])
     .map((plugin) => generatePluginPython(plugin))
@@ -273,6 +288,20 @@ config["agents"]["defaults"]["heartbeat"] = {
     "session": "main"
 }
 print("Configured heartbeat: every 1m")
+
+# Configure model with optional fallbacks
+${backupModel
+    ? `config["agents"]["defaults"]["model"] = {
+    "primary": "${model}",
+    "fallbacks": ["${backupModel}"]
+}
+print("Configured model: ${model} (fallback: ${backupModel})")`
+    : `config["agents"]["defaults"]["model"] = "${model}"
+print("Configured model: ${model}")`}
+
+# Configure coding agent CLI backend
+config["agents"]["defaults"]["cliBackends"] = ${cliBackendsJson}
+print("Configured cliBackends for ${codingAgentName}")
 ${pluginConfigs}
 # Configure agent identity for Slack mentions/tags
 agent_name = os.environ.get("AGENT_NAME", "")

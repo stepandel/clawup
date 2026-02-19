@@ -100,6 +100,12 @@ export interface IdentityManifest {
   pluginDefaults?: Record<string, Record<string, unknown>>;
   /** List of template variable names this identity uses (e.g., ["OWNER_NAME", "TIMEZONE"]) */
   templateVars: string[];
+  /** Default AI model for this identity (e.g., "anthropic/claude-opus-4-6") */
+  model?: string;
+  /** Backup/fallback model (e.g., "anthropic/claude-sonnet-4-5") */
+  backupModel?: string;
+  /** Coding agent CLI to use (e.g., "claude-code", "codex", "amp"). Defaults to "claude-code". */
+  codingAgent?: string;
 }
 
 /**

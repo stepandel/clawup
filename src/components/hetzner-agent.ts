@@ -48,6 +48,16 @@ export interface HetznerOpenClawAgentArgs {
   model?: pulumi.Input<string>;
 
   /**
+   * Backup/fallback model (e.g., "anthropic/claude-sonnet-4-5")
+   */
+  backupModel?: pulumi.Input<string>;
+
+  /**
+   * Coding agent CLI name (e.g., "claude-code", "codex", "amp")
+   */
+  codingAgent?: string;
+
+  /**
    * Enable Docker sandbox for code execution (default: true)
    */
   enableSandbox?: pulumi.Input<boolean>;
@@ -289,6 +299,8 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
                 gatewayPort: gatewayPort,
                 browserPort: browserPort,
                 model: model,
+                backupModel: args.backupModel as string | undefined,
+                codingAgent: args.codingAgent,
                 enableSandbox: enableSandbox,
                 tailscaleHostname: tsHostname,
                 workspaceFiles: args.workspaceFiles,

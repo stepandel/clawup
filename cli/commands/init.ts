@@ -180,17 +180,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(anthropicApiKey);
 
-  // Select default model (Anthropic models only)
-  const defaultModel = await p.select({
-    message: "Select default model for agents",
-    options: MODEL_PROVIDERS.anthropic.models.map((m) => ({
-      value: m.value,
-      label: m.label,
-    })),
-    initialValue: MODEL_PROVIDERS.anthropic.models[0]?.value ?? "anthropic/claude-sonnet-4-5",
-  });
-  handleCancel(defaultModel);
-
   p.log.step("Configure infrastructure secrets");
 
   p.note(
@@ -672,7 +661,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       `Working hours:  ${basicConfig.workingHours}`,
       `Linear team:    ${basicConfig.linearTeam}`,
       `GitHub repo:    ${basicConfig.githubRepo}`,
-      `Default model:  ${String(defaultModel)}`,
       `Integrations:   ${integrationNames.join(", ")}`,
       ``,
       `Agents (${agents.length}):`,
@@ -740,7 +728,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   setConfig("userNotes", basicConfig.userNotes as string, false, cwd);
   setConfig("linearTeam", basicConfig.linearTeam as string, false, cwd);
   setConfig("githubRepo", basicConfig.githubRepo as string, false, cwd);
-  setConfig("defaultModel", defaultModel as string, false, cwd);
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
     if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true, cwd);

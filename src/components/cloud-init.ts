@@ -5,6 +5,7 @@
 
 import * as zlib from "zlib";
 import { generateConfigPatchScript, PluginEntry } from "./config-generator";
+import { CODING_AGENT_REGISTRY, CodingAgentEntry } from "../../cli/lib/coding-agent-registry";
 
 /**
  * Config for a plugin to be installed on an agent.
@@ -38,6 +39,10 @@ export interface CloudInitConfig {
   enableSandbox?: boolean;
   /** AI model to use (default: anthropic/claude-opus-4-6) */
   model?: string;
+  /** Backup/fallback model for OpenClaw (e.g., "anthropic/claude-sonnet-4-5") */
+  backupModel?: string;
+  /** Coding agent CLI name (e.g., "claude-code"). Defaults to "claude-code". */
+  codingAgent?: string;
   /** Node.js version to install (default: 22) */
   nodeVersion?: number;
   /** NVM version to install (default: 0.40.1) */
@@ -91,6 +96,9 @@ export function generateCloudInit(config: CloudInitConfig): string {
   // Extract braveApiKey from depSecrets for config-generator (special case)
   const braveApiKey = config.depSecrets?.["BRAVE_API_KEY"];
 
+  const codingAgentName = config.codingAgent ?? "claude-code";
+  const codingAgentEntry = CODING_AGENT_REGISTRY[codingAgentName];
+
   const configPatchScript = generateConfigPatchScript({
     gatewayPort,
     gatewayToken: config.gatewayToken,
@@ -98,6 +106,8 @@ export function generateCloudInit(config: CloudInitConfig): string {
     enableControlUi: true,
     plugins: pluginEntries,
     braveApiKey: braveApiKey,
+    backupModel: config.backupModel,
+    codingAgent: codingAgentName,
   });
 
   // Dynamic dep installation scripts (runs as root)
@@ -117,8 +127,10 @@ DEP_POST_INSTALL
 `)
     .join("\n");
 
-  // Claude Code CLI installation script
-  const codingClisInstallScript = generateClaudeCodeInstallScript(config.model);
+  // Coding agent CLI installation script (registry-driven)
+  const codingClisInstallScript = codingAgentEntry
+    ? generateCodingAgentInstallScript(codingAgentEntry, config.model)
+    : "";
 
   // Dynamic plugin install steps (only for installable plugins)
   const installablePlugins = (config.plugins ?? []).filter((p) => p.installable !== false);
@@ -463,40 +475,19 @@ COMPRESSED_PAYLOAD
 }
 
 /**
- * Generates bash script to install Claude Code CLI and configure the default model
+ * Generates bash script to install a coding agent CLI and configure its default model.
+ * Uses the registry entry's installScript and configureModelScript.
  */
-function generateClaudeCodeInstallScript(model?: string): string {
-  // Strip provider prefix (e.g. "anthropic/claude-opus-4-6" → "claude-opus-4-6")
-  const claudeModel = model?.replace(/^anthropic\//, "") ?? "claude-opus-4-6";
+function generateCodingAgentInstallScript(entry: CodingAgentEntry, model?: string): string {
+  // Strip provider prefix (e.g. "anthropic/claude-opus-4-6" -> "claude-opus-4-6")
+  const strippedModel = model?.replace(/^[^/]+\//, "") ?? "claude-opus-4-6";
+
+  // Replace ${MODEL} placeholder in configureModelScript
+  const configScript = entry.configureModelScript.replace(/\$\{MODEL\}/g, strippedModel);
 
   return `
-# Install Claude Code CLI for ubuntu user
-echo "Installing Claude Code..."
-sudo -u ubuntu bash << 'CLAUDE_CODE_INSTALL_SCRIPT' || echo "WARNING: Claude Code installation failed. Install manually with: curl -fsSL https://claude.ai/install.sh | bash"
-set -e
-cd ~
+${entry.installScript}
 
-# Install Claude Code via official installer
-curl -fsSL https://claude.ai/install.sh | bash
-
-# Add .local/bin to PATH in .bashrc if not already there
-if ! grep -q '.local/bin' ~/.bashrc; then
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-fi
-
-# Verify installation
-BINARY_PATH="$HOME/.local/bin/claude"
-if [ -x "$BINARY_PATH" ] || command -v claude &>/dev/null; then
-  echo "Claude Code installed successfully"
-else
-  echo "WARNING: Claude Code installation may have failed"
-  exit 1
-fi
-
-# Configure default model
-mkdir -p ~/.claude
-echo '{"model":"${claudeModel}","fastMode":true}' > ~/.claude/settings.json
-echo "Claude Code default model set to ${claudeModel} (fast mode)"
-CLAUDE_CODE_INSTALL_SCRIPT
+${configScript}
 `;
 }
