@@ -36,8 +36,6 @@ const SETTABLE_TOP_KEYS = [
   "timezone",
   "workingHours",
   "userNotes",
-  "linearTeam",
-  "githubRepo",
 ] as const;
 
 type SettableTopKey = (typeof SETTABLE_TOP_KEYS)[number];
@@ -166,16 +164,22 @@ export async function configShowCommand(opts: ConfigShowOptions): Promise<void> 
   console.log(`  Owner:          ${manifest.ownerName}`);
   if (manifest.timezone) console.log(`  Timezone:       ${manifest.timezone}`);
   if (manifest.workingHours) console.log(`  Working Hours:  ${manifest.workingHours}`);
-  if (manifest.linearTeam) console.log(`  Linear Team:    ${manifest.linearTeam}`);
-  if (manifest.githubRepo) console.log(`  GitHub Repo:    ${manifest.githubRepo}`);
   if (manifest.userNotes) console.log(`  User Notes:     ${manifest.userNotes}`);
+
+  if (manifest.templateVars && Object.keys(manifest.templateVars).length > 0) {
+    console.log();
+    console.log(pc.bold("Template Variables:"));
+    for (const [key, value] of Object.entries(manifest.templateVars)) {
+      console.log(`  ${key}: ${value}`);
+    }
+  }
 
   console.log();
   console.log(pc.bold(`Agents (${manifest.agents.length}):`));
   for (const agent of manifest.agents) {
-    const type = agent.preset ? `preset:${agent.preset}` : "custom";
     const override = agent.instanceType ? ` [${agent.instanceType}]` : "";
-    console.log(`  ${pc.bold(agent.displayName)} (${agent.role}) [${type}] vol:${agent.volumeSize}GB${override}`);
+    console.log(`  ${pc.bold(agent.displayName)} (${agent.role}) vol:${agent.volumeSize}GB${override}`);
+    console.log(`    identity: ${agent.identity}`);
   }
   console.log();
 }
@@ -242,10 +246,24 @@ export async function configSetCommand(
     console.log(
       pc.green(`✓ ${agent.displayName}.${key}: ${String(oldValue ?? "(unset)")} → ${value}`)
     );
+  } else if (key.startsWith("templateVars.")) {
+    // templateVars.KEY set
+    const varName = key.slice("templateVars.".length);
+    if (!varName) {
+      console.error(pc.red("Template variable name cannot be empty. Use: templateVars.KEY"));
+      process.exit(1);
+    }
+
+    if (!manifest.templateVars) manifest.templateVars = {};
+    const oldValue = manifest.templateVars[varName];
+    manifest.templateVars[varName] = value;
+
+    saveManifest(configName, manifest);
+    console.log(pc.green(`✓ templateVars.${varName}: ${String(oldValue ?? "(unset)")} → ${value}`));
   } else {
     // Top-level set
     if (!isSettableTopKey(key)) {
-      console.error(pc.red(`Invalid key '${key}'. Valid keys:\n  ${SETTABLE_TOP_KEYS.join("\n  ")}`));
+      console.error(pc.red(`Invalid key '${key}'. Valid keys:\n  ${SETTABLE_TOP_KEYS.join("\n  ")}\n  templateVars.<KEY>`));
       process.exit(1);
     }
 

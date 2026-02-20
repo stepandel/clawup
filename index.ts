@@ -19,7 +19,6 @@ import YAML from "yaml";
 import { OpenClawAgent, HetznerOpenClawAgent, PluginInstallConfig } from "./src";
 import { SharedVpc } from "./shared-vpc";
 import { fetchIdentitySync } from "./cli/lib/identity";
-import { PRESET_TO_IDENTITY } from "./cli/lib/constants";
 import { classifySkills } from "./cli/lib/skills";
 import { PLUGIN_REGISTRY } from "./cli/lib/plugin-registry";
 import { resolveDeps, collectDepSecrets } from "./cli/lib/deps";
@@ -33,22 +32,13 @@ interface ManifestAgent {
   name: string;
   displayName: string;
   role: string;
-  preset: string | null;
-  /** Git URL or local path to an identity repo/folder. Mutually exclusive with `preset`. */
-  identity?: string;
+  /** Git URL or local path to an identity repo/folder */
+  identity: string;
   /** Pin the identity to a specific Git tag or commit hash */
   identityVersion?: string;
   volumeSize: number;
   instanceType?: string;
-  /** @deprecated Use an identity repo with a SOUL.md file instead. */
-  soulContent?: string;
-  /** @deprecated Use an identity repo with an IDENTITY.md file instead. */
-  identityContent?: string;
   envVars?: Record<string, string>;
-  /** Plugin names to install on this agent */
-  plugins?: string[];
-  /** Dep names for this agent (e.g., ["gh", "brave-search"]) */
-  deps?: string[];
 }
 
 interface Manifest {
@@ -60,8 +50,7 @@ interface Manifest {
   timezone?: string;
   workingHours?: string;
   userNotes?: string;
-  linearTeam?: string;
-  githubRepo?: string;
+  templateVars?: Record<string, string>;
   agents: ManifestAgent[];
 }
 
@@ -84,8 +73,6 @@ const ownerName = config.get("ownerName") ?? "Boss";
 const timezone = config.get("timezone") ?? "PST (America/Los_Angeles)";
 const workingHours = config.get("workingHours") ?? "9am-6pm";
 const userNotes = config.get("userNotes") ?? "No additional notes provided yet.";
-const linearTeam = config.get("linearTeam") ?? "";
-const githubRepo = config.get("githubRepo") ?? "";
 
 // Identity cache directory
 const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
@@ -255,8 +242,7 @@ function buildPluginsForAgent(
   const pluginSecrets: Record<string, pulumi.Output<string>> = {};
   let enableFunnel = false;
 
-  // Use agent's plugins, falling back to identity's recommended plugins
-  const pluginList = agent.plugins ?? identityPlugins ?? [];
+  const pluginList = identityPlugins ?? [];
 
   for (const pluginName of pluginList) {
     const pluginCfg = pluginConfigs[pluginName];
@@ -334,65 +320,34 @@ for (const agent of manifest.agents) {
     TIMEZONE: timezone,
     WORKING_HOURS: workingHours,
     USER_NOTES: userNotes,
-    LINEAR_TEAM: linearTeam,
-    GITHUB_REPO: githubRepo,
+    ...(manifest.templateVars ?? {}),
   };
 
-  // Track identity plugin/dep info for merging later
-  let identityPluginDefaults: Record<string, Record<string, unknown>> | undefined;
-  let identityPlugins: string[] | undefined;
-  let identityDeps: string[] | undefined;
+  // Fetch identity (always required)
+  const identity = fetchIdentitySync(agent.identity, identityCacheDir);
 
-  // Per-agent model/codingAgent from identity (with hardcoded defaults for custom agents)
-  let identityModel: string | undefined;
-  let identityBackupModel: string | undefined;
-  let identityCodingAgent: string | undefined;
+  // Identity files are the workspace files
+  workspaceFiles = processTemplates(identity.files, templateVars);
 
-  // Resolve identity source: explicit identity, legacy preset mapping, or custom
-  const identitySource = agent.identity ?? (agent.preset ? PRESET_TO_IDENTITY[agent.preset] : undefined);
+  // Pull defaults from identity manifest
+  agentEmoji = identity.manifest.emoji ?? agentEmoji;
+  agentDisplayName = agent.displayName || identity.manifest.displayName;
+  agentVolumeSize = agent.volumeSize ?? identity.manifest.volumeSize ?? 30;
 
-  if (identitySource) {
-    // Identity-based agent (or legacy preset converted to identity)
-    const identity = fetchIdentitySync(identitySource, identityCacheDir);
+  // Extract public (clawhub) skills from identity manifest
+  const { public: publicSkills } = classifySkills(identity.manifest.skills);
+  clawhubSkillSlugs = publicSkills.map((s) => s.slug);
 
-    // Identity files are the workspace files
-    workspaceFiles = processTemplates(identity.files, templateVars);
+  // Build plugin configs for this agent (always from identity)
+  const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identity.manifest.pluginDefaults, identity.manifest.plugins);
 
-    // Pull defaults from identity manifest (agent-level overrides take precedence)
-    agentEmoji = identity.manifest.emoji ?? agentEmoji;
-    agentDisplayName = agent.displayName || identity.manifest.displayName;
-    agentVolumeSize = agent.volumeSize ?? identity.manifest.volumeSize ?? 30;
+  // Resolve model/codingAgent from identity
+  const agentModel = identity.manifest.model ?? "anthropic/claude-opus-4-6";
+  const agentBackupModel = identity.manifest.backupModel;
+  const agentCodingAgent = identity.manifest.codingAgent ?? "claude-code";
 
-    // Capture identity plugin info for merging into plugin config
-    identityPluginDefaults = identity.manifest.pluginDefaults;
-    identityPlugins = identity.manifest.plugins;
-    identityDeps = identity.manifest.deps;
-
-    // Capture model/codingAgent from identity
-    identityModel = identity.manifest.model;
-    identityBackupModel = identity.manifest.backupModel;
-    identityCodingAgent = identity.manifest.codingAgent;
-
-    // Extract public (clawhub) skills from identity manifest
-    const { public: publicSkills } = classifySkills(identity.manifest.skills);
-    clawhubSkillSlugs = publicSkills.map((s) => s.slug);
-  } else {
-    // Custom agent with inline content (no identity)
-    workspaceFiles = {};
-    if (agent.soulContent) workspaceFiles["SOUL.md"] = agent.soulContent;
-    if (agent.identityContent) workspaceFiles["IDENTITY.md"] = agent.identityContent;
-  }
-
-  // Build plugin configs for this agent (merge identity defaults if available)
-  const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identityPluginDefaults, identityPlugins);
-
-  // Resolve model/codingAgent: identity values with hardcoded defaults for custom agents
-  const agentModel = identityModel ?? "anthropic/claude-opus-4-6";
-  const agentBackupModel = identityBackupModel;
-  const agentCodingAgent = identityCodingAgent ?? "claude-code";
-
-  // Resolve deps: agent manifest overrides identity defaults
-  const depNames = agent.deps ?? identityDeps ?? [];
+  // Resolve deps from identity
+  const depNames = identity.manifest.deps ?? [];
   const resolvedDeps = resolveDeps(depNames);
   const depEntries = resolvedDeps.map(d => ({
     name: d.name,

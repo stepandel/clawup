@@ -10,36 +10,19 @@ export interface AgentDefinition {
   displayName: string;
   /** Role identifier (e.g., "pm", "eng", "tester") */
   role: string;
-  /** Preset name if using a preset, null for custom agents. Mutually exclusive with `identity`. */
-  preset: string | null;
   /**
    * Git URL or local path to an identity repo/folder.
    * Supports `repo#subfolder` syntax for mono-repos.
-   * Mutually exclusive with `preset`.
    */
-  identity?: string;
+  identity: string;
   /** Pin the identity to a specific Git tag or commit hash */
   identityVersion?: string;
   /** EBS volume size in GB */
   volumeSize: number;
   /** Override instance type for this agent */
   instanceType?: string;
-  /**
-   * Custom SOUL.md content (custom agents only).
-   * @deprecated Use an identity repo with a SOUL.md file instead.
-   */
-  soulContent?: string;
-  /**
-   * Custom IDENTITY.md content (custom agents only).
-   * @deprecated Use an identity repo with an IDENTITY.md file instead.
-   */
-  identityContent?: string;
   /** Additional environment variables */
   envVars?: Record<string, string>;
-  /** Plugin names to install on this agent (e.g., ["openclaw-linear"]) */
-  plugins?: string[];
-  /** Dep names for this agent (e.g., ["gh", "brave-search"]) */
-  deps?: string[];
 }
 
 /** Per-plugin configuration file stored at ~/.agent-army/configs/<stack>/plugins/<plugin>.yaml */
@@ -60,10 +43,8 @@ export interface ArmyManifest {
   workingHours?: string;
   /** Additional notes about the owner for agents */
   userNotes?: string;
-  /** Default Linear team identifier for bootstrap integration checks (e.g., "AGE") */
-  linearTeam?: string;
-  /** GitHub repo URL for bootstrap integration checks */
-  githubRepo?: string;
+  /** Generic template variables (e.g., LINEAR_TEAM, GITHUB_REPO) */
+  templateVars?: Record<string, string>;
   agents: AgentDefinition[];
 }
 
@@ -121,12 +102,10 @@ export interface IdentityResult {
 
 /**
  * Validate an AgentDefinition for consistency.
- * Checks mutual exclusivity of `preset` and `identity`, and required fields.
  *
  * @throws Error with descriptive message if validation fails
  */
 export function validateAgentDefinition(agent: AgentDefinition): void {
-  // Validate required fields first so error messages below can reference agent.name safely
   if (!agent.name) {
     throw new Error(`Agent definition missing required field "name".`);
   }
@@ -139,37 +118,12 @@ export function validateAgentDefinition(agent: AgentDefinition): void {
     throw new Error(`Agent "${agent.name}" missing required field "role".`);
   }
 
+  if (!agent.identity) {
+    throw new Error(`Agent "${agent.name}" missing required field "identity".`);
+  }
+
   if (typeof agent.volumeSize !== "number" || agent.volumeSize <= 0) {
     throw new Error(`Agent "${agent.name}": "volumeSize" must be a positive number.`);
-  }
-
-  if (agent.preset && agent.identity) {
-    throw new Error(
-      `Agent "${agent.name}": "preset" and "identity" are mutually exclusive. Use one or the other.`
-    );
-  }
-
-  if (!agent.preset && !agent.identity && !agent.soulContent) {
-    throw new Error(
-      `Agent "${agent.name}": must specify either "preset", "identity", or custom content ("soulContent").`
-    );
-  }
-
-  if (agent.identityVersion && !agent.identity) {
-    throw new Error(
-      `Agent "${agent.name}": "identityVersion" requires "identity" to be set.`
-    );
-  }
-
-  if (agent.plugins !== undefined) {
-    if (!Array.isArray(agent.plugins)) {
-      throw new Error(`Agent "${agent.name}": "plugins" must be an array of strings.`);
-    }
-    for (const p of agent.plugins) {
-      if (typeof p !== "string" || !p) {
-        throw new Error(`Agent "${agent.name}": each plugin must be a non-empty string.`);
-      }
-    }
   }
 }
 

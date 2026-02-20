@@ -25,16 +25,6 @@ export const BUILT_IN_IDENTITIES: Record<string, { path: string; label: string; 
   },
 };
 
-/**
- * Map legacy preset names to identity paths for backward compatibility.
- * Existing manifests with `preset: "pm"` are converted to identity-based loading at runtime.
- * @deprecated Use BUILT_IN_IDENTITIES instead.
- */
-export const PRESET_TO_IDENTITY: Record<string, string> = {
-  pm: "https://github.com/stepandel/army-identities#pm",
-  eng: "https://github.com/stepandel/army-identities#eng",
-  tester: "https://github.com/stepandel/army-identities#tester",
-};
 
 /** Map agent aliases to role keys */
 export const AGENT_ALIASES: Record<string, string> = {

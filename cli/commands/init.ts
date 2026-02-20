@@ -1,10 +1,14 @@
 /**
  * agent-army init — Interactive setup wizard
+ *
+ * Identity-driven: every agent must have an identity source.
+ * The manifest stores only team composition (which agents to deploy).
+ * Plugins, deps, and config come from identities at deploy time.
  */
 
 import { execSync } from "child_process";
 import * as p from "@clack/prompts";
-import type { AgentDefinition, ArmyManifest } from "../types";
+import type { AgentDefinition, ArmyManifest, IdentityManifest } from "../types";
 import { fetchIdentity } from "../lib/identity";
 import * as os from "os";
 import * as path from "path";
@@ -22,6 +26,8 @@ import {
   slackAppManifest,
   tailscaleHostname,
 } from "../lib/constants";
+import { PLUGIN_REGISTRY } from "../lib/plugin-registry";
+import { DEP_REGISTRY } from "../lib/dep-registry";
 import { checkPrerequisites } from "../lib/prerequisites";
 import { selectOrCreateStack, setConfig } from "../lib/pulumi";
 import { saveManifest, savePluginConfig } from "../lib/config";
@@ -34,10 +40,18 @@ interface InitOptions {
   yes?: boolean;
 }
 
+/** Fetched identity data stored alongside the agent definition */
+interface FetchedIdentity {
+  agent: AgentDefinition;
+  manifest: IdentityManifest;
+}
+
 export async function initCommand(opts: InitOptions = {}): Promise<void> {
   showBanner();
 
+  // -------------------------------------------------------------------------
   // Step 1: Check prerequisites
+  // -------------------------------------------------------------------------
   p.log.step("Checking prerequisites...");
   const prereqsOk = await checkPrerequisites();
   if (!prereqsOk) {
@@ -45,7 +59,9 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   }
   p.log.success("All prerequisites satisfied!");
 
-  // Step 2: Collect basic config
+  // -------------------------------------------------------------------------
+  // Step 2: Infrastructure config
+  // -------------------------------------------------------------------------
   const stackName = await p.text({
     message: "Pulumi stack name",
     placeholder: "dev",
@@ -60,7 +76,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(provider);
 
-  // Provider-specific region/location and instance type selection
   let region: string;
   let instanceType: string;
 
@@ -99,6 +114,9 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     instanceType = hetznerServerType as string;
   }
 
+  // -------------------------------------------------------------------------
+  // Step 3: Owner info
+  // -------------------------------------------------------------------------
   const ownerName = await p.text({
     message: "Owner name (for workspace templates)",
     placeholder: "Boss",
@@ -127,26 +145,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(userNotes);
 
-  // Project-specific config for bootstrap
-  const linearTeam = await p.text({
-    message: "Default Linear team id (used in bootstrap integration check)",
-    placeholder: "e.g., ENG, AGE, PROJ",
-    validate: (val) => {
-      if (!val) return "Default Linear team id is required";
-    },
-  });
-  handleCancel(linearTeam);
-
-  const githubRepo = await p.text({
-    message: "Default GitHub repo URL (used in bootstrap integration check)",
-    placeholder: "https://github.com/org/repo",
-    validate: (val) => {
-      if (!val) return "Default GitHub repo URL is required";
-      if (!val.startsWith("https://github.com/")) return "Must be a GitHub HTTPS URL";
-    },
-  });
-  handleCancel(githubRepo);
-
   const basicConfig = {
     stackName: stackName as string,
     provider: provider as "aws" | "hetzner",
@@ -156,11 +154,11 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     timezone: timezone as string,
     workingHours: workingHours as string,
     userNotes: (userNotes as string) || "No additional notes provided yet.",
-    linearTeam: linearTeam as string,
-    githubRepo: githubRepo as string,
   };
 
-  // Step 3: Collect Anthropic API key and model
+  // -------------------------------------------------------------------------
+  // Step 4: Secrets (Anthropic, Tailscale, Hetzner)
+  // -------------------------------------------------------------------------
   p.log.step("Configure Anthropic API key");
 
   p.note(
@@ -221,7 +219,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(tailscaleApiKey);
 
-  // Hetzner API token (required for Hetzner provider)
   let hcloudToken: string | undefined;
   if (provider === "hetzner") {
     p.note(
@@ -239,26 +236,25 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     hcloudToken = token as string;
   }
 
-  // Step 4: Choose agents
+  // -------------------------------------------------------------------------
+  // Step 5: Agent selection (identity-driven, no custom mode)
+  // -------------------------------------------------------------------------
   p.log.step("Configure agents");
 
   const agentMode = await p.select({
     message: "How would you like to configure agents?",
     options: [
       { value: "built-in", label: "Built-in agents", hint: "PM (Juno), Eng (Titus), QA (Scout)" },
-      { value: "identity", label: "From identity repo", hint: "Load agent personas from a Git URL or local path" },
-      { value: "custom", label: "Custom only", hint: "Define your own agents" },
-      { value: "mix", label: "Mix of both", hint: "Pick built-in + add custom agents" },
+      { value: "identity", label: "From identity source", hint: "Load from a Git URL or local path" },
+      { value: "mix", label: "Mix of both", hint: "Pick built-in + add from identity source" },
     ],
   });
   handleCancel(agentMode);
 
-  const agents: AgentDefinition[] = [];
-  // Track identity pluginDefaults per role for seeding plugin config files
-  const identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>> = {};
+  const fetchedIdentities: FetchedIdentity[] = [];
   const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
 
-  // Collect built-in agents (loaded via identity system)
+  // Collect built-in agents
   if (agentMode === "built-in" || agentMode === "mix") {
     const selectedBuiltIns = await p.multiselect({
       message: "Select agents",
@@ -274,23 +270,18 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     for (const key of selectedBuiltIns as string[]) {
       const entry = BUILT_IN_IDENTITIES[key];
       const identity = await fetchIdentity(entry.path, identityCacheDir);
-      agents.push({
+      const agent: AgentDefinition = {
         name: `agent-${identity.manifest.name}`,
         displayName: identity.manifest.displayName,
         role: identity.manifest.role,
-        preset: null,
         identity: entry.path,
         volumeSize: identity.manifest.volumeSize,
-        plugins: identity.manifest.plugins ?? ["openclaw-linear"],
-      });
-
-      if (identity.manifest.pluginDefaults) {
-        identityPluginDefaults[identity.manifest.role] = identity.manifest.pluginDefaults;
-      }
+      };
+      fetchedIdentities.push({ agent, manifest: identity.manifest });
     }
   }
 
-  // Collect identity-based agents
+  // Collect identity-source agents
   if (agentMode === "identity" || agentMode === "mix") {
     let addMore = true;
 
@@ -304,7 +295,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       });
       handleCancel(identityUrl);
 
-      // Validate by fetching the identity
       const spinner = p.spinner();
       spinner.start("Validating identity...");
 
@@ -326,24 +316,18 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         });
         handleCancel(volumeOverride);
 
-        agents.push({
+        const agent: AgentDefinition = {
           name: `agent-${identity.manifest.name}`,
           displayName: identity.manifest.displayName,
           role: identity.manifest.role,
-          preset: null,
           identity: identityUrl as string,
           volumeSize: parseInt(volumeOverride as string, 10),
-          plugins: identity.manifest.plugins ?? ["openclaw-linear"],
-        });
-
-        // Track identity pluginDefaults for seeding plugin config files
-        if (identity.manifest.pluginDefaults) {
-          identityPluginDefaults[identity.manifest.role] = identity.manifest.pluginDefaults;
-        }
+        };
+        fetchedIdentities.push({ agent, manifest: identity.manifest });
       } catch (err) {
         spinner.stop(`Failed to validate identity: ${(err as Error).message}`);
         p.log.error("Please check the URL and try again.");
-        continue; // Re-prompt
+        continue;
       }
 
       const more = await p.confirm({
@@ -355,94 +339,87 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     }
   }
 
-  // Collect custom agents
-  if (agentMode === "custom" || agentMode === "mix") {
-    let addMore = true;
-    while (addMore) {
-      const customAgent = await p.group(
-        {
-          name: () =>
-            p.text({
-              message: "Agent resource name",
-              placeholder: "agent-researcher",
-              validate: (val) => {
-                if (!/^[a-z][a-z0-9-]*$/.test(val))
-                  return "Must be lowercase alphanumeric with hyphens, starting with a letter";
-              },
-            }),
-          displayName: () =>
-            p.text({
-              message: "Display name",
-              placeholder: "Nova",
-            }),
-          role: () =>
-            p.text({
-              message: "Role identifier",
-              placeholder: "researcher",
-              validate: (val) => {
-                if (!/^[a-z][a-z0-9-]*$/.test(val))
-                  return "Must be lowercase alphanumeric with hyphens";
-              },
-            }),
-          soulContent: () =>
-            p.text({
-              message: "Agent soul/personality description (optional)",
-              placeholder: "You are a research agent specializing in...",
-              defaultValue: "",
-            }),
-          volumeSize: () =>
-            p.text({
-              message: "Volume size in GB",
-              placeholder: "30",
-              defaultValue: "30",
-              validate: (val) => {
-                const n = parseInt(val, 10);
-                if (isNaN(n) || n < 8 || n > 500) return "Must be between 8 and 500";
-              },
-            }),
-        },
-        {
-          onCancel: () => {
-            p.cancel("Setup cancelled.");
-            process.exit(0);
-          },
-        }
-      );
-
-      const agentDef: AgentDefinition = {
-        name: customAgent.name,
-        displayName: customAgent.displayName,
-        role: customAgent.role,
-        preset: null,
-        volumeSize: parseInt(customAgent.volumeSize, 10),
-        plugins: ["openclaw-linear"],
-      };
-      if (customAgent.soulContent) {
-        agentDef.soulContent = customAgent.soulContent;
-      }
-      agents.push(agentDef);
-
-      const more = await p.confirm({
-        message: "Add another custom agent?",
-        initialValue: false,
-      });
-      handleCancel(more);
-      addMore = more as boolean;
-    }
-  }
-
-  if (agents.length === 0) {
+  if (fetchedIdentities.length === 0) {
     exitWithError("No agents configured. At least one agent is required.");
   }
 
-  // Step 5: Configure integrations
+  const agents = fetchedIdentities.map((fi) => fi.agent);
+
+  // -------------------------------------------------------------------------
+  // Step 6: Collect template variable values
+  // -------------------------------------------------------------------------
+
+  // Auto-fillable vars from owner info
+  const autoVars: Record<string, string> = {
+    OWNER_NAME: basicConfig.ownerName,
+    TIMEZONE: basicConfig.timezone,
+    WORKING_HOURS: basicConfig.workingHours,
+    USER_NOTES: basicConfig.userNotes,
+  };
+
+  // Scan all identities for template vars and deduplicate
+  const allTemplateVarNames = new Set<string>();
+  for (const fi of fetchedIdentities) {
+    for (const v of fi.manifest.templateVars ?? []) {
+      allTemplateVarNames.add(v);
+    }
+  }
+
+  const templateVars: Record<string, string> = {};
+
+  // Auto-fill known vars
+  for (const varName of allTemplateVarNames) {
+    if (autoVars[varName]) {
+      templateVars[varName] = autoVars[varName];
+    }
+  }
+
+  // Prompt for remaining vars
+  const remainingVars = [...allTemplateVarNames].filter((v) => !templateVars[v]);
+  if (remainingVars.length > 0) {
+    p.log.step("Configure template variables");
+    p.log.info(`Your agents use the following template variables: ${remainingVars.join(", ")}`);
+
+    for (const varName of remainingVars) {
+      const value = await p.text({
+        message: `Value for ${varName}`,
+        placeholder: varName === "LINEAR_TEAM" ? "e.g., ENG" : varName === "GITHUB_REPO" ? "https://github.com/org/repo" : "",
+        validate: (val) => {
+          if (!val.trim()) return `${varName} is required`;
+        },
+      });
+      handleCancel(value);
+      templateVars[varName] = value as string;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 7: Collect integration credentials (driven by identity plugins/deps)
+  // -------------------------------------------------------------------------
   p.log.step("Configure integrations");
 
-  // Required integrations
-  const integrations: string[] = ["linear", "github"];
+  // Determine which plugins and deps are needed across all identities
+  const agentPlugins = new Map<string, Set<string>>(); // role → plugin names
+  const agentDeps = new Map<string, Set<string>>(); // role → dep names
+  const allPluginNames = new Set<string>();
+  const allDepNames = new Set<string>();
 
-  // Check if any agent uses the Slack plugin
-  const hasSlackPlugin = agents.some((a) => a.plugins?.includes("slack"));
+  for (const fi of fetchedIdentities) {
+    const plugins = new Set(fi.manifest.plugins ?? []);
+    const deps = new Set(fi.manifest.deps ?? []);
+    agentPlugins.set(fi.agent.role, plugins);
+    agentDeps.set(fi.agent.role, deps);
+    for (const pl of plugins) allPluginNames.add(pl);
+    for (const d of deps) allDepNames.add(d);
+  }
+
+  // Track identity pluginDefaults per role for seeding plugin config files
+  const identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>> = {};
+  for (const fi of fetchedIdentities) {
+    if (fi.manifest.pluginDefaults) {
+      identityPluginDefaults[fi.agent.role] = fi.manifest.pluginDefaults;
+    }
+  }
 
   // Per-agent integration credentials
   const integrationCredentials: Record<string, {
@@ -451,37 +428,35 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     linearUserUuid?: string;
     githubToken?: string;
   }> = {};
-
   for (const agent of agents) {
     integrationCredentials[agent.role] = {};
   }
 
-  // Slack credentials — driven by plugin presence
+  // Slack credentials — only if any identity has the slack plugin
   const slackCredentials: Record<string, { botToken: string; appToken: string }> = {};
-  if (hasSlackPlugin) {
+  if (allPluginNames.has("slack")) {
     p.note(
       KEY_INSTRUCTIONS.slackCredentials.steps.join("\n"),
       KEY_INSTRUCTIONS.slackCredentials.title
     );
 
-    for (const agent of agents) {
-      if (!agent.plugins?.includes("slack")) continue;
+    for (const fi of fetchedIdentities) {
+      if (!agentPlugins.get(fi.agent.role)?.has("slack")) continue;
 
-      // Copy manifest to clipboard for easy paste into Slack
-      const manifest = slackAppManifest(agent.displayName);
+      const slackManifest = slackAppManifest(fi.agent.displayName);
       try {
         execSync(
           process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard",
-          { input: manifest },
+          { input: slackManifest },
         );
-        p.log.success(`Slack manifest for ${agent.displayName} copied to clipboard — paste it into Slack`);
+        p.log.success(`Slack manifest for ${fi.agent.displayName} copied to clipboard — paste it into Slack`);
       } catch {
-        p.log.warn(`Could not copy to clipboard. Manifest for ${agent.displayName}:`);
-        console.log(manifest);
+        p.log.warn(`Could not copy to clipboard. Manifest for ${fi.agent.displayName}:`);
+        console.log(slackManifest);
       }
 
       const botToken = await p.password({
-        message: `Slack Bot Token for ${agent.displayName} (${agent.role})`,
+        message: `Slack Bot Token for ${fi.agent.displayName} (${fi.agent.role})`,
         validate: (val) => {
           if (!val.startsWith("xoxb-")) return "Must start with xoxb-";
         },
@@ -489,40 +464,45 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       handleCancel(botToken);
 
       const appToken = await p.password({
-        message: `Slack App Token for ${agent.displayName} (${agent.role})`,
+        message: `Slack App Token for ${fi.agent.displayName} (${fi.agent.role})`,
         validate: (val) => {
           if (!val.startsWith("xapp-")) return "Must start with xapp-";
         },
       });
       handleCancel(appToken);
 
-      slackCredentials[agent.role] = {
+      slackCredentials[fi.agent.role] = {
         botToken: botToken as string,
         appToken: appToken as string,
       };
     }
   }
 
-  if (integrations.includes("linear")) {
+  // Linear credentials — only if any identity has the openclaw-linear plugin
+  if (allPluginNames.has("openclaw-linear")) {
     p.note(
       KEY_INSTRUCTIONS.linearApiKey.steps.join("\n"),
       KEY_INSTRUCTIONS.linearApiKey.title
     );
 
-    for (const agent of agents) {
+    const linearAgents = fetchedIdentities.filter(
+      (fi) => agentPlugins.get(fi.agent.role)?.has("openclaw-linear")
+    );
+
+    for (const fi of linearAgents) {
       const linearKey = await p.password({
-        message: `Linear API key for ${agent.displayName} (${agent.role})`,
+        message: `Linear API key for ${fi.agent.displayName} (${fi.agent.role})`,
         validate: (val) => {
           if (!val.startsWith("lin_api_")) return "Must start with lin_api_";
         },
       });
       handleCancel(linearKey);
 
-      integrationCredentials[agent.role].linearApiKey = linearKey as string;
+      integrationCredentials[fi.agent.role].linearApiKey = linearKey as string;
 
       // Auto-fetch user UUID from Linear API
       const s = p.spinner();
-      s.start(`Fetching Linear user ID for ${agent.displayName}...`);
+      s.start(`Fetching Linear user ID for ${fi.agent.displayName}...`);
       try {
         const res = await fetch("https://api.linear.app/graphql", {
           method: "POST",
@@ -535,13 +515,13 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         const data = (await res.json()) as { data?: { viewer?: { id?: string } } };
         const uuid = data?.data?.viewer?.id;
         if (!uuid) throw new Error("No user ID in response");
-        integrationCredentials[agent.role].linearUserUuid = uuid;
-        s.stop(`${agent.displayName}: ${uuid}`);
+        integrationCredentials[fi.agent.role].linearUserUuid = uuid;
+        s.stop(`${fi.agent.displayName}: ${uuid}`);
       } catch (err) {
-        s.stop(`Could not fetch Linear user ID for ${agent.displayName}`);
+        s.stop(`Could not fetch Linear user ID for ${fi.agent.displayName}`);
         p.log.warn(`${err instanceof Error ? err.message : String(err)}`);
         const linearUserUuid = await p.text({
-          message: `Enter Linear user UUID manually for ${agent.displayName}`,
+          message: `Enter Linear user UUID manually for ${fi.agent.displayName}`,
           placeholder: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
           validate: (val) => {
             if (!val) return "Linear user UUID is required";
@@ -551,12 +531,11 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
           },
         });
         handleCancel(linearUserUuid);
-        integrationCredentials[agent.role].linearUserUuid = linearUserUuid as string;
+        integrationCredentials[fi.agent.role].linearUserUuid = linearUserUuid as string;
       }
     }
 
-    // Per-agent Linear webhook signing secret
-    // The webhook URL is deterministic, so we can show it before deploy
+    // Linear webhook signing secrets
     p.note(
       [
         "Create a webhook in Linear for each agent:",
@@ -568,32 +547,35 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       "Linear Webhook Setup"
     );
 
-    for (const agent of agents) {
-      const webhookUrl = `https://${tailscaleHostname(basicConfig.stackName as string, agent.name)}.${tailnetDnsName as string}/hooks/linear`;
+    for (const fi of linearAgents) {
+      const webhookUrl = `https://${tailscaleHostname(basicConfig.stackName, fi.agent.name)}.${tailnetDnsName as string}/hooks/linear`;
 
-      p.log.info(`${agent.displayName} (${agent.role}): ${webhookUrl}`);
+      p.log.info(`${fi.agent.displayName} (${fi.agent.role}): ${webhookUrl}`);
 
       const webhookSecretInput = await p.password({
-        message: `Signing secret for ${agent.displayName} (${agent.role})`,
+        message: `Signing secret for ${fi.agent.displayName} (${fi.agent.role})`,
         validate: (val) => {
           if (!val) return "Webhook signing secret is required";
         },
       });
       handleCancel(webhookSecretInput);
 
-      integrationCredentials[agent.role].linearWebhookSecret = webhookSecretInput as string;
+      integrationCredentials[fi.agent.role].linearWebhookSecret = webhookSecretInput as string;
     }
   }
 
-  if (integrations.includes("github")) {
+  // GitHub token — only if any identity has the gh dep
+  if (allDepNames.has("gh")) {
     p.note(
       KEY_INSTRUCTIONS.githubToken.steps.join("\n"),
       KEY_INSTRUCTIONS.githubToken.title
     );
 
-    for (const agent of agents) {
+    for (const fi of fetchedIdentities) {
+      if (!agentDeps.get(fi.agent.role)?.has("gh")) continue;
+
       const githubKey = await p.password({
-        message: `GitHub token for ${agent.displayName} (${agent.role})`,
+        message: `GitHub token for ${fi.agent.displayName} (${fi.agent.role})`,
         validate: (val) => {
           if (!val.startsWith("ghp_") && !val.startsWith("github_pat_")) {
             return "Must start with ghp_ or github_pat_";
@@ -602,19 +584,13 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       });
       handleCancel(githubKey);
 
-      integrationCredentials[agent.role].githubToken = githubKey as string;
+      integrationCredentials[fi.agent.role].githubToken = githubKey as string;
     }
   }
 
-  // Optional: Brave Search API key (shared across all agents)
-  const braveApiKeyPrompt = await p.confirm({
-    message: "Add a Brave Search API key for web search? (optional)",
-    initialValue: false,
-  });
-  handleCancel(braveApiKeyPrompt);
-
+  // Brave Search API key — only if any identity has the brave-search dep (global, once)
   let braveApiKey: string | undefined;
-  if (braveApiKeyPrompt) {
+  if (allDepNames.has("brave-search")) {
     p.note(
       KEY_INSTRUCTIONS.braveApiKey.steps.join("\n"),
       KEY_INSTRUCTIONS.braveApiKey.title
@@ -630,48 +606,60 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     braveApiKey = braveKey as string;
   }
 
-  // Step 7: Show summary
+  // -------------------------------------------------------------------------
+  // Step 8: Summary
+  // -------------------------------------------------------------------------
   const costEstimates = basicConfig.provider === "aws" ? COST_ESTIMATES : HETZNER_COST_ESTIMATES;
-  const costPerAgent = costEstimates[basicConfig.instanceType as string] ?? 30;
+  const costPerAgent = costEstimates[basicConfig.instanceType] ?? 30;
   const totalCost = agents.reduce((sum, a) => {
-    const agentCost = costEstimates[a.instanceType ?? (basicConfig.instanceType as string)] ?? costPerAgent;
+    const agentCost = costEstimates[a.instanceType ?? basicConfig.instanceType] ?? costPerAgent;
     return sum + agentCost;
   }, 0);
 
-  const integrationNames = [
-    ...(hasSlackPlugin ? ["Slack"] : []),
-    ...integrations.map(i => {
-      if (i === "linear") return "Linear";
-      if (i === "github") return "GitHub CLI";
-      return i;
-    }),
-  ];
+  const integrationNames: string[] = [];
+  if (allPluginNames.has("openclaw-linear")) integrationNames.push("Linear");
+  if (allPluginNames.has("slack")) integrationNames.push("Slack");
+  if (allDepNames.has("gh")) integrationNames.push("GitHub CLI");
+  if (allDepNames.has("brave-search")) integrationNames.push("Brave Search");
 
   const providerLabel = basicConfig.provider === "aws" ? "AWS" : "Hetzner";
   const regionLabel = basicConfig.provider === "aws" ? "Region" : "Location";
 
-  p.note(
-    [
-      `Stack:          ${basicConfig.stackName}`,
-      `Provider:       ${providerLabel}`,
-      `${regionLabel.padEnd(14, " ")} ${basicConfig.region}`,
-      `Instance type:  ${basicConfig.instanceType}`,
-      `Owner:          ${basicConfig.ownerName}`,
-      `Timezone:       ${basicConfig.timezone}`,
-      `Working hours:  ${basicConfig.workingHours}`,
-      `Linear team:    ${basicConfig.linearTeam}`,
-      `GitHub repo:    ${basicConfig.githubRepo}`,
-      `Integrations:   ${integrationNames.join(", ")}`,
-      ``,
-      `Agents (${agents.length}):`,
-      formatAgentList(agents),
-      ``,
-      `Estimated cost: ${formatCost(totalCost)}`,
-    ].join("\n"),
-    "Deployment Summary"
+  // Build template vars display (excluding auto-filled owner vars)
+  const customVarEntries = Object.entries(templateVars).filter(
+    ([k]) => !autoVars[k]
   );
 
-  // Step 8: Confirm
+  const summaryLines = [
+    `Stack:          ${basicConfig.stackName}`,
+    `Provider:       ${providerLabel}`,
+    `${regionLabel.padEnd(14, " ")} ${basicConfig.region}`,
+    `Instance type:  ${basicConfig.instanceType}`,
+    `Owner:          ${basicConfig.ownerName}`,
+    `Timezone:       ${basicConfig.timezone}`,
+    `Working hours:  ${basicConfig.workingHours}`,
+  ];
+  if (customVarEntries.length > 0) {
+    for (const [k, v] of customVarEntries) {
+      summaryLines.push(`${k.padEnd(14, " ")} ${v}`);
+    }
+  }
+  if (integrationNames.length > 0) {
+    summaryLines.push(`Integrations:   ${integrationNames.join(", ")}`);
+  }
+  summaryLines.push(
+    ``,
+    `Agents (${agents.length}):`,
+    formatAgentList(agents),
+    ``,
+    `Estimated cost: ${formatCost(totalCost)}`
+  );
+
+  p.note(summaryLines.join("\n"), "Deployment Summary");
+
+  // -------------------------------------------------------------------------
+  // Step 9: Confirm
+  // -------------------------------------------------------------------------
   const confirmed = await p.confirm({
     message: "Proceed with setup?",
   });
@@ -681,10 +669,12 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     process.exit(0);
   }
 
-  // Step 9: Execute setup
+  // -------------------------------------------------------------------------
+  // Step 10: Execute setup
+  // -------------------------------------------------------------------------
   const s = p.spinner();
 
-  // Set up workspace (installs Pulumi SDK deps on first run, no-op in dev mode)
+  // Set up workspace
   s.start("Setting up workspace...");
   const wsResult = ensureWorkspace();
   if (!wsResult.ok) {
@@ -696,7 +686,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   // Select/create stack
   s.start("Selecting Pulumi stack...");
-  const stackResult = selectOrCreateStack(basicConfig.stackName as string, cwd);
+  const stackResult = selectOrCreateStack(basicConfig.stackName, cwd);
   if (!stackResult.ok) {
     s.stop("Failed to select/create stack");
     if (stackResult.error) p.log.error(stackResult.error);
@@ -721,13 +711,12 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   if (tailscaleApiKey) {
     setConfig("tailscaleApiKey", tailscaleApiKey as string, true, cwd);
   }
-  setConfig("instanceType", basicConfig.instanceType as string, false, cwd);
-  setConfig("ownerName", basicConfig.ownerName as string, false, cwd);
-  setConfig("timezone", basicConfig.timezone as string, false, cwd);
-  setConfig("workingHours", basicConfig.workingHours as string, false, cwd);
-  setConfig("userNotes", basicConfig.userNotes as string, false, cwd);
-  setConfig("linearTeam", basicConfig.linearTeam as string, false, cwd);
-  setConfig("githubRepo", basicConfig.githubRepo as string, false, cwd);
+  setConfig("instanceType", basicConfig.instanceType, false, cwd);
+  setConfig("ownerName", basicConfig.ownerName, false, cwd);
+  setConfig("timezone", basicConfig.timezone, false, cwd);
+  setConfig("workingHours", basicConfig.workingHours, false, cwd);
+  setConfig("userNotes", basicConfig.userNotes, false, cwd);
+
   // Set per-agent integration credentials
   for (const [role, creds] of Object.entries(integrationCredentials)) {
     if (creds.linearApiKey) setConfig(`${role}LinearApiKey`, creds.linearApiKey, true, cwd);
@@ -735,7 +724,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     if (creds.linearUserUuid) setConfig(`${role}LinearUserUuid`, creds.linearUserUuid, false, cwd);
     if (creds.githubToken) setConfig(`${role}GithubToken`, creds.githubToken, true, cwd);
   }
-  // Set per-agent Slack credentials (driven by plugin presence)
+  // Set per-agent Slack credentials
   for (const [role, creds] of Object.entries(slackCredentials)) {
     setConfig(`${role}SlackBotToken`, creds.botToken, true, cwd);
     setConfig(`${role}SlackAppToken`, creds.appToken, true, cwd);
@@ -744,52 +733,58 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   s.stop("Configuration saved");
 
   // Write manifest
-  const configName = basicConfig.stackName as string;
+  const configName = basicConfig.stackName;
   s.start(`Writing config to ~/.agent-army/configs/${configName}.yaml...`);
+
+  // Only include non-auto template vars in manifest (owner vars are derived at deploy time)
+  const manifestTemplateVars: Record<string, string> = {};
+  for (const [k, v] of Object.entries(templateVars)) {
+    if (!autoVars[k]) {
+      manifestTemplateVars[k] = v;
+    }
+  }
+
   const manifest: ArmyManifest = {
     stackName: configName,
-    provider: basicConfig.provider as "aws" | "hetzner",
-    region: basicConfig.region as string,
-    instanceType: basicConfig.instanceType as string,
-    ownerName: basicConfig.ownerName as string,
-    timezone: basicConfig.timezone as string,
-    workingHours: basicConfig.workingHours as string,
-    userNotes: basicConfig.userNotes as string,
-    linearTeam: basicConfig.linearTeam as string,
-    githubRepo: basicConfig.githubRepo as string,
+    provider: basicConfig.provider,
+    region: basicConfig.region,
+    instanceType: basicConfig.instanceType,
+    ownerName: basicConfig.ownerName,
+    timezone: basicConfig.timezone,
+    workingHours: basicConfig.workingHours,
+    userNotes: basicConfig.userNotes,
+    templateVars: Object.keys(manifestTemplateVars).length > 0 ? manifestTemplateVars : undefined,
     agents,
   };
   saveManifest(configName, manifest);
 
-  // Build and save plugin config files
-  // Collect all unique plugin names across agents
+  // Build and save plugin config files (seeded from identity pluginDefaults)
   const allPlugins = new Set<string>();
-  for (const agent of agents) {
-    for (const p of agent.plugins ?? []) allPlugins.add(p);
+  for (const fi of fetchedIdentities) {
+    for (const pl of fi.manifest.plugins ?? []) allPlugins.add(pl);
   }
 
   for (const pluginName of allPlugins) {
     const pluginAgents: Record<string, Record<string, unknown>> = {};
 
-    for (const agent of agents) {
-      if (!agent.plugins?.includes(pluginName)) continue;
+    for (const fi of fetchedIdentities) {
+      if (!agentPlugins.get(fi.agent.role)?.has(pluginName)) continue;
 
-      // Start with identity pluginDefaults if available
-      const defaults = identityPluginDefaults[agent.role]?.[pluginName] ?? {};
+      const defaults = identityPluginDefaults[fi.agent.role]?.[pluginName] ?? {};
       const agentConfig: Record<string, unknown> = {
         ...defaults,
-        agentId: agent.name,
+        agentId: fi.agent.name,
       };
 
-      // Layer on user-provided config (e.g., Linear credentials from init)
+      // Layer on user-provided config
       if (pluginName === "openclaw-linear") {
-        const creds = integrationCredentials[agent.role];
+        const creds = integrationCredentials[fi.agent.role];
         if (creds?.linearUserUuid) {
           agentConfig.linearUserUuid = creds.linearUserUuid;
         }
       }
 
-      pluginAgents[agent.role] = agentConfig;
+      pluginAgents[fi.agent.role] = agentConfig;
     }
 
     if (Object.keys(pluginAgents).length > 0) {

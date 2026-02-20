@@ -30,13 +30,10 @@ export interface DeployOptions {
  * Format agent list for display
  */
 function formatAgentList(
-  agents: { displayName: string; role: string; preset: string | null }[]
+  agents: { displayName: string; role: string }[]
 ): string {
   return agents
-    .map((a) => {
-      const type = a.preset ? `preset:${a.preset}` : "custom";
-      return `  ${pc.bold(a.displayName)} (${a.role}) [${type}]`;
-    })
+    .map((a) => `  ${pc.bold(a.displayName)} (${a.role})`)
     .join("\n");
 }
 
@@ -157,11 +154,8 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
     spinner.stop(magicDnsChanged ? "MagicDNS enabled" : "MagicDNS OK");
   }
 
-  // Ensure Tailscale Funnel prerequisites if any agent uses openclaw-linear plugin
-  const hasLinearAgents = manifest.agents.some(
-    (a) => a.plugins?.includes("openclaw-linear")
-  );
-  if (hasLinearAgents && tailscaleApiKey) {
+  // Ensure Tailscale Funnel prerequisites (identity plugins may need webhooks)
+  if (tailscaleApiKey) {
     const spinner = ui.spinner("Ensuring Tailscale Funnel prerequisites...");
     const funnel = ensureTailscaleFunnel(tailscaleApiKey);
     const changes: string[] = [];

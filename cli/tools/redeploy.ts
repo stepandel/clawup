@@ -30,13 +30,10 @@ export interface RedeployOptions {
  * Format agent list for display
  */
 function formatAgentList(
-  agents: { displayName: string; role: string; preset: string | null }[]
+  agents: { displayName: string; role: string }[]
 ): string {
   return agents
-    .map((a) => {
-      const type = a.preset ? `preset:${a.preset}` : "custom";
-      return `  ${pc.bold(a.displayName)} (${a.role}) [${type}]`;
-    })
+    .map((a) => `  ${pc.bold(a.displayName)} (${a.role})`)
     .join("\n");
 }
 

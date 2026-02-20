@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
-import { AGENT_ALIASES, PRESET_TO_IDENTITY, SSH_USER, tailscaleHostname } from "../lib/constants";
+import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "../lib/constants";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import type { AgentDefinition } from "../types";
@@ -205,14 +205,11 @@ export const pushTool: ToolImplementation<PushOptions> = async (
 
     let needsRestart = false;
 
-    // Resolve identity source (explicit identity or legacy preset mapping)
-    const identitySource = agent.identity ?? (agent.preset ? PRESET_TO_IDENTITY[agent.preset] : undefined);
-
     // 1. Push workspace files and skills (unified via identity system)
-    if ((doWorkspace || doSkills) && identitySource) {
+    if (doWorkspace || doSkills) {
       try {
         const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
-        const identity = fetchIdentitySync(identitySource, identityCacheDir);
+        const identity = fetchIdentitySync(agent.identity, identityCacheDir);
 
         // Ensure remote workspace dir exists
         sshExec(exec, host, `mkdir -p ${REMOTE_WORKSPACE}`);
@@ -294,8 +291,6 @@ export const pushTool: ToolImplementation<PushOptions> = async (
         console.log(`    ${pc.red("FAIL")}  identity fetch failed: ${(err as Error).message}`);
         allOk = false;
       }
-    } else if ((doWorkspace || doSkills) && !identitySource) {
-      console.log(`    ${pc.yellow("SKIP")}  no identity defined for ${agent.displayName} (custom agent)`);
     }
 
     // 3. Memory reset

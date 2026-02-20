@@ -205,6 +205,10 @@ function parseManifest(raw: unknown, sourcePath: string): IdentityManifest {
     plugins: validatePlugins(obj.plugins),
     pluginDefaults: validatePluginDefaults(obj.pluginDefaults),
     templateVars: obj.templateVars as string[],
+    model: typeof obj.model === "string" ? obj.model : undefined,
+    backupModel: typeof obj.backupModel === "string" ? obj.backupModel : undefined,
+    codingAgent: typeof obj.codingAgent === "string" ? obj.codingAgent : undefined,
+    deps: Array.isArray(obj.deps) ? obj.deps as string[] : undefined,
   };
 }
 

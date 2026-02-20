@@ -6,61 +6,21 @@ function makeAgent(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
     name: "agent-test",
     displayName: "Test",
     role: "eng",
-    preset: "eng",
+    identity: "https://github.com/org/identities#eng",
     volumeSize: 30,
     ...overrides,
   };
 }
 
 describe("validateAgentDefinition", () => {
-  it("accepts a valid preset-based agent", () => {
+  it("accepts a valid identity-based agent", () => {
     expect(() => validateAgentDefinition(makeAgent())).not.toThrow();
   });
 
-  it("accepts a valid identity-based agent", () => {
+  it("rejects agent missing identity", () => {
     expect(() =>
-      validateAgentDefinition(
-        makeAgent({ preset: null, identity: "https://github.com/org/identities#juno" })
-      )
-    ).not.toThrow();
-  });
-
-  it("rejects agent with both preset and identity", () => {
-    expect(() =>
-      validateAgentDefinition(
-        makeAgent({ preset: "pm", identity: "https://github.com/org/identities#juno" })
-      )
-    ).toThrow("mutually exclusive");
-  });
-
-  it("rejects agent with neither preset, identity, nor soulContent", () => {
-    expect(() =>
-      validateAgentDefinition(makeAgent({ preset: null }))
-    ).toThrow('must specify either "preset", "identity"');
-  });
-
-  it("allows custom agent with soulContent but no preset/identity", () => {
-    expect(() =>
-      validateAgentDefinition(makeAgent({ preset: null, soulContent: "# Soul" }))
-    ).not.toThrow();
-  });
-
-  it("rejects identityVersion without identity", () => {
-    expect(() =>
-      validateAgentDefinition(makeAgent({ identityVersion: "v1.0.0" }))
-    ).toThrow('"identityVersion" requires "identity"');
-  });
-
-  it("accepts identityVersion with identity", () => {
-    expect(() =>
-      validateAgentDefinition(
-        makeAgent({
-          preset: null,
-          identity: "https://github.com/org/ids#juno",
-          identityVersion: "v1.0.0",
-        })
-      )
-    ).not.toThrow();
+      validateAgentDefinition(makeAgent({ identity: "" }))
+    ).toThrow('missing required field "identity"');
   });
 
   it("rejects non-positive volumeSize", () => {
@@ -82,35 +42,15 @@ describe("validateAgentDefinition", () => {
     ).toThrow('missing required field "role"');
   });
 
-  it("accepts deprecated soulContent/identityContent for custom agents", () => {
+  it("accepts agent with optional instanceType override", () => {
     expect(() =>
-      validateAgentDefinition(
-        makeAgent({ preset: null, soulContent: "# Soul", identityContent: "# Identity" })
-      )
+      validateAgentDefinition(makeAgent({ instanceType: "t3.large" }))
     ).not.toThrow();
   });
 
-  it("accepts a valid plugins array", () => {
+  it("accepts agent with optional envVars", () => {
     expect(() =>
-      validateAgentDefinition(makeAgent({ plugins: ["openclaw-linear"] }))
-    ).not.toThrow();
-  });
-
-  it("accepts an empty plugins array", () => {
-    expect(() =>
-      validateAgentDefinition(makeAgent({ plugins: [] }))
-    ).not.toThrow();
-  });
-
-  it("rejects non-string plugin entries", () => {
-    expect(() =>
-      validateAgentDefinition(makeAgent({ plugins: ["openclaw-linear", "" as string] }))
-    ).toThrow("non-empty string");
-  });
-
-  it("accepts agent without plugins field", () => {
-    expect(() =>
-      validateAgentDefinition(makeAgent())
+      validateAgentDefinition(makeAgent({ envVars: { FOO: "bar" } }))
     ).not.toThrow();
   });
 });

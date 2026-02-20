@@ -41,11 +41,8 @@ export function formatCost(monthlyCost: number): string {
 /**
  * Format agent list for display
  */
-export function formatAgentList(agents: { displayName: string; role: string; preset: string | null }[]): string {
+export function formatAgentList(agents: { displayName: string; role: string; identity: string }[]): string {
   return agents
-    .map((a) => {
-      const type = a.preset ? `preset:${a.preset}` : "custom";
-      return `  ${pc.bold(a.displayName)} (${a.role}) [${type}]`;
-    })
+    .map((a) => `  ${pc.bold(a.displayName)} (${a.role})`)
     .join("\n");
 }
