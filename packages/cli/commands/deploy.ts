@@ -1,5 +1,5 @@
 /**
- * agent-army deploy — Deploy agents with pulumi up
+ * clawup deploy — Deploy agents with pulumi up
  *
  * This command wraps the platform-agnostic deployTool with the CLI adapter.
  */

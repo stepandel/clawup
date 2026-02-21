@@ -27,7 +27,7 @@ jobs:
       - name: Set version from release tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          cd cli && npm version "$VERSION" --no-git-tag-version --allow-same-version
+          cd packages/cli && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Build root Pulumi program
         run: pnpm build
@@ -36,10 +36,10 @@ jobs:
         run: bash scripts/bundle-infra.sh
 
       - name: Build CLI
-        run: pnpm --filter ./cli build
+        run: pnpm --filter ./packages/cli build
 
       - name: Publish to npm
         run: npm publish --provenance --access public
-        working-directory: cli/
+        working-directory: packages/cli/
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

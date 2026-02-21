@@ -1,19 +1,19 @@
 ---
-title: "What is Agent Army?"
+title: "What is Clawup?"
 description: "Deploy a fleet of autonomous AI agents on your own cloud infrastructure"
 ---
 
-Agent Army deploys autonomous [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner. Each agent is defined by a composable **identity** that packages personality, skills, model preferences, and tool configuration into a self-contained, reusable unit. Agents run 24/7 on dedicated servers, coordinating through integrations like Linear, GitHub, and Slack.
+Clawup deploys autonomous [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner. Each agent is defined by a composable **identity** that packages personality, skills, model preferences, and tool configuration into a self-contained, reusable unit. Agents run 24/7 on dedicated servers, coordinating through integrations like Linear, GitHub, and Slack.
 
-## Why Agent Army?
+## Why Clawup?
 
-You define _what_ your agents do through identities. Agent Army handles _where_ and _how_ they run — provisioning servers, installing tools, configuring networking, and keeping agents operational.
+You define _what_ your agents do through identities. Clawup handles _where_ and _how_ they run — provisioning servers, installing tools, configuring networking, and keeping agents operational.
 
 Each agent has a specific role, persistent memory, and the tools to do its job. Use the built-in identities to get started, or create your own for any role you need.
 
 ## Built-in Team
 
-Agent Army ships with three built-in identities that form a complete software development team:
+Clawup ships with three built-in identities that form a complete software development team:
 
 <CardGroup cols={3}>
   <Card title="Juno" icon="compass">
@@ -31,16 +31,16 @@ These are standard identities hosted in a Git repo — the same format as any cu
 
 ## How It Works
 
-1. **Configure** — Run `agent-army init` to set up your cloud provider, select identities (built-in, Git repo, or local), and connect integrations
-2. **Deploy** — Run `agent-army deploy` to provision your agents on dedicated servers
+1. **Configure** — Run `clawup init` to set up your cloud provider, select identities (built-in, Git repo, or local), and connect integrations
+2. **Deploy** — Run `clawup deploy` to provision your agents on dedicated servers
 3. **Assign work** — Move tickets through your Linear workflow and agents pick them up automatically. The [Linear plugin](/integrations/linear#linear-plugin) watches for ticket state changes and routes them into per-agent queues — each agent's [queue handler](/architecture/identities#how-agents-coordinate) processes tickets end-to-end
-4. **Monitor** — Use `agent-army status`, `ssh`, and `validate` to check on your agents
+4. **Monitor** — Use `clawup status`, `ssh`, and `validate` to check on your agents
 
 ## Key Features
 
 <CardGroup cols={2}>
   <Card title="One-Command Deploy" icon="rocket">
-    Interactive wizard configures everything. Deploy your entire fleet with `agent-army deploy`.
+    Interactive wizard configures everything. Deploy your entire fleet with `clawup deploy`.
   </Card>
   <Card title="Composable Identities" icon="sliders">
     Use built-in identities, create your own, or mix both. Each identity is a self-contained package with personality, skills, and configuration.

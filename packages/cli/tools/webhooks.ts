@@ -9,7 +9,7 @@
 
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
-import { SSH_USER, tailscaleHostname } from "@agent-army/core";
+import { SSH_USER, tailscaleHostname } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, getStackOutputs } from "../lib/tool-helpers";
 import pc from "picocolors";
@@ -80,14 +80,14 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
   // Select stack
   const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
   if (selectResult.exitCode !== 0) {
-    ui.log.error(`Could not select Pulumi stack "${manifest.stackName}". Run ${pc.cyan("agent-army deploy")} first.`);
+    ui.log.error(`Could not select Pulumi stack "${manifest.stackName}". Run ${pc.cyan("clawup deploy")} first.`);
     process.exit(1);
   }
 
   // Get stack outputs
   const outputs = getStackOutputs(exec, true, cwd);
   if (!outputs) {
-    ui.log.error(`Could not fetch stack outputs. Run ${pc.cyan("agent-army deploy")} first.`);
+    ui.log.error(`Could not fetch stack outputs. Run ${pc.cyan("clawup deploy")} first.`);
     process.exit(1);
   }
 
@@ -107,7 +107,7 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
     ui.log.error(
       "No webhook URLs found in stack outputs.\n" +
       `  Make sure agents are deployed and exposing webhook endpoints.\n` +
-      `  Run ${pc.cyan("agent-army deploy")} if you haven't already.`
+      `  Run ${pc.cyan("clawup deploy")} if you haven't already.`
     );
     process.exit(1);
   }

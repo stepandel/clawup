@@ -1,9 +1,9 @@
 ---
 title: "Networking & Security"
-description: "How Agent Army secures agent communication with Tailscale mesh VPN"
+description: "How Clawup secures agent communication with Tailscale mesh VPN"
 ---
 
-Agent Army uses [Tailscale](https://tailscale.com) to create a private mesh network between you and your agents. No ports are exposed to the public internet — all access flows through an encrypted WireGuard tunnel.
+Clawup uses [Tailscale](https://tailscale.com) to create a private mesh network between you and your agents. No ports are exposed to the public internet — all access flows through an encrypted WireGuard tunnel.
 
 ## Tailscale Mesh VPN
 
@@ -41,10 +41,10 @@ Public SSH is disabled by default. You can opt in via `allowedSshCidrs` (AWS) or
 
 ## SSH Access
 
-The `agent-army ssh` command connects to agents through the Tailscale mesh:
+The `clawup ssh` command connects to agents through the Tailscale mesh:
 
 ```
-agent-army ssh
+clawup ssh
 ```
 
 The CLI resolves the agent's Tailscale hostname and opens an SSH session through the encrypted tunnel. No public IP or open SSH port required — Tailscale's `--ssh` flag enables SSH access over the mesh.

@@ -1,16 +1,16 @@
 /**
- * Load/save agent-army manifests from ~/.agent-army/configs/
+ * Load/save clawup manifests from ~/.clawup/configs/
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import YAML from "yaml";
-import type { ArmyManifest, PluginConfigFile } from "@agent-army/core";
-import { CONFIG_DIR, MANIFEST_FILE, PLUGINS_DIR } from "@agent-army/core";
+import type { ClawupManifest, PluginConfigFile } from "@clawup/core";
+import { CONFIG_DIR, MANIFEST_FILE, PLUGINS_DIR } from "@clawup/core";
 
 /**
- * Get the configs directory path (~/.agent-army/configs/)
+ * Get the configs directory path (~/.clawup/configs/)
  */
 export function configsDir(): string {
   return path.join(os.homedir(), CONFIG_DIR);
@@ -34,7 +34,7 @@ export function configPath(name: string): string {
 }
 
 /**
- * Copy a named config to agent-army.yaml so the Pulumi program can read it.
+ * Copy a named config to clawup.yaml so the Pulumi program can read it.
  * When projectDir is provided, writes there instead of process.cwd().
  */
 export function syncManifestToProject(name: string, projectDir?: string): void {
@@ -53,13 +53,13 @@ export function manifestExists(name: string): boolean {
 /**
  * Load a manifest by name. Returns null if not found or invalid.
  */
-export function loadManifest(name: string): ArmyManifest | null {
+export function loadManifest(name: string): ClawupManifest | null {
   const filePath = configPath(name);
   if (!fs.existsSync(filePath)) return null;
 
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
-    return YAML.parse(raw) as ArmyManifest;
+    return YAML.parse(raw) as ClawupManifest;
   } catch (err) {
     console.warn(`[config] Failed to load manifest '${name}' at ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -69,7 +69,7 @@ export function loadManifest(name: string): ArmyManifest | null {
 /**
  * Save a manifest by name
  */
-export function saveManifest(name: string, manifest: ArmyManifest): void {
+export function saveManifest(name: string, manifest: ClawupManifest): void {
   ensureConfigsDir();
   const filePath = configPath(name);
   fs.writeFileSync(filePath, YAML.stringify(manifest), "utf-8");
@@ -112,7 +112,7 @@ export function resolveConfigName(name?: string): string {
     if (!manifestExists(name)) {
       const available = listManifests();
       if (available.length === 0) {
-        throw new Error(`Config '${name}' not found. No configs exist. Run 'agent-army init' to create one.`);
+        throw new Error(`Config '${name}' not found. No configs exist. Run 'clawup init' to create one.`);
       }
       throw new Error(
         `Config '${name}' not found. Available configs:\n  ${available.join("\n  ")}`
@@ -124,7 +124,7 @@ export function resolveConfigName(name?: string): string {
   const configs = listManifests();
 
   if (configs.length === 0) {
-    throw new Error("No configs found. Run 'agent-army init' to create one.");
+    throw new Error("No configs found. Run 'clawup init' to create one.");
   }
 
   if (configs.length === 1) {
@@ -142,8 +142,8 @@ export function resolveConfigName(name?: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Get the plugins directory for a stack (~/.agent-army/configs/<stackName>/plugins/)
- * @deprecated Plugin config is now inline in the manifest. Use `agent-army config migrate` to upgrade.
+ * Get the plugins directory for a stack (~/.clawup/configs/<stackName>/plugins/)
+ * @deprecated Plugin config is now inline in the manifest. Use `clawup config migrate` to upgrade.
  */
 export function pluginsDir(stackName: string): string {
   return path.join(configsDir(), stackName, PLUGINS_DIR);
@@ -162,7 +162,7 @@ export function ensurePluginsDir(stackName: string): void {
 
 /**
  * Load a plugin config file. Returns null if not found or invalid.
- * @deprecated Plugin config is now inline in the manifest. Use `agent-army config migrate` to upgrade.
+ * @deprecated Plugin config is now inline in the manifest. Use `clawup config migrate` to upgrade.
  */
 export function loadPluginConfig(stackName: string, pluginName: string): PluginConfigFile | null {
   const filePath = path.join(pluginsDir(stackName), `${pluginName}.yaml`);
@@ -179,7 +179,7 @@ export function loadPluginConfig(stackName: string, pluginName: string): PluginC
 
 /**
  * Save a plugin config file
- * @deprecated Plugin config is now inline in the manifest. Use `agent-army config migrate` to upgrade.
+ * @deprecated Plugin config is now inline in the manifest. Use `clawup config migrate` to upgrade.
  */
 export function savePluginConfig(stackName: string, pluginName: string, data: PluginConfigFile): void {
   ensurePluginsDir(stackName);

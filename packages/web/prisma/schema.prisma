@@ -78,7 +78,7 @@ model Deployment {
   userId       String
   credentialId String
   stackName    String
-  manifest     String   // Full ArmyManifest JSON
+  manifest     String   // Full ClawupManifest JSON
   status       String   @default("queued") // queued | running | success | failed
   logs         String   @default("") // Deployment logs
   errorMessage String?

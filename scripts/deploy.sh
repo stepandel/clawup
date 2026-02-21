@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# deploy.sh - Deploy the Agent Army stack
+# deploy.sh - Deploy the Clawup stack
 #
-# Thin wrapper around: agent-army deploy
+# Thin wrapper around: clawup deploy
 #
 set -euo pipefail
 

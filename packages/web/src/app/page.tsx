@@ -47,19 +47,19 @@ const steps = [
   {
     number: "01",
     title: "Install",
-    command: "npm install -g agent-army",
+    command: "npm install -g clawup",
     description: "One command to get the CLI on your machine.",
   },
   {
     number: "02",
     title: "Configure",
-    command: "agent-army init",
+    command: "clawup init",
     description: "Interactive wizard sets up your cloud, integrations, and team.",
   },
   {
     number: "03",
     title: "Deploy",
-    command: "agent-army deploy",
+    command: "clawup deploy",
     description: "Provisions your fleet in minutes. Agents start working immediately.",
   },
 ];
@@ -101,7 +101,7 @@ export default function Home() {
             Docs
           </a>
           <a
-            href="https://github.com/stepandel/agent-army"
+            href="https://github.com/stepandel/clawup"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -149,9 +149,9 @@ export default function Home() {
         <div className="animate-fade-in-up-3 max-w-md mx-auto mb-10">
           <div className="flex items-center gap-3 px-6 py-4 rounded-xl bg-[#0c0c0c] border border-border font-mono text-sm">
             <span className="text-accent-emerald">$</span>
-            <code className="text-foreground flex-1 text-left">npm install -g agent-army</code>
+            <code className="text-foreground flex-1 text-left">npm install -g clawup</code>
             <button
-              onClick={() => navigator.clipboard.writeText("npm install -g agent-army")}
+              onClick={() => navigator.clipboard.writeText("npm install -g clawup")}
               className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
               title="Copy to clipboard"
             >
@@ -163,7 +163,7 @@ export default function Home() {
         <div className="animate-fade-in-up-3 flex justify-center gap-4 flex-wrap">
           <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
             <a
-              href="https://github.com/stepandel/agent-army"
+              href="https://github.com/stepandel/clawup"
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -190,7 +190,7 @@ export default function Home() {
           <div className="p-6 font-mono text-sm leading-8">
             <div>
               <span className="text-accent-emerald">$</span>{" "}
-              <span className="text-foreground">agent-army deploy</span>
+              <span className="text-foreground">clawup deploy</span>
             </div>
             <div className="text-muted-foreground">
               Deploying 3 agents to Hetzner (nbg1)...
@@ -325,7 +325,7 @@ export default function Home() {
               {[
                 {
                   label: "GitHub",
-                  href: "https://github.com/stepandel/agent-army",
+                  href: "https://github.com/stepandel/clawup",
                 },
                 { label: "Documentation", href: "https://docs.agent-army.ai" },
               ].map((link) => (

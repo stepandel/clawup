@@ -191,9 +191,9 @@ export default function LaunchPost() {
       </ol>
       <p>All while I&apos;m driving through Big Sur with no cell service.</p>
 
-      {/* Agent Army */}
+      {/* Clawup */}
       <h2 className="text-xl font-bold text-foreground pt-4">
-        Deploying the team: Agent Army
+        Deploying the team: Clawup
       </h2>
       <p>
         As powerful as they are, changing the agents was a pain. I wanted to update
@@ -206,12 +206,12 @@ export default function LaunchPost() {
       <p>
         So I built{" "}
         <a
-          href="https://github.com/stepandel/agent-army"
+          href="https://github.com/stepandel/clawup"
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline"
         >
-          Agent Army
+          Clawup
         </a>
         , a CLI tool that handles the whole thing.
       </p>
@@ -219,18 +219,18 @@ export default function LaunchPost() {
       <div className="rounded-xl bg-[#0c0c0c] border border-border p-5 font-mono text-sm leading-7 overflow-x-auto">
         <div>
           <span className="text-accent-emerald">$</span>{" "}
-          <span className="text-foreground">npm install -g agent-army</span>
+          <span className="text-foreground">npm install -g clawup</span>
         </div>
         <div>
           <span className="text-accent-emerald">$</span>{" "}
-          <span className="text-foreground">agent-army init</span>
+          <span className="text-foreground">clawup init</span>
           <span className="text-muted-foreground/60">
             {"    "}# interactive wizard — cloud, keys, integrations
           </span>
         </div>
         <div>
           <span className="text-accent-emerald">$</span>{" "}
-          <span className="text-foreground">agent-army deploy</span>
+          <span className="text-foreground">clawup deploy</span>
           <span className="text-muted-foreground/60">
             {"  "}# provisions 3 servers, installs everything
           </span>
@@ -311,7 +311,7 @@ export default function LaunchPost() {
         <div>
           <span className="text-accent-emerald">$</span>{" "}
           <span className="text-foreground">
-            agent-army destroy -y && agent-army deploy -y
+            clawup destroy -y && clawup deploy -y
           </span>
         </div>
       </div>
@@ -339,14 +339,14 @@ export default function LaunchPost() {
       {/* Try it */}
       <h2 className="text-xl font-bold text-foreground pt-4">Try it</h2>
       <p>
-        Agent Army is MIT licensed. The repo is at{" "}
+        Clawup is MIT licensed. The repo is at{" "}
         <a
-          href="https://github.com/stepandel/agent-army"
+          href="https://github.com/stepandel/clawup"
           target="_blank"
           rel="noopener noreferrer"
           className="text-primary hover:underline"
         >
-          github.com/stepandel/agent-army
+          github.com/stepandel/clawup
         </a>{" "}
         and the docs are at{" "}
         <a

@@ -1,5 +1,5 @@
 /**
- * agent-army config — View and modify config without re-running init
+ * clawup config — View and modify config without re-running init
  *
  * Subcommands:
  *   show  — Display current config
@@ -23,8 +23,8 @@ import {
   HETZNER_SERVER_TYPES_EU,
   HETZNER_SERVER_TYPES_US,
   hetznerServerTypes,
-} from "@agent-army/core";
-import type { ArmyManifest, AgentDefinition } from "@agent-army/core";
+} from "@clawup/core";
+import type { ClawupManifest, AgentDefinition } from "@clawup/core";
 import pc from "picocolors";
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ function allInstanceTypeValues(provider: string, region?: string): string[] {
 }
 
 function validateTopValue(
-  manifest: ArmyManifest,
+  manifest: ClawupManifest,
   key: SettableTopKey,
   value: string
 ): string | null {
@@ -89,7 +89,7 @@ function validateTopValue(
     if (provider === "hetzner" && manifest.instanceType) {
       const validTypes = allInstanceTypeValues(provider, value);
       if (!validTypes.includes(manifest.instanceType)) {
-        return `Region '${value}' is not compatible with current instanceType '${manifest.instanceType}'.\nUpdate instanceType first, or set both:\n  agent-army config set instanceType <type>\n  agent-army config set region ${value}`;
+        return `Region '${value}' is not compatible with current instanceType '${manifest.instanceType}'.\nUpdate instanceType first, or set both:\n  clawup config set instanceType <type>\n  clawup config set region ${value}`;
       }
     }
   }
@@ -105,7 +105,7 @@ function validateTopValue(
 }
 
 function validateAgentValue(
-  manifest: ArmyManifest,
+  manifest: ClawupManifest,
   key: SettableAgentKey,
   value: string
 ): string | null {
@@ -284,7 +284,7 @@ export async function configSetCommand(
     console.log(pc.green(`✓ ${key}: ${String(oldValue ?? "(unset)")} → ${value}`));
   }
 
-  console.log(pc.dim("\nRun 'agent-army redeploy' or 'agent-army destroy && agent-army deploy' to apply changes."));
+  console.log(pc.dim("\nRun 'clawup redeploy' or 'clawup destroy && clawup deploy' to apply changes."));
 }
 
 // ---------------------------------------------------------------------------

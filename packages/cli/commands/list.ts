@@ -12,7 +12,7 @@ export async function listCommand(opts: ListOptions): Promise<void> {
   const configs = listManifests();
 
   if (configs.length === 0) {
-    console.log("No configs found. Run 'agent-army init' to create one.");
+    console.log("No configs found. Run 'clawup init' to create one.");
     return;
   }
 

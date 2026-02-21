@@ -1,4 +1,4 @@
-name: agent-army
+name: clawup
 description: Multi-agent OpenClaw deployment - PM, Engineer, and Tester
 main: packages/pulumi/dist/index.js
 runtime:

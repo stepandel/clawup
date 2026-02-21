@@ -119,7 +119,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     args: OpenClawAgentArgs,
     opts?: pulumi.ComponentResourceOptions
   ) {
-    super("agent-army:aws:OpenClawAgent", name, {}, opts);
+    super("clawup:aws:OpenClawAgent", name, {}, opts);
 
     const defaultResourceOptions: pulumi.ResourceOptions = { parent: this };
 

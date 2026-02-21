@@ -3,7 +3,7 @@
  * Builds the openclaw.json configuration file content
  */
 
-import { CODING_AGENT_REGISTRY } from "@agent-army/core";
+import { CODING_AGENT_REGISTRY } from "@clawup/core";
 
 /**
  * A single plugin entry for the OpenClaw config.

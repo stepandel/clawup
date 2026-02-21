@@ -35,12 +35,12 @@ interface IdentityManifest {
 |-------|------|-------------|
 | `name` | string | Machine-readable identifier. Used in resource names and logging. Examples: `eng`, `researcher`, `pm` |
 | `displayName` | string | Human-readable name shown in the UI and Slack messages. Examples: `Titus`, `Atlas`, `Juno` |
-| `role` | string | Functional role identifier. Used for agent resolution (`agent-army ssh <role>`). Examples: `pm`, `eng`, `tester`, `researcher` |
+| `role` | string | Functional role identifier. Used for agent resolution (`clawup ssh <role>`). Examples: `pm`, `eng`, `tester`, `researcher` |
 | `emoji` | string | GitHub emoji shortcode without colons. Used in the OpenClaw UI. Examples: `telescope`, `clipboard`, `building_construction`, `mag` |
-| `description` | string | One-line summary of the agent's purpose. Shown during `agent-army init` and in status output. |
+| `description` | string | One-line summary of the agent's purpose. Shown during `clawup init` and in status output. |
 | `volumeSize` | number | Default persistent storage in GB. Can be overridden per-agent in the deployment manifest. Engineers typically need more (50GB) for repos; research/PM roles need less (20-30GB). |
 | `skills` | string[] | List of skill directory names bundled with this identity. Each entry corresponds to a `skills/<name>/SKILL.md` file. Supports `clawhub:` prefix for public skills. |
-| `templateVars` | string[] | Template variable names used in workspace files (e.g., `SOUL.md`, `USER.md`). Values are collected during `agent-army init` and substituted at deploy time. |
+| `templateVars` | string[] | Template variable names used in workspace files (e.g., `SOUL.md`, `USER.md`). Values are collected during `clawup init` and substituted at deploy time. |
 
 ## Optional Fields
 
@@ -236,13 +236,13 @@ pluginDefaults:
 Plugin configuration is resolved in this order (later wins):
 
 1. **Identity defaults** — `pluginDefaults` in `identity.yaml`
-2. **Deployment overrides** — Plugin config files at `~/.agent-army/configs/<stack>/plugins/<plugin>.yaml`
+2. **Deployment overrides** — Plugin config files at `~/.clawup/configs/<stack>/plugins/<plugin>.yaml`
 
 ## Identity vs Deployment Manifest
 
-The `identity.yaml` and `agent-army.yaml` serve different purposes:
+The `identity.yaml` and `clawup.yaml` serve different purposes:
 
-| Concern | `identity.yaml` | `agent-army.yaml` |
+| Concern | `identity.yaml` | `clawup.yaml` |
 |---------|-----------------|-------------------|
 | What the agent _is_ | Name, personality, skills, model | — |
 | What the agent _needs_ | Deps, plugins, plugin defaults | Plugin/dep overrides |
@@ -255,7 +255,7 @@ When both files specify `plugins` or `deps`, the deployment manifest values take
 
 ## Validation
 
-Agent Army validates `identity.yaml` at deploy time. The following checks are enforced:
+Clawup validates `identity.yaml` at deploy time. The following checks are enforced:
 
 - All required fields must be present and non-empty
 - `name`, `displayName`, `role`, `emoji`, `description` must be strings

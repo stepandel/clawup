@@ -1,5 +1,5 @@
 /**
- * agent-army webhooks setup — Configure Linear webhooks for deployed agents
+ * clawup webhooks setup — Configure Linear webhooks for deployed agents
  *
  * This command wraps the platform-agnostic webhooksSetupTool with the CLI adapter.
  */

@@ -3,7 +3,7 @@
  */
 
 import { capture, stream } from "./exec";
-import type { VoidResult } from "@agent-army/core";
+import type { VoidResult } from "@clawup/core";
 
 /**
  * Get the current Pulumi stack name

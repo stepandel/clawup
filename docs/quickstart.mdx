@@ -8,7 +8,7 @@ Get AI agents running on your own cloud infrastructure in minutes.
 ## 1. Install
 
 ```bash
-npm install -g agent-army
+npm install -g clawup
 ```
 
 ## 2. Check Prerequisites
@@ -21,13 +21,13 @@ Make sure you have the required tools installed:
 - **Tailscale** — installed and connected to your tailnet ([Install guide](https://tailscale.com/download))
 
 <Tip>
-Run `agent-army validate` after deployment to verify all agents are healthy.
+Run `clawup validate` after deployment to verify all agents are healthy.
 </Tip>
 
 ## 3. Initialize
 
 ```bash
-agent-army init
+clawup init
 ```
 
 The interactive wizard walks you through:
@@ -40,12 +40,12 @@ The interactive wizard walks you through:
 6. **Agent selection** — Pick from built-in identities, point to a Git repo or local directory, or mix both
 7. **Review** — Confirm config and estimated costs
 
-This generates an `agent-army.yaml` manifest and sets all Pulumi config values automatically.
+This generates a `clawup.yaml` manifest and sets all Pulumi config values automatically.
 
 ## 4. Deploy
 
 ```bash
-agent-army deploy
+clawup deploy
 ```
 
 Pulumi provisions your agents: dedicated servers, persistent storage, networking, and bootstrap with all integrations.
@@ -58,13 +58,13 @@ First deployment takes 3-5 minutes. Subsequent deployments are incremental.
 
 ```bash
 # Check status
-agent-army status
+clawup status
 
 # SSH to an agent
-agent-army ssh <agent-name>
+clawup ssh <agent-name>
 
 # Validate health
-agent-army validate
+clawup validate
 ```
 
 ## What's Next?

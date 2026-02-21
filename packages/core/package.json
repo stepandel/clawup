@@ -1,8 +1,8 @@
 {
-  "name": "@agent-army/core",
+  "name": "@clawup/core",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared types, constants, and utilities for Agent Army",
+  "description": "Shared types, constants, and utilities for Clawup",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

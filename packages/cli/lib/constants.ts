@@ -1,6 +1,6 @@
 /**
- * Re-export all constants from @agent-army/core for backward compatibility.
- * External consumers importing "agent-army/lib/constants" will get these.
+ * Re-export all constants from @clawup/core for backward compatibility.
+ * External consumers importing "clawup/lib/constants" will get these.
  */
 export {
   AGENT_ALIASES,
@@ -23,4 +23,4 @@ export {
   hetznerServerTypes,
   slackAppManifest,
   tailscaleHostname,
-} from "@agent-army/core";
+} from "@clawup/core";

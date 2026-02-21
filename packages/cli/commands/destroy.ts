@@ -1,5 +1,5 @@
 /**
- * agent-army destroy — Tear down resources with safety confirmations
+ * clawup destroy — Tear down resources with safety confirmations
  *
  * This command wraps the platform-agnostic destroyTool with the CLI adapter.
  */

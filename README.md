@@ -1,15 +1,15 @@
-# Agent Army
+# Clawup
 
-[![npm](https://img.shields.io/npm/v/agent-army)](https://www.npmjs.com/package/agent-army)
-[![license](https://img.shields.io/npm/l/agent-army)](./LICENSE)
+[![npm](https://img.shields.io/npm/v/clawup)](https://www.npmjs.com/package/clawup)
+[![license](https://img.shields.io/npm/l/clawup)](./LICENSE)
 
 Deploy a fleet of specialized [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud** — managed entirely from your terminal.
 
 ## What Is This?
 
-Agent Army provisions autonomous AI agents with persistent memory, role-specific behavior, and secure networking. Each agent runs in a Docker sandbox with its own identity — personality, skills, tools, and model preferences — connected over a Tailscale mesh VPN with no public port exposure.
+Clawup provisions autonomous AI agents with persistent memory, role-specific behavior, and secure networking. Each agent runs in a Docker sandbox with its own identity — personality, skills, tools, and model preferences — connected over a Tailscale mesh VPN with no public port exposure.
 
-You define _what_ your agents do. Agent Army handles _where_ and _how_ they run.
+You define _what_ your agents do. Clawup handles _where_ and _how_ they run.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -61,7 +61,7 @@ my-identity/
 Identities can live in a **Git repo**, a **monorepo subdirectory**, or a **local path**. Point any agent at any identity:
 
 ```yaml
-# agent-army.yaml
+# clawup.yaml
 agents:
   - name: agent-researcher
     displayName: Atlas
@@ -111,7 +111,7 @@ templateVars:
 
 ### Built-in Identities
 
-Agent Army ships with three built-in identities to get you started:
+Clawup ships with three built-in identities to get you started:
 
 | Alias | Role | What It Does |
 |-------|------|-------------|
@@ -137,13 +137,13 @@ See the [`examples/identity/`](./examples/identity/) directory for a complete, m
 ### 1. Install
 
 ```bash
-npm install -g agent-army
+npm install -g clawup
 ```
 
 ### 2. Run the Setup Wizard
 
 ```bash
-agent-army init
+clawup init
 ```
 
 The wizard walks you through:
@@ -155,12 +155,12 @@ The wizard walks you through:
 - **Optional integrations** — Slack, Linear, GitHub per agent
 - **Review & confirm** — see full config and estimated monthly cost
 
-This generates an `agent-army.yaml` manifest and sets all Pulumi config values automatically.
+This generates a `clawup.yaml` manifest and sets all Pulumi config values automatically.
 
 ### 3. Deploy
 
 ```bash
-agent-army deploy
+clawup deploy
 ```
 
 ### 4. Validate
@@ -168,51 +168,51 @@ agent-army deploy
 Wait 3-5 minutes for cloud-init to complete, then:
 
 ```bash
-agent-army validate
+clawup validate
 ```
 
 ### 5. Access Your Agents
 
 ```bash
-agent-army ssh <agent-name>    # SSH by name, role, or alias
+clawup ssh <agent-name>    # SSH by name, role, or alias
 ```
 
 ## CLI Reference
 
-Run `agent-army --help` for the full list.
+Run `clawup --help` for the full list.
 
 | Command | Description |
 |---------|-------------|
-| `agent-army init` | Interactive setup wizard |
-| `agent-army deploy` | Deploy agents (`pulumi up` under the hood) |
-| `agent-army deploy -y` | Deploy without confirmation prompt |
-| `agent-army status` | Show agent statuses and outputs |
-| `agent-army status --json` | Status in JSON format |
-| `agent-army ssh <agent>` | SSH to an agent by name, role, or alias |
-| `agent-army ssh <agent> '<cmd>'` | Run a command on an agent remotely |
-| `agent-army validate` | Health check all agents via Tailscale |
-| `agent-army destroy` | Tear down all resources (with confirmation) |
-| `agent-army redeploy` | Update agents in-place (`pulumi up --refresh`) |
-| `agent-army redeploy -y` | Redeploy without confirmation prompt |
-| `agent-army destroy -y` | Tear down without confirmation |
-| `agent-army list` | List saved configurations |
-| `agent-army config show` | Display current config |
-| `agent-army config show --json` | Config in JSON format |
-| `agent-army config set <key> <value>` | Update a config value |
-| `agent-army config set <key> <value> -a <agent>` | Update a per-agent config value |
-| `agent-army config migrate` | Migrate old plugin config files into manifest |
-| `agent-army secrets set <key> <value>` | Set a Pulumi secret (e.g. API keys) |
-| `agent-army secrets list` | Show which secrets are configured (redacted) |
-| `agent-army push` | Push workspace files, skills, and config to running agents |
-| `agent-army webhooks setup` | Configure Linear webhooks for deployed agents |
-| `agent-army update` | Update agent-army CLI to the latest version |
+| `clawup init` | Interactive setup wizard |
+| `clawup deploy` | Deploy agents (`pulumi up` under the hood) |
+| `clawup deploy -y` | Deploy without confirmation prompt |
+| `clawup status` | Show agent statuses and outputs |
+| `clawup status --json` | Status in JSON format |
+| `clawup ssh <agent>` | SSH to an agent by name, role, or alias |
+| `clawup ssh <agent> '<cmd>'` | Run a command on an agent remotely |
+| `clawup validate` | Health check all agents via Tailscale |
+| `clawup destroy` | Tear down all resources (with confirmation) |
+| `clawup redeploy` | Update agents in-place (`pulumi up --refresh`) |
+| `clawup redeploy -y` | Redeploy without confirmation prompt |
+| `clawup destroy -y` | Tear down without confirmation |
+| `clawup list` | List saved configurations |
+| `clawup config show` | Display current config |
+| `clawup config show --json` | Config in JSON format |
+| `clawup config set <key> <value>` | Update a config value |
+| `clawup config set <key> <value> -a <agent>` | Update a per-agent config value |
+| `clawup config migrate` | Migrate old plugin config files into manifest |
+| `clawup secrets set <key> <value>` | Set a Pulumi secret (e.g. API keys) |
+| `clawup secrets list` | Show which secrets are configured (redacted) |
+| `clawup push` | Push workspace files, skills, and config to running agents |
+| `clawup webhooks setup` | Configure Linear webhooks for deployed agents |
+| `clawup update` | Update clawup CLI to the latest version |
 
 Agent resolution is flexible — all of these target the same agent:
 
 ```bash
-agent-army ssh juno        # by alias
-agent-army ssh pm          # by role
-agent-army ssh agent-pm    # by resource name
+clawup ssh juno        # by alias
+clawup ssh pm          # by role
+clawup ssh agent-pm    # by resource name
 ```
 
 ## Cloud Providers
@@ -245,7 +245,7 @@ All agents share a single VPC/network for cost optimization.
 
 ## Dependencies
 
-You need the following installed on your **local machine** before running `agent-army init`. The init wizard checks for these and will tell you what's missing.
+You need the following installed on your **local machine** before running `clawup init`. The init wizard checks for these and will tell you what's missing.
 
 ### Required (all providers)
 
@@ -309,7 +309,7 @@ The system auto-detects which type you provide and sets the correct environment 
 For in-place updates that preserve Tailscale devices and existing infrastructure:
 
 ```bash
-agent-army redeploy
+clawup redeploy
 ```
 
 This runs `pulumi up --refresh` to sync cloud state and apply changes. If the stack doesn't exist yet, it falls back to a fresh deploy automatically.
@@ -317,7 +317,7 @@ This runs `pulumi up --refresh` to sync cloud state and apply changes. If the st
 For a clean rebuild (when in-place update can't recover):
 
 ```bash
-agent-army destroy -y && agent-army deploy -y
+clawup destroy -y && clawup deploy -y
 ```
 
 ## Configuration
@@ -327,24 +327,24 @@ agent-army destroy -y && agent-army deploy -y
 View your current configuration without opening the manifest file:
 
 ```bash
-agent-army config show              # Human-readable summary
-agent-army config show --json       # Full JSON output
+clawup config show              # Human-readable summary
+clawup config show --json       # Full JSON output
 ```
 
 Modify config values with validation (no need to re-run `init`):
 
 ```bash
-agent-army config set region us-west-2
-agent-army config set instanceType t3.large
-agent-army config set instanceType cx32 -a atlas     # Per-agent override
-agent-army config set volumeSize 50 -a atlas         # Per-agent volume
+clawup config set region us-west-2
+clawup config set instanceType t3.large
+clawup config set instanceType cx32 -a atlas     # Per-agent override
+clawup config set volumeSize 50 -a atlas         # Per-agent volume
 ```
 
-Run `agent-army redeploy` after changing config to apply.
+Run `clawup redeploy` after changing config to apply.
 
-### `agent-army.yaml`
+### `clawup.yaml`
 
-Generated by `agent-army init`. This manifest drives the entire deployment:
+Generated by `clawup init`. This manifest drives the entire deployment:
 
 ```yaml
 stackName: dev
@@ -387,14 +387,14 @@ pulumi config set tailnetDnsName tail12345.ts.net
 
 ### Pulumi ESC
 
-For more advanced secret management, use [Pulumi ESC](https://www.pulumi.com/docs/esc/). See `esc/agent-army-secrets.yaml.example` for the full template.
+For more advanced secret management, use [Pulumi ESC](https://www.pulumi.com/docs/esc/). See `esc/clawup-secrets.yaml.example` for the full template.
 
 ## Project Structure
 
 ```
-agent-army/
+clawup/
 ├── packages/
-│   ├── core/               # @agent-army/core — shared types, constants, registries
+│   ├── core/               # @clawup/core — shared types, constants, registries
 │   │   └── src/
 │   │       ├── schemas/    # Zod schemas (source of truth for types)
 │   │       ├── constants.ts
@@ -403,13 +403,13 @@ agent-army/
 │   │       ├── coding-agent-registry.ts
 │   │       ├── dep-registry.ts
 │   │       └── skills.ts
-│   ├── cli/                # agent-army CLI (published npm package)
+│   ├── cli/                # clawup CLI (published npm package)
 │   │   ├── bin.ts          # Entry point (Commander.js)
 │   │   ├── commands/       # init, deploy, redeploy, status, ssh, validate, destroy, config, list, push, secrets, webhooks, update
 │   │   ├── tools/          # Tool implementations (adapter-based)
 │   │   ├── lib/            # CLI-only: config, pulumi, ui, tailscale, exec
 │   │   └── adapters/       # Runtime adapters (CLI vs API)
-│   ├── pulumi/             # @agent-army/pulumi — infrastructure as code
+│   ├── pulumi/             # @clawup/pulumi — infrastructure as code
 │   │   └── src/
 │   │       ├── components/
 │   │       │   ├── openclaw-agent.ts    # AWS EC2 agent component
@@ -418,7 +418,7 @@ agent-army/
 │   │       │   └── config-generator.ts  # OpenClaw config builder
 │   │       ├── shared-vpc.ts
 │   │       └── index.ts    # Main Pulumi stack program
-│   └── web/                # Next.js dashboard (agent-army-web)
+│   └── web/                # Next.js dashboard (clawup-web)
 ├── identities/             # Built-in identity stubs (point to external repos)
 ├── examples/               # Example identities for reference
 │   └── identity/           # Complete "researcher" identity example
@@ -443,15 +443,15 @@ agent-army/
 ### Agents not appearing in Tailscale
 
 1. Wait 3-5 minutes for cloud-init to complete
-2. Check logs: `agent-army ssh <agent> 'sudo cat /var/log/cloud-init-output.log | tail -100'`
+2. Check logs: `clawup ssh <agent> 'sudo cat /var/log/cloud-init-output.log | tail -100'`
 3. Verify your Tailscale auth key is valid and reusable
 
 ### OpenClaw gateway not running
 
 ```bash
-agent-army ssh <agent> 'openclaw gateway status'
-agent-army ssh <agent> 'journalctl -u openclaw -n 50'
-agent-army ssh <agent> 'openclaw gateway restart'
+clawup ssh <agent> 'openclaw gateway status'
+clawup ssh <agent> 'journalctl -u openclaw -n 50'
+clawup ssh <agent> 'openclaw gateway restart'
 ```
 
 ### SSH connection refused
@@ -469,20 +469,20 @@ pulumi cancel     # Force unlock if locked
 
 ## Development
 
-For contributing to Agent Army itself:
+For contributing to Clawup itself:
 
 ```bash
-git clone https://github.com/stepandel/agent-army.git
-cd agent-army
+git clone https://github.com/stepandel/clawup.git
+cd clawup
 pnpm install
 pnpm build                                # Build all packages
 pnpm test                                 # Run all tests
 
 # Individual packages
-pnpm --filter @agent-army/core build      # Build core
-pnpm --filter agent-army build            # Build CLI
-pnpm --filter @agent-army/pulumi build    # Build Pulumi
-pnpm --filter agent-army-web dev          # Web dev server
+pnpm --filter @clawup/core build      # Build core
+pnpm --filter clawup build            # Build CLI
+pnpm --filter @clawup/pulumi build    # Build Pulumi
+pnpm --filter clawup-web dev          # Web dev server
 ```
 
 ## License

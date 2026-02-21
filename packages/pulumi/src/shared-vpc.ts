@@ -61,7 +61,7 @@ export class SharedVpc extends pulumi.ComponentResource {
     args: SharedVpcArgs = {},
     opts?: pulumi.ComponentResourceOptions
   ) {
-    super("agent-army:aws:SharedVpc", name, {}, opts);
+    super("clawup:aws:SharedVpc", name, {}, opts);
 
     const defaultResourceOptions: pulumi.ResourceOptions = { parent: this };
     const cidrBlock = args.cidrBlock ?? "10.0.0.0/16";

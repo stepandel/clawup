@@ -1,5 +1,5 @@
 {
-  "name": "@agent-army/pulumi",
+  "name": "@clawup/pulumi",
   "private": true,
   "description": "Pulumi components for deploying OpenClaw agents on AWS and Hetzner",
   "main": "dist/index.js",
@@ -9,7 +9,7 @@
     "watch": "tsc --watch"
   },
   "dependencies": {
-    "@agent-army/core": "workspace:*",
+    "@clawup/core": "workspace:*",
     "@pulumi/aws": "^6.0.0",
     "@pulumi/hcloud": "^1.32.0",
     "@pulumi/pulumi": "^3.0.0",

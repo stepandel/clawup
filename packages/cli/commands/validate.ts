@@ -1,5 +1,5 @@
 /**
- * agent-army validate — Health check agents via Tailscale SSH
+ * clawup validate — Health check agents via Tailscale SSH
  *
  * This command wraps the platform-agnostic validateTool with the CLI adapter.
  */

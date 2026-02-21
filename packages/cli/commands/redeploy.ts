@@ -1,5 +1,5 @@
 /**
- * agent-army redeploy — Update agents in-place without destroying infrastructure
+ * clawup redeploy — Update agents in-place without destroying infrastructure
  *
  * This command wraps the platform-agnostic redeployTool with the CLI adapter.
  */

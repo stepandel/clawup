@@ -39,7 +39,7 @@ For each agent account:
 
 ## Step 3: Provide Keys During Init
 
-The `agent-army init` wizard prompts you for each agent's Linear API key:
+The `clawup init` wizard prompts you for each agent's Linear API key:
 
 ```
 ? Linear API key for Juno (pm) lin_api_XXXXXXXXXXXX
@@ -98,7 +98,7 @@ Each agent gets a webhook endpoint on your Tailscale network:
 https://<stack>-<agent-name>.<tailnet>/hooks/linear
 ```
 
-During `agent-army init`, the CLI collects a **Linear webhook secret** per agent. You need to register the webhook URL in Linear:
+During `clawup init`, the CLI collects a **Linear webhook secret** per agent. You need to register the webhook URL in Linear:
 
 1. Go to **Linear Settings** > **API** > **Webhooks**
 2. Create a webhook pointing to the agent's endpoint URL
@@ -106,7 +106,7 @@ During `agent-army init`, the CLI collects a **Linear webhook secret** per agent
 4. Enable the **Issues** event type
 
 <Tip>
-You can set or rotate webhook secrets post-deploy with `agent-army secrets set linearWebhookSecret <secret> --agent <role>`.
+You can set or rotate webhook secrets post-deploy with `clawup secrets set linearWebhookSecret <secret> --agent <role>`.
 </Tip>
 
 ### Plugin Configuration

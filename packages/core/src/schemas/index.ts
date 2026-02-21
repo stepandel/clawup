@@ -4,7 +4,7 @@
 
 export {
   AgentDefinitionSchema,
-  ArmyManifestSchema,
+  ClawupManifestSchema,
   PluginConfigFileSchema,
 } from "./manifest";
 

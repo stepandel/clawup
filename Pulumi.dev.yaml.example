@@ -1,15 +1,15 @@
 # Pulumi Stack Configuration - Development Environment
 #
 # This configuration pulls secrets from Pulumi ESC.
-# See esc/agent-army-secrets.yaml.example for the ESC environment template.
+# See esc/clawup-secrets.yaml.example for the ESC environment template.
 #
 # Setup:
-#   1. Create ESC environment: pulumi env init <org>/agent-army-dev
-#   2. Copy secrets from esc/agent-army-secrets.yaml.example
+#   1. Create ESC environment: pulumi env init <org>/clawup-dev
+#   2. Copy secrets from esc/clawup-secrets.yaml.example
 #   3. Run: pulumi up
 
 environment:
-  - agent-army-dev
+  - clawup-dev
 
 config:
   # AWS region for deployment
@@ -17,19 +17,19 @@ config:
 
   # Tailscale DNS name (your tailnet domain)
   # Example: tail12345.ts.net
-  agent-army:tailnetDnsName: ${esc:tailnetDnsName}
+  clawup:tailnetDnsName: ${esc:tailnetDnsName}
 
   # Instance type for all agents
   # WARNING: t3.micro is too small (1GB RAM insufficient)
-  agent-army:instanceType: t3.medium
+  clawup:instanceType: t3.medium
 
   # Owner name (used in workspace templates)
-  agent-army:ownerName: ${esc:ownerName}
+  clawup:ownerName: ${esc:ownerName}
 
   # Shared secrets (pulled from ESC)
-  agent-army:anthropicApiKey:
+  clawup:anthropicApiKey:
     fn::secret: ${esc:anthropicApiKey}
-  agent-army:tailscaleAuthKey:
+  clawup:tailscaleAuthKey:
     fn::secret: ${esc:tailscaleAuthKey}
 
   # =========================================================================
@@ -37,29 +37,29 @@ config:
   # =========================================================================
   # Bot Token (xoxb-...) + App Token (xapp-...) for each agent
 
-  agent-army:pmSlackBotToken:
+  clawup:pmSlackBotToken:
     fn::secret: ${esc:pmSlackBotToken}
-  agent-army:pmSlackAppToken:
+  clawup:pmSlackAppToken:
     fn::secret: ${esc:pmSlackAppToken}
 
-  agent-army:engSlackBotToken:
+  clawup:engSlackBotToken:
     fn::secret: ${esc:engSlackBotToken}
-  agent-army:engSlackAppToken:
+  clawup:engSlackAppToken:
     fn::secret: ${esc:engSlackAppToken}
 
-  agent-army:testerSlackBotToken:
+  clawup:testerSlackBotToken:
     fn::secret: ${esc:testerSlackBotToken}
-  agent-army:testerSlackAppToken:
+  clawup:testerSlackAppToken:
     fn::secret: ${esc:testerSlackAppToken}
 
   # =========================================================================
   # Per-agent Linear credentials
   # =========================================================================
 
-  agent-army:pmLinearApiKey:
+  clawup:pmLinearApiKey:
     fn::secret: ${esc:pmLinearApiKey}
-  agent-army:engLinearApiKey:
+  clawup:engLinearApiKey:
     fn::secret: ${esc:engLinearApiKey}
-  agent-army:testerLinearApiKey:
+  clawup:testerLinearApiKey:
     fn::secret: ${esc:testerLinearApiKey}
 

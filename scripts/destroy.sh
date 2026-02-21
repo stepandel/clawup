@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# destroy.sh - Tear down the Agent Army stack
+# destroy.sh - Tear down the Clawup stack
 #
-# Thin wrapper around: agent-army destroy
+# Thin wrapper around: clawup destroy
 #
 set -euo pipefail
 

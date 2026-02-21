@@ -2,16 +2,16 @@
  * Workspace management for installed CLI mode.
  *
  * Dev mode:  repo root has Pulumi.yaml + node_modules/@pulumi → use repo directly
- * Installed: bundle infra to ~/.agent-army/workspace/, npm-install Pulumi SDK there
+ * Installed: bundle infra to ~/.clawup/workspace/, npm-install Pulumi SDK there
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
-import type { VoidResult } from "@agent-army/core";
+import type { VoidResult } from "@clawup/core";
 
-const WORKSPACE_DIR = path.join(os.homedir(), ".agent-army", "workspace");
+const WORKSPACE_DIR = path.join(os.homedir(), ".clawup", "workspace");
 const VERSION_FILE = ".cli-version";
 
 /**
@@ -86,12 +86,12 @@ export function ensureWorkspace(): VoidResult {
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 
   // Preserve user state files across re-sync
-  const preservePatterns = ["Pulumi.*.yaml", "agent-army.yaml"];
+  const preservePatterns = ["Pulumi.*.yaml", "clawup.yaml"];
   const preserved = new Map<string, Buffer>();
   for (const pattern of preservePatterns) {
     // Simple glob: Pulumi.*.yaml
     const files = fs.readdirSync(WORKSPACE_DIR).filter((f) => {
-      if (pattern === "agent-army.yaml") return f === "agent-army.yaml";
+      if (pattern === "clawup.yaml") return f === "clawup.yaml";
       // Match Pulumi.<stack>.yaml but not Pulumi.yaml itself
       return f.startsWith("Pulumi.") && f.endsWith(".yaml") && f !== "Pulumi.yaml";
     });

@@ -2,7 +2,7 @@
 #
 # ssh.sh - SSH to an agent by name via Tailscale
 #
-# Thin wrapper around: agent-army ssh
+# Thin wrapper around: clawup ssh
 #
 set -euo pipefail
 

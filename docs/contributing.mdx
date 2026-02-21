@@ -1,29 +1,29 @@
 ---
 title: "Contributing"
-description: "How to contribute to Agent Army"
+description: "How to contribute to Clawup"
 ---
 
-Agent Army is open source. Contributions are welcome!
+Clawup is open source. Contributions are welcome!
 
 ## Getting Started
 
 ```bash
 # Clone the repo
-git clone https://github.com/stepandel/agent-army.git
-cd agent-army
+git clone https://github.com/stepandel/clawup.git
+cd clawup
 
 # Install dependencies
 pnpm install
 
 # Build the CLI
-pnpm --filter agent-army build
+pnpm --filter clawup build
 ```
 
 ## Project Structure
 
-- `packages/core/` — Shared types, constants, registries, and utilities (`@agent-army/core`)
+- `packages/core/` — Shared types, constants, registries, and utilities (`@clawup/core`)
 - `packages/cli/` — CLI package (commands, config, adapters)
-- `packages/pulumi/` — Pulumi infrastructure components (`@agent-army/pulumi`)
+- `packages/pulumi/` — Pulumi infrastructure components (`@clawup/pulumi`)
 - `packages/web/` — Next.js dashboard
 - `identities/` — Built-in identity stubs (point to external Git repos)
 - `examples/` — Example identities for reference
@@ -44,7 +44,7 @@ pnpm --filter agent-army build
 
 ## Adding a New Built-in Identity
 
-1. Create an identity directory with `identity.yaml` and workspace files (see [examples/identity/](https://github.com/stepandel/agent-army/tree/main/examples/identity) for the format)
+1. Create an identity directory with `identity.yaml` and workspace files (see [examples/identity/](https://github.com/stepandel/clawup/tree/main/examples/identity) for the format)
 2. Host the identity in a Git repo (or add to an existing identities repo)
 3. Register it in `packages/core/src/constants.ts` under `BUILT_IN_IDENTITIES`
 4. Update documentation in `docs/architecture/identities.mdx`

@@ -1,12 +1,12 @@
 ---
 title: "Creating Identities"
-description: "Step-by-step guide to building a custom identity for Agent Army"
+description: "Step-by-step guide to building a custom identity for Clawup"
 ---
 
 This guide walks you through creating a custom identity from scratch. For the full `identity.yaml` field reference, see [Identity Manifest](/configuration/identity).
 
 <Tip>
-The fastest way to get started is to copy the [example identity](https://github.com/stepandel/agent-army/tree/main/examples/identity) and modify it for your use case.
+The fastest way to get started is to copy the [example identity](https://github.com/stepandel/clawup/tree/main/examples/identity) and modify it for your use case.
 </Tip>
 
 ## Identity Structure
@@ -160,7 +160,7 @@ A cheat sheet for the tools available to the agent:
 
 ### AGENTS.md — Operational Instructions
 
-Shared instructions for multi-agent coordination. Covers session startup, memory management, safety rules, and heartbeat behavior. You can use the [example AGENTS.md](https://github.com/stepandel/agent-army/blob/main/examples/identity/AGENTS.md) as a starting point.
+Shared instructions for multi-agent coordination. Covers session startup, memory management, safety rules, and heartbeat behavior. You can use the [example AGENTS.md](https://github.com/stepandel/clawup/blob/main/examples/identity/AGENTS.md) as a starting point.
 
 ### BOOTSTRAP.md — First-Run Setup
 
@@ -239,7 +239,7 @@ skills:
 ### During Development (Local Path)
 
 ```yaml
-# agent-army.yaml
+# clawup.yaml
 agents:
   - name: agent-researcher
     displayName: Atlas
@@ -288,7 +288,7 @@ Workspace files support `{{VARIABLE}}` substitution.
 
 1. Declare variables in `templateVars` in `identity.yaml`
 2. Use `{{VARIABLE_NAME}}` in any workspace file
-3. During `agent-army init`, the wizard prompts for values
+3. During `clawup init`, the wizard prompts for values
 4. Values are substituted before files are injected into the agent
 
 ### Standard Variables
@@ -318,7 +318,7 @@ Then reference them in workspace files: `Check open issues in {{LINEAR_TEAM}}`.
 
 ## Tips
 
-- **Start with the example.** Copy `examples/identity/` from the Agent Army repo and modify it.
+- **Start with the example.** Copy `examples/identity/` from the Clawup repo and modify it.
 - **Keep SOUL.md focused.** 30-50 lines is plenty. Agents work better with clear, concise personality guidance.
 - **Test locally first.** Use a local path identity during development, switch to Git URL for production.
 - **One skill per workflow.** Each skill should handle one complete workflow. If a skill is doing too much, split it.

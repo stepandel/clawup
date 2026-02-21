@@ -110,10 +110,10 @@ export const HETZNER_COST_ESTIMATES: Record<string, number> = {
 };
 
 /** Manifest filename */
-export const MANIFEST_FILE = "agent-army.yaml";
+export const MANIFEST_FILE = "clawup.yaml";
 
-/** Config directory under home (~/.agent-army/configs/) */
-export const CONFIG_DIR = ".agent-army/configs";
+/** Config directory under home (~/.clawup/configs/) */
+export const CONFIG_DIR = ".clawup/configs";
 
 /** Plugins config subdirectory name */
 export const PLUGINS_DIR = "plugins";

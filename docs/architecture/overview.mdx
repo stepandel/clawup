@@ -1,16 +1,16 @@
 ---
 title: "How It Works"
-description: "End-to-end walkthrough of how Agent Army provisions and runs your agents"
+description: "End-to-end walkthrough of how Clawup provisions and runs your agents"
 ---
 
-Agent Army uses [Pulumi](https://pulumi.com) to provision cloud infrastructure as code, deploying each agent on a dedicated Ubuntu server with persistent storage, secure networking, and all the tools defined by its identity.
+Clawup uses [Pulumi](https://pulumi.com) to provision cloud infrastructure as code, deploying each agent on a dedicated Ubuntu server with persistent storage, secure networking, and all the tools defined by its identity.
 
 ## Deploy Flow
 
-When you run `agent-army deploy`, here's what happens:
+When you run `clawup deploy`, here's what happens:
 
 ```
-agent-army.yaml         identity.yaml
+clawup.yaml         identity.yaml
    (Manifest)            (Per-agent)
   • Provider, region     • Model, coding agent
   • Instance type        • Plugins & deps
@@ -31,7 +31,7 @@ agent-army.yaml         identity.yaml
           • Cloud-init script
 ```
 
-1. **Load manifest** — The CLI reads your `agent-army.yaml` config and shows a deployment summary.
+1. **Load manifest** — The CLI reads your `clawup.yaml` config and shows a deployment summary.
 2. **Fetch identities** — For each agent with an `identity` field, the CLI fetches the identity from the Git repo or local path, validates `identity.yaml`, and collects all workspace files and skills.
 3. **Select Pulumi stack** — Creates or selects a stack matching your config name.
 4. **Sync config** — Copies the manifest to the project root and sets provider-specific Pulumi config.

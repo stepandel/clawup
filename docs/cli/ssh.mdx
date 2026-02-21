@@ -8,7 +8,7 @@ Connect to an agent via Tailscale SSH. Supports agent names and aliases.
 ## Usage
 
 ```bash
-agent-army ssh <agent> [command...] [options]
+clawup ssh <agent> [command...] [options]
 ```
 
 ## Arguments
@@ -37,14 +37,14 @@ agent-army ssh <agent> [command...] [options]
 
 ```bash
 # Interactive SSH session
-agent-army ssh titus
+clawup ssh titus
 
 # Run a command
-agent-army ssh titus uptime
+clawup ssh titus uptime
 
 # Use full agent name
-agent-army ssh agent-eng
+clawup ssh agent-eng
 
 # Custom SSH user
-agent-army ssh titus -u root
+clawup ssh titus -u root
 ```

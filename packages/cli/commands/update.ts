@@ -1,5 +1,5 @@
 /**
- * Update the agent-army CLI to the latest version
+ * Update the clawup CLI to the latest version
  */
 
 import * as p from "@clack/prompts";
@@ -20,7 +20,7 @@ export async function updateCommand(_opts: UpdateOptions): Promise<void> {
   const { default: https } = await import("https");
   const latest = await new Promise<string | null>((resolve) => {
     const req = https.get(
-      "https://registry.npmjs.org/agent-army/latest",
+      "https://registry.npmjs.org/clawup/latest",
       { timeout: 5000 },
       (res) => {
         let data = "";
@@ -79,7 +79,7 @@ export async function updateCommand(_opts: UpdateOptions): Promise<void> {
   let exitCode = 1;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    exitCode = await stream("npm", ["install", "-g", `agent-army@${latest}`]);
+    exitCode = await stream("npm", ["install", "-g", `clawup@${latest}`]);
     if (exitCode === 0) break;
 
     if (attempt < MAX_RETRIES) {
@@ -98,7 +98,7 @@ export async function updateCommand(_opts: UpdateOptions): Promise<void> {
     p.log.success(`Updated to ${pc.green(latest)}`);
   } else {
     p.log.error("Update failed. You may need to run with sudo:");
-    p.log.message(`  sudo npm install -g agent-army@${latest}`);
+    p.log.message(`  sudo npm install -g clawup@${latest}`);
     process.exit(1);
   }
 

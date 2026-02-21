@@ -1,5 +1,5 @@
 /**
- * agent-army status — Show agent statuses from stack outputs
+ * clawup status — Show agent statuses from stack outputs
  *
  * This command wraps the platform-agnostic statusTool with the CLI adapter.
  */

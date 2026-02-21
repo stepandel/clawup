@@ -1,11 +1,11 @@
 /**
- * @agent-army/core — shared types, constants, registries, and utilities
+ * @clawup/core — shared types, constants, registries, and utilities
  */
 
 // Types
 export type {
   AgentDefinition,
-  ArmyManifest,
+  ClawupManifest,
   IdentityManifest,
   IdentityResult,
   PluginConfigFile,
@@ -59,13 +59,13 @@ export { resolveDeps, collectDepSecrets } from "./deps";
 export type { ParsedSkill } from "./skills";
 export { CLAWHUB_PREFIX, parseSkill, classifySkills } from "./skills";
 
-// Identity — re-exported from "@agent-army/core/identity" subpath to avoid
+// Identity — re-exported from "@clawup/core/identity" subpath to avoid
 // pulling Node.js-only modules (fs, child_process) into browser bundles.
 
 // Schemas
 export {
   AgentDefinitionSchema,
-  ArmyManifestSchema,
+  ClawupManifestSchema,
   PluginConfigFileSchema,
   IdentityManifestSchema,
 } from "./schemas";

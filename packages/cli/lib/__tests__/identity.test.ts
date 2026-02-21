@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { fetchIdentity } from "@agent-army/core/identity";
+import { fetchIdentity } from "@clawup/core/identity";
 
 /** Helper to create a valid identity manifest object */
 function validManifest(overrides: Record<string, unknown> = {}) {

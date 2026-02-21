@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "Agent Army",
+  "name": "Clawup",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -14,7 +14,7 @@
   "topbarLinks": [
     {
       "name": "GitHub",
-      "url": "https://github.com/stepandel/agent-army"
+      "url": "https://github.com/stepandel/clawup"
     }
   ],
   "tabs": [
@@ -97,10 +97,10 @@
     }
   ],
   "metadata": {
-    "og:site_name": "Agent Army Docs",
+    "og:site_name": "Clawup Docs",
     "twitter:site": "@stepanarsent"
   },
   "footerSocials": {
-    "github": "https://github.com/stepandel/agent-army"
+    "github": "https://github.com/stepandel/clawup"
   }
 }

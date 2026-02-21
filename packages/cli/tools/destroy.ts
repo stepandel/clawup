@@ -137,7 +137,7 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
   } else if (tailnetDnsName && !tailscaleApiKey) {
     ui.log.warn("No Tailscale API key configured - devices must be removed manually.");
     console.log("  Remove devices at: https://login.tailscale.com/admin/machines");
-    console.log("  Tip: Set a Tailscale API key (`agent-army init`) for automatic cleanup.");
+    console.log("  Tip: Set a Tailscale API key (`clawup init`) for automatic cleanup.");
   }
 
   ui.log.success(`Stack "${manifest.stackName}" has been destroyed.`);

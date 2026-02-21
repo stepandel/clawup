@@ -36,7 +36,7 @@ const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.j
 const program = new Command();
 
 program
-  .name("agent-army")
+  .name("clawup")
   .description("Deploy and manage a fleet of OpenClaw AI agents on AWS")
   .version(pkgJson.version);
 
@@ -199,7 +199,7 @@ webhooksCmd
 
 program
   .command("update")
-  .description("Update agent-army CLI to the latest version")
+  .description("Update clawup CLI to the latest version")
   .action(async (opts) => {
     await updateCommand(opts);
   });

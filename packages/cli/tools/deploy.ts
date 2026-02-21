@@ -6,7 +6,7 @@
 
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
 import { loadManifest, resolveConfigName, syncManifestToProject } from "../lib/config";
-import { COST_ESTIMATES, HETZNER_COST_ESTIMATES } from "@agent-army/core";
+import { COST_ESTIMATES, HETZNER_COST_ESTIMATES } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
 import { getConfig } from "../lib/tool-helpers";
@@ -209,8 +209,8 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
   }
 
   ui.log.info(
-    `Run ${pc.cyan("agent-army webhooks setup")} to configure Linear webhooks for your agents.`
+    `Run ${pc.cyan("clawup webhooks setup")} to configure Linear webhooks for your agents.`
   );
 
-  ui.outro("Agents will be ready in 3-5 minutes. Run `agent-army validate` to check.");
+  ui.outro("Agents will be ready in 3-5 minutes. Run `clawup validate` to check.");
 };

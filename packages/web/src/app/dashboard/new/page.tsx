@@ -10,8 +10,8 @@ import {
   COST_ESTIMATES,
   HETZNER_COST_ESTIMATES,
   BUILT_IN_IDENTITIES,
-} from "@agent-army/core";
-import type { ArmyManifest, AgentDefinition } from "@agent-army/core";
+} from "@clawup/core";
+import type { ClawupManifest, AgentDefinition } from "@clawup/core";
 
 const STEPS = [
   "Stack & Provider",
@@ -135,7 +135,7 @@ export default function NewDeploymentWizard() {
     }));
   }
 
-  function buildManifest(): ArmyManifest {
+  function buildManifest(): ClawupManifest {
     const agents: AgentDefinition[] = state.selectedAgents.map((key) => {
       const identity = BUILT_IN_IDENTITIES[key];
       const [displayName] = identity.label.split(" (");
@@ -210,7 +210,7 @@ export default function NewDeploymentWizard() {
             <label style={s.label}>Stack Name</label>
             <input
               style={s.input}
-              placeholder="my-agent-army"
+              placeholder="my-project"
               value={state.stackName}
               onChange={(e) => update("stackName", e.target.value)}
             />

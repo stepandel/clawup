@@ -6,7 +6,7 @@
 
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
-import { SSH_USER, tailscaleHostname } from "@agent-army/core";
+import { SSH_USER, tailscaleHostname } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { requireTailscale } from "../lib/tailscale";
 import { getConfig } from "../lib/tool-helpers";
@@ -274,7 +274,7 @@ timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
         const agent = manifest.agents.find((a) => a.displayName === r.agent);
         return agent ? agent.role : r.agent;
       });
-    console.log(`  2. Check logs: agent-army ssh ${agentHints[0] ?? "<role>"} -- journalctl -u openclaw`);
+    console.log(`  2. Check logs: clawup ssh ${agentHints[0] ?? "<role>"} -- journalctl -u openclaw`);
     console.log("  3. Verify Tailscale: tailscale status");
     process.exit(1);
   } else {

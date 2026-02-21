@@ -1,5 +1,5 @@
 /**
- * agent-army init — Interactive setup wizard
+ * clawup init — Interactive setup wizard
  *
  * Identity-driven: every agent must have an identity source.
  * The manifest stores only team composition (which agents to deploy).
@@ -8,7 +8,7 @@
 
 import { execSync } from "child_process";
 import * as p from "@clack/prompts";
-import type { AgentDefinition, ArmyManifest, IdentityManifest } from "@agent-army/core";
+import type { AgentDefinition, ClawupManifest, IdentityManifest } from "@clawup/core";
 import {
   BUILT_IN_IDENTITIES,
   PROVIDERS,
@@ -24,8 +24,8 @@ import {
   tailscaleHostname,
   PLUGIN_REGISTRY,
   DEP_REGISTRY,
-} from "@agent-army/core";
-import { fetchIdentity } from "@agent-army/core/identity";
+} from "@clawup/core";
+import { fetchIdentity } from "@clawup/core/identity";
 import * as os from "os";
 import * as path from "path";
 import { checkPrerequisites } from "../lib/prerequisites";
@@ -251,7 +251,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   handleCancel(agentMode);
 
   const fetchedIdentities: FetchedIdentity[] = [];
-  const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
+  const identityCacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
 
   // Collect built-in agents
   if (agentMode === "built-in" || agentMode === "mix") {
@@ -733,7 +733,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   // Write manifest
   const configName = basicConfig.stackName;
-  s.start(`Writing config to ~/.agent-army/configs/${configName}.yaml...`);
+  s.start(`Writing config to ~/.clawup/configs/${configName}.yaml...`);
 
   // Only include non-auto template vars in manifest (owner vars are derived at deploy time)
   const manifestTemplateVars: Record<string, string> = {};
@@ -743,7 +743,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     }
   }
 
-  const manifest: ArmyManifest = {
+  const manifest: ClawupManifest = {
     stackName: configName,
     provider: basicConfig.provider,
     region: basicConfig.region,
@@ -794,6 +794,6 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     const { deployCommand } = await import("./deploy.js");
     await deployCommand({ config: configName, yes: opts.yes });
   } else {
-    p.outro("Setup complete! Run `agent-army deploy` to deploy your agents.");
+    p.outro("Setup complete! Run `clawup deploy` to deploy your agents.");
   }
 }

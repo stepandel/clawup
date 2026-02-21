@@ -18,7 +18,7 @@ mkdir -p "$INFRA/dist/components"
 
 # --- Pulumi.yaml (npm instead of pnpm, flat dist structure) ---
 cat > "$INFRA/Pulumi.yaml" <<'EOF'
-name: agent-army
+name: clawup
 description: Multi-agent OpenClaw deployment - PM, Engineer, and Tester
 runtime:
   name: nodejs
@@ -33,7 +33,7 @@ node -e "
   for (const name of ['@pulumi/pulumi', '@pulumi/aws', '@pulumi/hcloud', '@pulumi/tls', 'yaml']) {
     if (pkg.dependencies[name]) deps[name] = pkg.dependencies[name];
   }
-  const out = { name: 'agent-army-infra', private: true, main: 'dist/index.js', dependencies: deps };
+  const out = { name: 'clawup-infra', private: true, main: 'dist/index.js', dependencies: deps };
   console.log(JSON.stringify(out, null, 2));
 " > "$INFRA/package.json"
 
@@ -45,10 +45,10 @@ for f in "$PULUMI_DIST/components/"*.js; do
   [ -f "$f" ] && cp "$f" "$INFRA/dist/components/"
 done
 
-# --- @agent-army/core (workspace package, not on npm) ---
-mkdir -p "$INFRA/node_modules/@agent-army/core"
-cp "$CORE_ROOT/package.json" "$INFRA/node_modules/@agent-army/core/"
-cp -r "$CORE_ROOT/dist" "$INFRA/node_modules/@agent-army/core/dist"
+# --- @clawup/core (workspace package, not on npm) ---
+mkdir -p "$INFRA/node_modules/@clawup/core"
+cp "$CORE_ROOT/package.json" "$INFRA/node_modules/@clawup/core/"
+cp -r "$CORE_ROOT/dist" "$INFRA/node_modules/@clawup/core/dist"
 
 echo "Done. Contents of packages/cli/infra/:"
 find "$INFRA" -type f | sed "s|$INFRA/||" | sort

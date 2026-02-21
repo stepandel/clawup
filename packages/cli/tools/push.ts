@@ -11,13 +11,13 @@ import * as fs from "fs";
 import * as path from "path";
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { loadManifest, resolveConfigName } from "../lib/config";
-import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "@agent-army/core";
+import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
-import type { AgentDefinition } from "@agent-army/core";
-import { fetchIdentitySync } from "@agent-army/core/identity";
-import { classifySkills } from "@agent-army/core";
-import { resolveDeps } from "@agent-army/core";
+import type { AgentDefinition } from "@clawup/core";
+import { fetchIdentitySync } from "@clawup/core/identity";
+import { classifySkills } from "@clawup/core";
+import { resolveDeps } from "@clawup/core";
 import * as os from "os";
 import pc from "picocolors";
 
@@ -126,7 +126,7 @@ export const pushTool: ToolImplementation<PushOptions> = async (
 ) => {
   const { ui, exec } = runtime;
 
-  ui.intro("Agent Army");
+  ui.intro("Clawup");
 
   // Ensure workspace is set up
   const wsResult = ensureWorkspace();
@@ -208,7 +208,7 @@ export const pushTool: ToolImplementation<PushOptions> = async (
     // 1. Push workspace files and skills (unified via identity system)
     if (doWorkspace || doSkills) {
       try {
-        const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
+        const identityCacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
         const identity = fetchIdentitySync(agent.identity, identityCacheDir);
 
         // Ensure remote workspace dir exists

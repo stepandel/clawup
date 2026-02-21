@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# _common.sh - Shared helpers for agent-army wrapper scripts
+# _common.sh - Shared helpers for clawup wrapper scripts
 #
 # Source this file from any wrapper script:
 #   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_common.sh"

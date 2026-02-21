@@ -1,15 +1,15 @@
-# Agent Army - Development Guide
+# Clawup - Development Guide
 
 ## Project Overview
 
-Agent Army deploys fleets of specialized AI agents (PM, Engineer, QA) on AWS or Hetzner Cloud. Each agent runs OpenClaw with Claude Code in a Docker sandbox, connected via Tailscale mesh VPN.
+Clawup deploys fleets of specialized AI agents (PM, Engineer, QA) on AWS or Hetzner Cloud. Each agent runs OpenClaw with Claude Code in a Docker sandbox, connected via Tailscale mesh VPN.
 
 ## Architecture
 
 ```text
-agent-army/
+clawup/
 ├── packages/
-│   ├── core/                    # @agent-army/core — shared types, constants, registries
+│   ├── core/                    # @clawup/core — shared types, constants, registries
 │   │   └── src/
 │   │       ├── schemas/         # Zod schemas (source of truth for types)
 │   │       ├── types.ts         # TypeScript types (z.infer<> re-exports)
@@ -20,13 +20,13 @@ agent-army/
 │   │       ├── plugin-registry.ts
 │   │       ├── coding-agent-registry.ts
 │   │       └── dep-registry.ts
-│   ├── cli/                     # Published npm package (agent-army CLI)
+│   ├── cli/                     # Published npm package (clawup CLI)
 │   │   ├── bin.ts               # Entry point - Commander.js commands
 │   │   ├── commands/            # Command implementations (init, deploy, ssh, etc.)
 │   │   ├── tools/               # Tool implementations (adapter-based)
 │   │   ├── lib/                 # CLI-only utilities (config, pulumi, ui, exec, tailscale)
 │   │   └── adapters/            # Runtime adapters (CLI vs API)
-│   ├── pulumi/                  # @agent-army/pulumi — infrastructure as code
+│   ├── pulumi/                  # @clawup/pulumi — infrastructure as code
 │   │   └── src/
 │   │       ├── components/
 │   │       │   ├── openclaw-agent.ts    # AWS EC2 agent
@@ -35,7 +35,7 @@ agent-army/
 │   │       │   └── config-generator.ts  # OpenClaw config builder
 │   │       ├── shared-vpc.ts            # AWS VPC component
 │   │       └── index.ts                 # Main Pulumi stack program
-│   └── web/                     # Next.js dashboard (agent-army-web)
+│   └── web/                     # Next.js dashboard (clawup-web)
 │       └── src/
 │           ├── app/             # App router pages & API routes
 │           ├── components/      # React components (shadcn/ui)
@@ -48,8 +48,8 @@ agent-army/
 
 ## Key Concepts
 
-### Manifest (agent-army.yaml)
-The manifest is the source of truth for deployments. Created by `agent-army init`, it defines:
+### Manifest (clawup.yaml)
+The manifest is the source of truth for deployments. Created by `clawup init`, it defines:
 - Stack name, cloud provider, region, instance type
 - Owner info (name, timezone, working hours)
 - Agent definitions (identity-based or custom)
@@ -74,10 +74,10 @@ pnpm build                                # Build all packages
 pnpm test                                 # Run all tests
 
 # Individual packages
-pnpm --filter @agent-army/core build      # Build core
-pnpm --filter agent-army build            # Build CLI
-pnpm --filter @agent-army/pulumi build    # Build Pulumi
-pnpm --filter agent-army-web dev          # Web dev server (localhost:3000)
+pnpm --filter @clawup/core build      # Build core
+pnpm --filter clawup build            # Build CLI
+pnpm --filter @clawup/pulumi build    # Build Pulumi
+pnpm --filter clawup-web dev          # Web dev server (localhost:3000)
 
 # Watch mode
 cd packages/cli && pnpm watch
@@ -124,7 +124,7 @@ cd packages/cli && pnpm watch
 | `packages/core/src/identity.ts` | Git-based identity loader |
 | `packages/pulumi/src/components/cloud-init.ts` | Cloud-init script generation (dynamic plugin support) |
 | `packages/pulumi/src/components/config-generator.ts` | OpenClaw config builder (dynamic plugin entries) |
-| `packages/pulumi/src/index.ts` | Main Pulumi program that reads agent-army.yaml manifest |
+| `packages/pulumi/src/index.ts` | Main Pulumi program that reads clawup.yaml manifest |
 | `packages/web/src/lib/deploy.ts` | Pulumi Automation API runner |
 
 ## Testing
@@ -173,8 +173,8 @@ Currently minimal test coverage. When adding tests:
 
 ## Troubleshooting
 
-### "agent-army.yaml not found"
-Run `agent-army init` first, or ensure you're in the project root.
+### "clawup.yaml not found"
+Run `clawup init` first, or ensure you're in the project root.
 
 ### Pulumi stack conflicts
 ```bash

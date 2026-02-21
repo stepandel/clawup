@@ -78,7 +78,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
     args: HetznerOpenClawAgentArgs,
     opts?: pulumi.ComponentResourceOptions
   ) {
-    super("agent-army:hetzner:HetznerOpenClawAgent", name, {}, opts);
+    super("clawup:hetzner:HetznerOpenClawAgent", name, {}, opts);
 
     const defaultResourceOptions: pulumi.ResourceOptions = { parent: this };
 

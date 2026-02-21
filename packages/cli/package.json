@@ -1,8 +1,8 @@
 {
-  "name": "agent-army",
+  "name": "clawup",
   "version": "0.1.36",
   "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS",
-  "bin": { "agent-army": "dist/bin.js" },
+  "bin": { "clawup": "dist/bin.js" },
   "files": ["dist", "infra", "scripts"],
   "scripts": {
     "build": "tsc",
@@ -10,7 +10,7 @@
     "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
-    "@agent-army/core": "workspace:*",
+    "@clawup/core": "workspace:*",
     "@clack/prompts": "^0.9",
     "commander": "^13.0",
     "picocolors": "^1.1",
@@ -24,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/stepandel/agent-army.git",
+    "url": "https://github.com/stepandel/clawup.git",
     "directory": "packages/cli"
   },
   "homepage": "https://agent-army.ai",

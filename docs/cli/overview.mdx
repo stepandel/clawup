@@ -1,14 +1,14 @@
 ---
 title: "CLI Overview"
-description: "Agent Army command-line interface reference"
+description: "Clawup command-line interface reference"
 ---
 
-The Agent Army CLI is the primary interface for managing your agent team: setup, deployment, monitoring, access, and teardown.
+The Clawup CLI is the primary interface for managing your agent team: setup, deployment, monitoring, access, and teardown.
 
 ## Installation
 
 ```bash
-npm install -g agent-army
+npm install -g clawup
 ```
 
 ## Commands
@@ -26,11 +26,11 @@ npm install -g agent-army
 ## Global Options
 
 ```bash
-agent-army --version    # Show version
-agent-army --help       # Show help
-agent-army <cmd> --help # Show command-specific help
+clawup --version    # Show version
+clawup --help       # Show help
+clawup <cmd> --help # Show command-specific help
 ```
 
 ## Config Management
 
-Configs are stored in `~/.agent-army/configs/<stack>/agent-army.yaml`. The CLI auto-detects your config if only one exists; use `-c <name>` to specify when you have multiple.
+Configs are stored in `~/.clawup/configs/<stack>/clawup.yaml`. The CLI auto-detects your config if only one exists; use `-c <name>` to specify when you have multiple.

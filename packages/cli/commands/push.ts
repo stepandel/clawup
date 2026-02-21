@@ -1,5 +1,5 @@
 /**
- * agent-army push — Live-update running agents via Tailscale SSH
+ * clawup push — Live-update running agents via Tailscale SSH
  *
  * This command wraps the platform-agnostic pushTool with the CLI adapter.
  */

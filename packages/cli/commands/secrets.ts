@@ -1,5 +1,5 @@
 /**
- * agent-army secrets — View and update Pulumi secrets without re-running init
+ * clawup secrets — View and update Pulumi secrets without re-running init
  *
  * Subcommands:
  *   set   — Set a secret value (e.g. braveApiKey, anthropicApiKey)
@@ -120,7 +120,7 @@ export async function secretsSetCommand(
     : value;
 
   console.log(pc.green(`✓ ${pulumiKey}: set to ${maskedValue}`));
-  console.log(pc.dim("\nRun 'agent-army deploy' or 'agent-army redeploy' to apply changes."));
+  console.log(pc.dim("\nRun 'clawup deploy' or 'clawup redeploy' to apply changes."));
 }
 
 // ---------------------------------------------------------------------------

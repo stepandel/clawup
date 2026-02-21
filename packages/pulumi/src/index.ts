@@ -1,14 +1,14 @@
 /**
- * Agent Army - Data-Driven Multi-Agent Pulumi Stack
+ * Clawup - Data-Driven Multi-Agent Pulumi Stack
  *
- * Reads agent-army.yaml manifest to dynamically deploy OpenClaw agents.
- * The manifest is created by `agent-army init` and serves as the single
+ * Reads clawup.yaml manifest to dynamically deploy OpenClaw agents.
+ * The manifest is created by `clawup init` and serves as the single
  * source of truth for the agent fleet configuration.
  *
  * All agents share a single VPC for cost optimization.
  * Each agent loads workspace files from identity repos.
  * Secrets are pulled from Pulumi config (set by CLI or ESC).
- * Plugin configs are loaded from ~/.agent-army/configs/<stack>/plugins/.
+ * Plugin configs are loaded from ~/.clawup/configs/<stack>/plugins/.
  */
 
 import * as pulumi from "@pulumi/pulumi";
@@ -24,9 +24,9 @@ import {
   PLUGIN_REGISTRY,
   resolveDeps,
   collectDepSecrets,
-} from "@agent-army/core";
-import { fetchIdentitySync } from "@agent-army/core/identity";
-import type { AgentDefinition, ArmyManifest, PluginConfigFile } from "@agent-army/core";
+} from "@clawup/core";
+import { fetchIdentitySync } from "@clawup/core/identity";
+import type { AgentDefinition, ClawupManifest, PluginConfigFile } from "@clawup/core";
 import * as os from "os";
 
 // -----------------------------------------------------------------------------
@@ -45,7 +45,7 @@ const workingHours = config.get("workingHours") ?? "9am-6pm";
 const userNotes = config.get("userNotes") ?? "No additional notes provided yet.";
 
 // Identity cache directory
-const identityCacheDir = path.join(os.homedir(), ".agent-army", "identity-cache");
+const identityCacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
 
 
 /**
@@ -76,18 +76,18 @@ function processTemplates(
 // -----------------------------------------------------------------------------
 
 // Pulumi sets cwd to the project root (where Pulumi.yaml lives)
-const manifestPath = path.join(process.cwd(), "agent-army.yaml");
+const manifestPath = path.join(process.cwd(), "clawup.yaml");
 if (!fs.existsSync(manifestPath)) {
   throw new Error(
-    "agent-army.yaml not found. Run `agent-army init` to create it."
+    "clawup.yaml not found. Run `clawup init` to create it."
   );
 }
 
 // Cast as partial — old manifests may omit `provider` (defaults to "aws" below)
-const manifest = YAML.parse(fs.readFileSync(manifestPath, "utf-8")) as ArmyManifest & { provider?: string };
+const manifest = YAML.parse(fs.readFileSync(manifestPath, "utf-8")) as ClawupManifest & { provider?: string };
 
-// Load plugin configs from ~/.agent-army/configs/<stackName>/plugins/
-const pluginConfigsDir = path.join(os.homedir(), ".agent-army", "configs", manifest.stackName, "plugins");
+// Load plugin configs from ~/.clawup/configs/<stackName>/plugins/
+const pluginConfigsDir = path.join(os.homedir(), ".clawup", "configs", manifest.stackName, "plugins");
 const pluginConfigs: Record<string, PluginConfigFile> = {};
 if (fs.existsSync(pluginConfigsDir)) {
   for (const file of fs.readdirSync(pluginConfigsDir)) {
@@ -116,7 +116,7 @@ if (provider !== "aws" && provider !== "hetzner") {
 // -----------------------------------------------------------------------------
 
 const baseTags = {
-  Project: "agent-army",
+  Project: "clawup",
   Environment: pulumi.getStack(),
   ManagedBy: "pulumi",
 };
@@ -186,7 +186,7 @@ if (provider === "aws") {
   // Shared VPC (cost optimization - all agents share one VPC)
   // -------------------------------------------------------------------------
 
-  sharedVpc = new SharedVpc("agent-army", {
+  sharedVpc = new SharedVpc("clawup", {
     availabilityZone: availabilityZone,
     tags: baseTags,
   });

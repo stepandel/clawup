@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   AgentDefinitionSchema,
-  ArmyManifestSchema,
+  ClawupManifestSchema,
   IdentityManifestSchema,
 } from "../schemas";
 
@@ -53,7 +53,7 @@ describe("AgentDefinitionSchema", () => {
   });
 });
 
-describe("ArmyManifestSchema", () => {
+describe("ClawupManifestSchema", () => {
   const validManifest = {
     stackName: "dev",
     provider: "aws",
@@ -72,16 +72,16 @@ describe("ArmyManifestSchema", () => {
   };
 
   it("accepts a valid manifest", () => {
-    expect(() => ArmyManifestSchema.parse(validManifest)).not.toThrow();
+    expect(() => ClawupManifestSchema.parse(validManifest)).not.toThrow();
   });
 
   it("rejects manifest with no agents", () => {
-    const result = ArmyManifestSchema.safeParse({ ...validManifest, agents: [] });
+    const result = ClawupManifestSchema.safeParse({ ...validManifest, agents: [] });
     expect(result.success).toBe(false);
   });
 
   it("rejects invalid provider", () => {
-    const result = ArmyManifestSchema.safeParse({ ...validManifest, provider: "gcp" });
+    const result = ClawupManifestSchema.safeParse({ ...validManifest, provider: "gcp" });
     expect(result.success).toBe(false);
   });
 });

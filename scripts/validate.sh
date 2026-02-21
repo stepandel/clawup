@@ -2,7 +2,7 @@
 #
 # validate.sh - Health check all deployed agents
 #
-# Thin wrapper around: agent-army validate
+# Thin wrapper around: clawup validate
 #
 set -euo pipefail
 

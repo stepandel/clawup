@@ -3,7 +3,7 @@ title: "Identities & Customization"
 description: "How identities work, how agents coordinate, and how to create your own"
 ---
 
-Agent Army uses an **identity system** to define agent behavior. Each identity is a self-contained directory with an `identity.yaml` manifest and workspace files — everything an agent needs to operate: personality, skills, model preferences, plugin configuration, and dependencies.
+Clawup uses an **identity system** to define agent behavior. Each identity is a self-contained directory with an `identity.yaml` manifest and workspace files — everything an agent needs to operate: personality, skills, model preferences, plugin configuration, and dependencies.
 
 For a complete field-by-field reference, see [Identity Manifest Reference](/configuration/identity). For a step-by-step creation guide, see [Creating Identities](/guides/creating-identities).
 
@@ -206,7 +206,7 @@ skills:
 
 ## Template Variables
 
-Workspace files support `{{VARIABLE}}` substitution. Variables declared in `templateVars` are populated from values collected during `agent-army init`.
+Workspace files support `{{VARIABLE}}` substitution. Variables declared in `templateVars` are populated from values collected during `clawup init`.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -217,11 +217,11 @@ Workspace files support `{{VARIABLE}}` substitution. Variables declared in `temp
 | `{{LINEAR_TEAM}}` | Linear team identifier | `ENG` |
 | `{{GITHUB_REPO}}` | Target repository | `myorg/myrepo` |
 
-You can define custom variables beyond these — any name listed in `templateVars` will be prompted during `agent-army init` and substituted at deploy time.
+You can define custom variables beyond these — any name listed in `templateVars` will be prompted during `clawup init` and substituted at deploy time.
 
 ## Built-in Identities
 
-Agent Army ships with three built-in identities hosted at [github.com/stepandel/army-identities](https://github.com/stepandel/army-identities):
+Clawup ships with three built-in identities hosted at [github.com/stepandel/army-identities](https://github.com/stepandel/army-identities):
 
 | Identity | Agent | Role | Volume | Model |
 |----------|-------|------|--------|-------|
@@ -328,7 +328,7 @@ my-identities/
 
 Reference each with `https://github.com/org/my-identities#researcher`, `#analyst`, etc.
 
-Identities are cached locally at `~/.agent-army/identity-cache/` and re-fetched on each deploy.
+Identities are cached locally at `~/.clawup/identity-cache/` and re-fetched on each deploy.
 
 ## Customization
 
@@ -363,7 +363,7 @@ agents:
 
 ### Create a New Identity
 
-To create an agent with a completely custom role, create a new identity directory. See the [example identity](https://github.com/stepandel/agent-army/tree/main/examples/identity) for a minimal starting point, or the [Creating Identities](/guides/creating-identities) guide for a full walkthrough.
+To create an agent with a completely custom role, create a new identity directory. See the [example identity](https://github.com/stepandel/clawup/tree/main/examples/identity) for a minimal starting point, or the [Creating Identities](/guides/creating-identities) guide for a full walkthrough.
 
 <Tip>
 Start by copying the example identity and modifying it for your use case. The key files to customize are `SOUL.md` (personality), `HEARTBEAT.md` (periodic tasks), and any skills you want to bundle.

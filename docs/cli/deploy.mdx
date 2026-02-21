@@ -8,7 +8,7 @@ Provisions infrastructure and deploys your agent team using Pulumi.
 ## Usage
 
 ```bash
-agent-army deploy [options]
+clawup deploy [options]
 ```
 
 ## Options
@@ -20,7 +20,7 @@ agent-army deploy [options]
 
 ## What It Does
 
-1. Reads your `agent-army.yaml` manifest
+1. Reads your `clawup.yaml` manifest
 2. Runs `pulumi up` to provision/update infrastructure
 3. Creates servers, volumes, networking, and security groups
 4. Bootstraps each agent with OpenClaw and configured tools
@@ -30,13 +30,13 @@ agent-army deploy [options]
 
 ```bash
 # Deploy with confirmation
-agent-army deploy
+clawup deploy
 
 # Deploy without confirmation
-agent-army deploy --yes
+clawup deploy --yes
 
 # Deploy a specific config
-agent-army deploy -c production
+clawup deploy -c production
 ```
 
 <Note>

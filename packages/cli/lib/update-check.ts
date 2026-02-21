@@ -8,7 +8,7 @@ import * as path from "path";
 import * as os from "os";
 import pc from "picocolors";
 
-const PACKAGE_NAME = "agent-army";
+const PACKAGE_NAME = "clawup";
 const CACHE_FILE = ".update-check.json";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const FETCH_TIMEOUT_MS = 3000;
@@ -19,7 +19,8 @@ interface UpdateCache {
 }
 
 function getCacheDir(): string {
-  return path.join(os.homedir(), ".agent-army");
+  // Previously ~/.agent-army — users upgrading from the old name will start a fresh cache
+  return path.join(os.homedir(), ".clawup");
 }
 
 function getCachePath(): string {
@@ -104,7 +105,11 @@ export async function checkForUpdates(currentVersion: string): Promise<void> {
 
     // Fetch in background — don't block CLI exit
     const latest = await fetchLatestVersion();
-    if (!latest) return;
+    if (!latest) {
+      // Cache the current version so we don't retry on every CLI run
+      saveCache({ lastChecked: now, latestVersion: currentVersion });
+      return;
+    }
 
     saveCache({ lastChecked: now, latestVersion: latest });
 
@@ -121,6 +126,6 @@ function printUpdateNotice(current: string, latest: string): void {
   console.log(
     `  Update available: ${pc.dim(current)} ${pc.dim("→")} ${pc.green(latest)}`
   );
-  console.log(`  Run ${pc.cyan("agent-army update")} to install`);
+  console.log(`  Run ${pc.cyan("clawup update")} to install`);
   console.log();
 }

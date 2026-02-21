@@ -1,21 +1,21 @@
 {
-  "name": "agent-army-web",
+  "name": "clawup-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm --filter @agent-army/core build && next build",
+    "build": "pnpm --filter @clawup/core build && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@agent-army/core": "workspace:*",
+    "@clawup/core": "workspace:*",
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/client": "5.22.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@vercel/analytics": "^1.6.1",
-    "agent-army": "workspace:*",
+    "clawup": "workspace:*",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

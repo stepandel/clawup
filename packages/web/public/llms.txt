@@ -1,8 +1,8 @@
-# Agent Army
+# Clawup
 
 > Deploy and manage autonomous AI coding agents on your own cloud infrastructure.
 
-Agent Army is an open-source CLI tool that provisions, orchestrates, and monitors AI dev teams. Deploy AI coding agents (Claude, GPT, etc.) to your own AWS infrastructure with a single command.
+Clawup is an open-source CLI tool that provisions, orchestrates, and monitors AI dev teams. Deploy AI coding agents (Claude, GPT, etc.) to your own AWS infrastructure with a single command.
 
 ## Key Features
 
@@ -17,6 +17,6 @@ Agent Army is an open-source CLI tool that provisions, orchestrates, and monitor
 
 - [Documentation](https://docs.agent-army.ai)
 - [Quickstart Guide](https://docs.agent-army.ai/quickstart)
-- [GitHub Repository](https://github.com/stepandel/agent-army)
+- [GitHub Repository](https://github.com/stepandel/clawup)
 - [CLI Reference](https://docs.agent-army.ai/cli/overview)
 - [Architecture Overview](https://docs.agent-army.ai/architecture/overview)

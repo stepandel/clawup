@@ -1,11 +1,11 @@
 /**
- * agent-army ssh — SSH to agent by name/alias
+ * clawup ssh — SSH to agent by name/alias
  */
 
 import * as p from "@clack/prompts";
 import { loadManifest, resolveConfigName } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
-import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "@agent-army/core";
+import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, exitWithError } from "../lib/ui";
 import { requireTailscale } from "../lib/tailscale";

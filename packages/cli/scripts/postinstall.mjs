@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Postinstall script for agent-army CLI
+ * Postinstall script for clawup CLI
  *
  * Downloads vendored binaries (Pulumi CLI, AWS CLI v2) for the current
  * platform to cli/vendor/. Runs automatically after `npm install`.
@@ -84,7 +84,7 @@ function httpsGet(url) {
         reject(new Error("Too many redirects"));
         return;
       }
-      https.get(reqUrl, { headers: { "User-Agent": "agent-army-postinstall" } }, (res) => {
+      https.get(reqUrl, { headers: { "User-Agent": "clawup-postinstall" } }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
           doRequest(res.headers.location, redirectCount + 1);
@@ -113,7 +113,7 @@ function download(url, destPath) {
         return;
       }
       https
-        .get(reqUrl, { headers: { "User-Agent": "agent-army-postinstall" } }, (response) => {
+        .get(reqUrl, { headers: { "User-Agent": "clawup-postinstall" } }, (response) => {
           if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
             response.resume();
             request(response.headers.location, redirectCount + 1);
@@ -225,7 +225,7 @@ async function installPulumi(platform) {
   const destDir = path.join(VENDOR_DIR, "pulumi");
   fs.mkdirSync(destDir, { recursive: true });
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-army-pulumi-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawup-pulumi-"));
 
   try {
     if (platform.os === "windows") {
@@ -285,7 +285,7 @@ async function installAwsCli(platform) {
   // Fetch checksum from AWS .sha256 sidecar file
   const expectedChecksum = await getAwsCliChecksum(url);
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "agent-army-awscli-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawup-awscli-"));
 
   try {
     if (platform.os === "linux") {
@@ -353,20 +353,20 @@ function copyDirSync(src, dest) {
 }
 
 async function main() {
-  // Skip in CI or if AGENT_ARMY_SKIP_POSTINSTALL is set
-  if (process.env.AGENT_ARMY_SKIP_POSTINSTALL || process.env.CI) {
-    console.log("agent-army: skipping postinstall (CI or AGENT_ARMY_SKIP_POSTINSTALL set)");
+  // Skip in CI or if CLAWUP_SKIP_POSTINSTALL is set
+  if (process.env.CLAWUP_SKIP_POSTINSTALL || process.env.AGENT_ARMY_SKIP_POSTINSTALL || process.env.CI) {
+    console.log("clawup: skipping postinstall (CI or CLAWUP_SKIP_POSTINSTALL set)");
     return;
   }
 
   const platform = getPlatform();
   if (!platform) {
-    console.log(`agent-army: unsupported platform (${process.platform}/${process.arch}), skipping vendor install`);
+    console.log(`clawup: unsupported platform (${process.platform}/${process.arch}), skipping vendor install`);
     console.log("  Pulumi and AWS CLI must be installed manually.");
     return;
   }
 
-  console.log(`agent-army: installing vendored binaries (${platform.os}/${platform.arch})...`);
+  console.log(`clawup: installing vendored binaries (${platform.os}/${platform.arch})...`);
 
   // Install Pulumi
   try {
@@ -384,12 +384,12 @@ async function main() {
     console.warn("  The CLI will fall back to system PATH for AWS CLI.");
   }
 
-  console.log("agent-army: postinstall complete.");
+  console.log("clawup: postinstall complete.");
 }
 
 main().catch((err) => {
   // Non-fatal — the CLI will fall back to system PATH
-  console.warn(`agent-army postinstall: ${err instanceof Error ? err.message : String(err)}`);
+  console.warn(`clawup postinstall: ${err instanceof Error ? err.message : String(err)}`);
   console.warn("  Vendored binaries may not be available. Falling back to system PATH.");
   process.exit(0); // Exit 0 so npm install doesn't fail
 });

@@ -162,7 +162,7 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     ui.log.error("Redeploy failed. Check the output above for details.");
     if (stackExists) {
       ui.log.warn(
-        "If the in-place update cannot recover, try: agent-army destroy && agent-army deploy"
+        "If the in-place update cannot recover, try: clawup destroy && clawup deploy"
       );
     }
     process.exit(1);
@@ -214,5 +214,5 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     );
   }
 
-  ui.outro("Agents updated. Run `agent-army validate` to verify.");
+  ui.outro("Agents updated. Run `clawup validate` to verify.");
 };

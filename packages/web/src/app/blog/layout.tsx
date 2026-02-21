@@ -22,7 +22,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
       <nav className={`fixed left-0 right-0 z-50 flex items-center justify-between px-8 py-4 backdrop-blur-md bg-background/80 border-b border-border transition-[top] duration-300 ${showBanner ? "top-10" : "top-0"}`}>
         <a href="/" className="flex items-center gap-2.5">
           <span className="text-xl">🪖</span>
-          <span className="text-base font-bold tracking-tight">Agent Army</span>
+          <span className="text-base font-bold tracking-tight">Clawup</span>
         </a>
         <div className="flex items-center gap-6">
           <a
@@ -32,13 +32,13 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
             Blog
           </a>
           <a
-            href="https://docs.agent-army.ai"
+            href="https://docs.clawup.ai"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Docs
           </a>
           <a
-            href="https://github.com/stepandel/agent-army"
+            href="https://github.com/stepandel/clawup"
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -58,14 +58,14 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
             <div className="flex items-center gap-2.5">
               <span className="text-base">🪖</span>
               <span className="text-sm font-semibold text-muted-foreground">
-                Agent Army
+                Clawup
               </span>
             </div>
             <div className="flex gap-7 flex-wrap">
               {[
                 { label: "Blog", href: "/blog/launch" },
-                { label: "GitHub", href: "https://github.com/stepandel/agent-army" },
-                { label: "Documentation", href: "https://docs.agent-army.ai" },
+                { label: "GitHub", href: "https://github.com/stepandel/clawup" },
+                { label: "Documentation", href: "https://docs.clawup.ai" },
               ].map((link) => (
                 <a
                   key={link.label}

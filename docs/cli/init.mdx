@@ -8,7 +8,7 @@ Interactive setup wizard that walks you through configuring your cloud provider,
 ## Usage
 
 ```bash
-agent-army init [options]
+clawup init [options]
 ```
 
 ## Options
@@ -56,15 +56,15 @@ Review your full configuration with cost estimates before saving.
 
 ```bash
 # Standard interactive init
-agent-army init
+clawup init
 
 # Init and deploy immediately
-agent-army init --deploy
+clawup init --deploy
 
 # Init, deploy, skip confirmation
-agent-army init --deploy --yes
+clawup init --deploy --yes
 ```
 
 ## Output
 
-Creates `~/.agent-army/configs/<stack-name>/agent-army.yaml` with your full manifest.
+Creates `~/.clawup/configs/<stack-name>/clawup.yaml` with your full manifest.
