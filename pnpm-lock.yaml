@@ -23,9 +23,6 @@ importers:
       '@clack/prompts':
         specifier: ^0.9
         version: 0.9.1
-      '@clawup/core':
-        specifier: workspace:*
-        version: link:../core
       commander:
         specifier: ^13.0
         version: 13.1.0
@@ -36,6 +33,9 @@ importers:
         specifier: ^2.7.0
         version: 2.8.2
     devDependencies:
+      '@clawup/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.33
