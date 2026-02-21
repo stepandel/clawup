@@ -38,7 +38,13 @@ jobs:
       - name: Build CLI
         run: pnpm --filter ./packages/cli build
 
-      - name: Publish to npm
+      - name: Publish @clawup/core to npm
+        run: pnpm publish --provenance --access public --no-git-checks
+        working-directory: packages/core/
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish clawup CLI to npm
         run: pnpm publish --provenance --access public --no-git-checks
         working-directory: packages/cli/
         env:

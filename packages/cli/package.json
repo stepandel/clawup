@@ -4,7 +4,6 @@
   "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS",
   "bin": { "clawup": "dist/bin.js" },
   "files": ["dist", "infra", "scripts"],
-  "bundleDependencies": ["@clawup/core"],
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
