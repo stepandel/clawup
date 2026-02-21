@@ -21,7 +21,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
       {/* Nav */}
       <nav className={`fixed left-0 right-0 z-50 flex items-center justify-between px-8 py-4 backdrop-blur-md bg-background/80 border-b border-border transition-[top] duration-300 ${showBanner ? "top-10" : "top-0"}`}>
         <a href="/" className="flex items-center gap-2.5">
-          <span className="text-xl">🪖</span>
+          <img src="/logo.svg" alt="Clawup" className="h-7 w-7" />
           <span className="text-base font-bold tracking-tight">Clawup</span>
         </a>
         <div className="flex items-center gap-6">
@@ -56,7 +56,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
         <div className="max-w-5xl mx-auto flex flex-col gap-6">
           <div className="flex justify-between items-center flex-wrap gap-5">
             <div className="flex items-center gap-2.5">
-              <span className="text-base">🪖</span>
+              <img src="/logo.svg" alt="Clawup" className="h-5 w-5" />
               <span className="text-sm font-semibold text-muted-foreground">
                 Clawup
               </span>

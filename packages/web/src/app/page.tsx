@@ -165,8 +165,8 @@ function renderYamlLine(line: string, i: number) {
     const value = line.slice(colonIdx);
     return (
       <div key={i}>
-        <span className="text-accent-blue">{key}</span>
-        <span className="text-muted-foreground">{value}</span>
+        <span className="text-[#60a5fa]">{key}</span>
+        <span className="text-[#9ca3af]">{value}</span>
       </div>
     );
   }
@@ -196,7 +196,7 @@ export default function Home() {
         className={`fixed left-0 right-0 z-50 flex items-center justify-between px-8 py-4 backdrop-blur-md bg-background/80 border-b border-border transition-[top] duration-300 ${showBanner ? "top-10" : "top-0"}`}
       >
         <a href="/" className="flex items-center gap-2.5">
-          <span className="text-xl">🪖</span>
+          <img src="/logo.svg" alt="Clawup" className="h-7 w-7" />
           <span className="text-base font-bold tracking-tight">
             Clawup
           </span>
@@ -239,7 +239,7 @@ export default function Home() {
           </Badge>
         </div>
 
-        <h1 className="animate-fade-in-up-1 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[1.1] tracking-tighter mb-4 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
+        <h1 className="animate-fade-in-up-1 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[1.1] tracking-tighter mb-4 bg-gradient-to-b from-foreground to-foreground/50 bg-clip-text text-transparent">
           Define, deploy, and manage
           <br />
           AI agent fleets
@@ -267,15 +267,15 @@ export default function Home() {
         {/* Install command */}
         <div className="animate-fade-in-up-3 max-w-md mx-auto mb-10">
           <div className="flex items-center gap-3 px-6 py-4 rounded-xl bg-[#0c0c0c] border border-border font-mono text-sm">
-            <span className="text-accent-emerald">$</span>
-            <code className="text-foreground flex-1 text-left">
+            <span className="text-[#34d399]">$</span>
+            <code className="text-white flex-1 text-left">
               npm install -g clawup
             </code>
             <button
               onClick={() =>
                 navigator.clipboard?.writeText("npm install -g clawup").catch(() => {})
               }
-              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              className="text-[#9ca3af] hover:text-white transition-colors shrink-0"
               title="Copy to clipboard"
             >
               <svg
@@ -318,42 +318,42 @@ export default function Home() {
 
       {/* Terminal Preview — YAML-first flow */}
       <section className="max-w-2xl mx-auto mb-24 px-8">
-        <div className="animate-fade-in-up-3 bg-[#0c0c0c] border border-border rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
+        <div className="animate-fade-in-up-3 bg-[#0c0c0c] border border-border rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.12)]">
           {/* Title bar */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
             <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
             <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
             <div className="w-3 h-3 rounded-full bg-[#28c840]" />
-            <span className="ml-2 text-xs text-muted-foreground">
+            <span className="ml-2 text-xs text-[#9ca3af]">
               Terminal
             </span>
           </div>
           {/* Content */}
           <div className="p-6 font-mono text-sm leading-7">
             <div className="mb-1">
-              <span className="text-accent-emerald">$</span>{" "}
-              <span className="text-foreground">cat atlas.yaml</span>
+              <span className="text-[#34d399]">$</span>{" "}
+              <span className="text-white">cat atlas.yaml</span>
             </div>
-            <div className="text-muted-foreground pl-2 mb-3 whitespace-pre leading-6 text-xs">
+            <div className="text-[#9ca3af] pl-2 mb-3 whitespace-pre leading-6 text-xs">
               {yamlSnippet.split("\n").map(renderYamlLine)}
             </div>
             <div className="mb-1">
-              <span className="text-accent-emerald">$</span>{" "}
-              <span className="text-foreground">clawup deploy</span>
+              <span className="text-[#34d399]">$</span>{" "}
+              <span className="text-white">clawup deploy</span>
             </div>
-            <div className="text-muted-foreground">
+            <div className="text-[#9ca3af]">
               Deploying 1 agent to Hetzner (nbg1)...
             </div>
             <div>
-              <span className="text-accent-emerald">✓</span>{" "}
-              <span className="text-muted-foreground">
+              <span className="text-[#34d399]">✓</span>{" "}
+              <span className="text-[#9ca3af]">
                 Atlas (researcher) —{" "}
               </span>
-              <span className="text-accent-emerald">ready</span>
+              <span className="text-[#34d399]">ready</span>
             </div>
             <div className="mt-1">
-              <span className="text-accent-emerald">$</span>{" "}
-              <span className="text-muted-foreground">
+              <span className="text-[#34d399]">$</span>{" "}
+              <span className="text-[#9ca3af]">
                 <span className="animate-pulse-glow">▊</span>
               </span>
             </div>
@@ -467,15 +467,15 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           {/* YAML snippet */}
           <div className="bg-[#0c0c0c] border border-border rounded-2xl overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
               <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
               <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
               <div className="w-3 h-3 rounded-full bg-[#28c840]" />
-              <span className="ml-2 text-xs text-muted-foreground">
+              <span className="ml-2 text-xs text-[#9ca3af]">
                 sentinel.yaml
               </span>
             </div>
-            <div className="p-6 font-mono text-xs leading-6 whitespace-pre text-muted-foreground">
+            <div className="p-6 font-mono text-xs leading-6 whitespace-pre text-[#9ca3af]">
               {customYamlSnippet.split("\n").map(renderYamlLine)}
             </div>
           </div>
@@ -537,7 +537,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto flex flex-col gap-6">
           <div className="flex justify-between items-center flex-wrap gap-5">
             <div className="flex items-center gap-2.5">
-              <span className="text-base">🪖</span>
+              <img src="/logo.svg" alt="Clawup" className="h-5 w-5" />
               <span className="text-sm font-semibold text-muted-foreground">
                 Clawup
               </span>
