@@ -21,8 +21,10 @@ pnpm --filter agent-army build
 
 ## Project Structure
 
-- `cli/` — CLI package (commands, config, types, registries)
-- `src/` — Pulumi infrastructure components
+- `packages/core/` — Shared types, constants, registries, and utilities (`@agent-army/core`)
+- `packages/cli/` — CLI package (commands, config, adapters)
+- `packages/pulumi/` — Pulumi infrastructure components (`@agent-army/pulumi`)
+- `packages/web/` — Next.js dashboard
 - `identities/` — Built-in identity stubs (point to external Git repos)
 - `examples/` — Example identities for reference
 - `docs/` — Mintlify documentation
@@ -44,18 +46,18 @@ pnpm --filter agent-army build
 
 1. Create an identity directory with `identity.yaml` and workspace files (see [examples/identity/](https://github.com/stepandel/agent-army/tree/main/examples/identity) for the format)
 2. Host the identity in a Git repo (or add to an existing identities repo)
-3. Register it in `cli/lib/constants.ts` under `BUILT_IN_IDENTITIES`
+3. Register it in `packages/core/src/constants.ts` under `BUILT_IN_IDENTITIES`
 4. Update documentation in `docs/architecture/identities.mdx`
 
 ## Adding a New Cloud Provider
 
-1. Create a new component in `src/components/`
-2. Add provider constants to `cli/lib/constants.ts`
+1. Create a new component in `packages/pulumi/src/components/`
+2. Add provider constants to `packages/core/src/constants.ts`
 3. Update the CLI adapter and web wizard
 4. Document in `docs/architecture/cloud-providers.mdx`
 
 ## Adding a Registry Entry
 
-- **Coding agent:** Add to `cli/lib/coding-agent-registry.ts` with install script and model config
-- **Dep:** Add to `cli/lib/dep-registry.ts` with install script
-- **Plugin:** Add to `cli/lib/plugin-registry.ts` with metadata
+- **Coding agent:** Add to `packages/core/src/coding-agent-registry.ts` with install script and model config
+- **Dep:** Add to `packages/core/src/dep-registry.ts` with install script
+- **Plugin:** Add to `packages/core/src/plugin-registry.ts` with metadata

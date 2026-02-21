@@ -117,7 +117,7 @@ The `codingAgent` field selects which coding CLI is installed and configured on 
 |-------|-----|-------------|
 | `claude-code` | `claude` | Claude Code CLI (default) |
 
-Each entry provides an install script, model configuration script, and OpenClaw `cliBackends` config. New coding agents can be added by extending the registry in `cli/lib/coding-agent-registry.ts`.
+Each entry provides an install script, model configuration script, and OpenClaw `cliBackends` config. New coding agents can be added by extending the registry in `packages/core/src/coding-agent-registry.ts`.
 
 ### Dep Registry
 
@@ -128,7 +128,7 @@ System-level tools installed on agents. Declared via the `deps` field.
 | `gh` | GitHub CLI (with token-based auth) |
 | `brave-search` | Brave Search API key (config-only, no binary) |
 
-New deps can be added in `cli/lib/dep-registry.ts`.
+New deps can be added in `packages/core/src/dep-registry.ts`.
 
 ### Plugin Registry
 
@@ -139,7 +139,7 @@ OpenClaw plugins configured per-agent. Declared via the `plugins` field.
 | `openclaw-linear` | Linear issue tracking with webhook-driven ticket queuing |
 | `slack` | Slack bot integration (Socket Mode) |
 
-Plugin metadata is defined in `cli/lib/plugin-registry.ts`. Plugin configuration defaults can be set in `pluginDefaults` in the identity manifest, and overridden per-deployment via plugin config files at `~/.agent-army/configs/<stack>/plugins/<plugin>.yaml`.
+Plugin metadata is defined in `packages/core/src/plugin-registry.ts`. Plugin configuration defaults can be set in `pluginDefaults` in the identity manifest, and overridden per-deployment in the agent's `plugins` field in the manifest.
 
 ## Workspace Files
 

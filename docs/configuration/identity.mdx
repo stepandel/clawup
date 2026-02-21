@@ -189,7 +189,7 @@ The `codingAgent` field selects which coding CLI is installed.
 |-----|-----------|-------------|
 | `claude-code` | `claude` | Claude Code CLI (default) |
 
-Each entry provides an install script, model configuration, and OpenClaw `cliBackends` config. Defined in `cli/lib/coding-agent-registry.ts`.
+Each entry provides an install script, model configuration, and OpenClaw `cliBackends` config. Defined in `packages/core/src/coding-agent-registry.ts`.
 
 ### Dep Registry
 
@@ -200,7 +200,7 @@ System-level tools declared via the `deps` field.
 | `gh` | GitHub CLI — installed from official apt repo, authenticated with provided token |
 | `brave-search` | Brave Search API key — config-only, sets environment variable for API access |
 
-Defined in `cli/lib/dep-registry.ts`.
+Defined in `packages/core/src/dep-registry.ts`.
 
 ### Plugin Registry
 
@@ -211,7 +211,7 @@ OpenClaw plugins declared via the `plugins` field.
 | `openclaw-linear` | Linear issue tracking — webhook-driven ticket queuing, per-agent routing rules, state management |
 | `slack` | Slack bot integration — Socket Mode, DMs, group chats, emoji reactions |
 
-Defined in `cli/lib/plugin-registry.ts`.
+Defined in `packages/core/src/plugin-registry.ts`.
 
 ## Plugin Defaults
 

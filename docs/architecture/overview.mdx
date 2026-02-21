@@ -69,14 +69,14 @@ System dependencies declared in the identity's `deps` field are installed. For e
 - `gh` — GitHub CLI from the official apt repository, authenticated with the provided token
 - `brave-search` — Brave Search API key configured as an environment variable
 
-The dep registry (`cli/lib/dep-registry.ts`) maps each dep name to its install script.
+The dep registry (`packages/core/src/dep-registry.ts`) maps each dep name to its install script.
 
 ### 5. Coding Agent
 
 The coding agent CLI declared in the identity's `codingAgent` field is installed. For example:
 - `claude-code` — Claude Code installed via `claude.ai/install.sh`, added to `~/.local/bin`
 
-The coding agent registry (`cli/lib/coding-agent-registry.ts`) maps each agent name to install and model configuration scripts.
+The coding agent registry (`packages/core/src/coding-agent-registry.ts`) maps each agent name to install and model configuration scripts.
 
 ### 6. Tailscale
 

@@ -28,7 +28,7 @@ Interactive setup wizard that walks you through the full configuration:
 6. **Optional integrations** — Slack, Linear, GitHub per agent
 7. **Summary & confirmation** — review config and estimated cost before proceeding
 
-Outputs an `agent-army.json` manifest and sets all Pulumi config values.
+Outputs an `agent-army.yaml` manifest and sets all Pulumi config values.
 
 ```bash
 agent-army init              # Interactive wizard
@@ -181,27 +181,27 @@ You can also define fully custom agents during `init`.
 
 ## Configuration
 
-### `agent-army.json`
+### `agent-army.yaml`
 
-The `init` command generates an `agent-army.json` manifest in the project root:
+The `init` command generates an `agent-army.yaml` manifest:
 
-```json
-{
-  "stackName": "dev",
-  "provider": "aws",
-  "region": "us-east-1",
-  "instanceType": "t3.medium",
-  "ownerName": "Your Name",
-  "agents": [
-    {
-      "name": "agent-pm",
-      "displayName": "Juno",
-      "role": "pm",
-      "preset": "pm",
-      "volumeSize": 30
-    }
-  ]
-}
+```yaml
+stackName: dev
+provider: aws
+region: us-east-1
+instanceType: t3.medium
+ownerName: Your Name
+agents:
+  - name: agent-pm
+    displayName: Juno
+    role: pm
+    identity: "https://github.com/your-org/army-identities#pm"
+    volumeSize: 30
+    plugins:
+      openclaw-linear:
+        agentId: agent-pm
+      slack:
+        mode: socket
 ```
 
 This manifest is read by the Pulumi program at deploy time to dynamically create the agent stack.
@@ -220,39 +220,22 @@ Secrets and stack configuration are stored in Pulumi config (encrypted). The `in
 ## Project Structure
 
 ```
-cli/
+packages/cli/
 ├── bin.ts              # Entry point (Commander.js program)
-├── types.ts            # TypeScript type definitions
-├── commands/
-│   ├── init.ts         # Interactive setup wizard
-│   ├── config.ts       # View and modify config
-│   ├── secrets.ts      # Set and list Pulumi secrets
-│   ├── deploy.ts       # Deploy agents
-│   ├── redeploy.ts     # Update agents in-place
-│   ├── status.ts       # Show agent statuses
-│   ├── ssh.ts          # SSH to agents
-│   ├── validate.ts     # Health check agents
-│   ├── destroy.ts      # Tear down resources
-│   └── list.ts         # List saved configs
-├── lib/
-│   ├── config.ts       # Load/save agent-army.json manifest
-│   ├── constants.ts    # Presets, aliases, regions, instance types, cost estimates
+├── commands/           # Command handlers (init, deploy, ssh, secrets, push, webhooks, etc.)
+├── tools/              # Tool implementations (adapter-based: deploy, destroy, redeploy, status, validate, push, webhooks)
+├── lib/                # CLI-only utilities
+│   ├── config.ts       # Load/save agent-army.yaml manifest
 │   ├── exec.ts         # Shell command execution
 │   ├── prerequisites.ts # Prerequisite checks
 │   ├── process.ts      # Graceful shutdown handling
 │   ├── pulumi.ts       # Pulumi stack & config operations
 │   ├── tailscale.ts    # Tailscale device management
+│   ├── tool-helpers.ts # Shared helpers for tool implementations
 │   └── ui.ts           # UI helpers (banners, spinners, formatting)
-├── adapters/
-│   ├── cli-adapter.ts  # CLI adapter for interactive commands
-│   ├── api-adapter.ts  # API adapter for programmatic use
-│   └── types.ts        # Adapter type definitions
-└── tools/
-    ├── deploy.ts       # Deploy tool logic
-    ├── destroy.ts      # Destroy tool logic
-    ├── redeploy.ts     # Redeploy tool logic
-    ├── status.ts       # Status tool logic
-    └── validate.ts     # Validate tool logic
+└── adapters/           # Runtime adapters (CLI vs API)
+
+# Shared types, constants, and registries live in @agent-army/core (packages/core/)
 ```
 
 ## Dependencies

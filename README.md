@@ -200,6 +200,12 @@ Run `agent-army --help` for the full list.
 | `agent-army config show --json` | Config in JSON format |
 | `agent-army config set <key> <value>` | Update a config value |
 | `agent-army config set <key> <value> -a <agent>` | Update a per-agent config value |
+| `agent-army config migrate` | Migrate old plugin config files into manifest |
+| `agent-army secrets set <key> <value>` | Set a Pulumi secret (e.g. API keys) |
+| `agent-army secrets list` | Show which secrets are configured (redacted) |
+| `agent-army push` | Push workspace files, skills, and config to running agents |
+| `agent-army webhooks setup` | Configure Linear webhooks for deployed agents |
+| `agent-army update` | Update agent-army CLI to the latest version |
 
 Agent resolution is flexible — all of these target the same agent:
 
@@ -387,33 +393,40 @@ For more advanced secret management, use [Pulumi ESC](https://www.pulumi.com/doc
 
 ```
 agent-army/
-├── cli/                    # CLI tool (commands, prompts, config management)
-│   ├── bin.ts              # Entry point (Commander.js)
-│   ├── commands/           # init, deploy, redeploy, status, ssh, validate, destroy, config, list
-│   ├── lib/                # Config, prerequisites, Pulumi ops, UI helpers
-│   │   ├── coding-agent-registry.ts  # Coding agent CLI install/config registry
-│   │   ├── dep-registry.ts           # System dep install registry (gh, brave-search)
-│   │   ├── plugin-registry.ts        # OpenClaw plugin metadata registry
-│   │   ├── identity.ts               # Identity loader (Git repos, local paths)
-│   │   ├── skills.ts                 # Skill classifier (private vs public/clawhub)
-│   │   └── ...
-│   └── types.ts            # TypeScript types (ArmyManifest, IdentityManifest, etc.)
-├── src/                    # Reusable Pulumi components
-│   └── components/
-│       ├── openclaw-agent.ts    # AWS EC2 agent component
-│       ├── hetzner-agent.ts     # Hetzner Cloud agent component
-│       ├── cloud-init.ts        # Cloud-init script generation (registry-driven)
-│       └── config-generator.ts  # OpenClaw config builder (model fallbacks, cliBackends)
+├── packages/
+│   ├── core/               # @agent-army/core — shared types, constants, registries
+│   │   └── src/
+│   │       ├── schemas/    # Zod schemas (source of truth for types)
+│   │       ├── constants.ts
+│   │       ├── identity.ts # Identity loader (Git repos, local paths)
+│   │       ├── plugin-registry.ts
+│   │       ├── coding-agent-registry.ts
+│   │       ├── dep-registry.ts
+│   │       └── skills.ts
+│   ├── cli/                # agent-army CLI (published npm package)
+│   │   ├── bin.ts          # Entry point (Commander.js)
+│   │   ├── commands/       # init, deploy, redeploy, status, ssh, validate, destroy, config, list, push, secrets, webhooks, update
+│   │   ├── tools/          # Tool implementations (adapter-based)
+│   │   ├── lib/            # CLI-only: config, pulumi, ui, tailscale, exec
+│   │   └── adapters/       # Runtime adapters (CLI vs API)
+│   ├── pulumi/             # @agent-army/pulumi — infrastructure as code
+│   │   └── src/
+│   │       ├── components/
+│   │       │   ├── openclaw-agent.ts    # AWS EC2 agent component
+│   │       │   ├── hetzner-agent.ts     # Hetzner Cloud agent component
+│   │       │   ├── cloud-init.ts        # Cloud-init script generation
+│   │       │   └── config-generator.ts  # OpenClaw config builder
+│   │       ├── shared-vpc.ts
+│   │       └── index.ts    # Main Pulumi stack program
+│   └── web/                # Next.js dashboard (agent-army-web)
 ├── identities/             # Built-in identity stubs (point to external repos)
 ├── examples/               # Example identities for reference
 │   └── identity/           # Complete "researcher" identity example
 ├── docs/                   # Documentation (Mintlify site + guides)
 ├── esc/                    # Pulumi ESC secret templates
 ├── scripts/                # Shell script helpers
-├── web/                    # Next.js dashboard (agent-army-web)
-├── index.ts                # Main Pulumi stack program
-├── shared-vpc.ts           # Shared VPC component (AWS)
-└── Pulumi.yaml             # Pulumi project config
+├── Pulumi.yaml             # Pulumi project config (points to packages/pulumi/)
+└── pnpm-workspace.yaml     # Monorepo workspace config
 ```
 
 ## Security
@@ -462,8 +475,14 @@ For contributing to Agent Army itself:
 git clone https://github.com/stepandel/agent-army.git
 cd agent-army
 pnpm install
-pnpm build
-pnpm run watch    # Watch mode
+pnpm build                                # Build all packages
+pnpm test                                 # Run all tests
+
+# Individual packages
+pnpm --filter @agent-army/core build      # Build core
+pnpm --filter agent-army build            # Build CLI
+pnpm --filter @agent-army/pulumi build    # Build Pulumi
+pnpm --filter agent-army-web dev          # Web dev server
 ```
 
 ## License

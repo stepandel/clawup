@@ -8,30 +8,42 @@ Agent Army deploys fleets of specialized AI agents (PM, Engineer, QA) on AWS or 
 
 ```text
 agent-army/
-├── cli/                    # Published npm package (agent-army CLI)
-│   ├── bin.ts              # Entry point - Commander.js commands
-│   ├── commands/           # Command implementations (init, deploy, ssh, etc.)
-│   ├── lib/                # Shared utilities (config, pulumi, ui, exec)
-│   ├── adapters/           # Runtime adapters (CLI vs API)
-│   └── types.ts            # Shared TypeScript types
-├── src/                    # Pulumi components (infrastructure as code)
-│   └── components/
-│       ├── openclaw-agent.ts    # AWS EC2 agent
-│       ├── hetzner-agent.ts     # Hetzner Cloud agent
-│       ├── cloud-init.ts        # User-data script generation
-│       └── config-generator.ts  # OpenClaw config builder
-├── web/                    # Next.js dashboard (agent-army-web)
-│   └── src/
-│       ├── app/            # App router pages & API routes
-│       ├── components/     # React components (shadcn/ui)
-│       └── lib/            # Server utilities (prisma, auth, crypto)
-├── identities/             # Built-in agent identities (self-contained)
-│   ├── pm/                 # Juno - Product Manager (identity.yaml + workspace files + skills)
-│   ├── eng/                # Titus - Engineer
-│   └── tester/             # Scout - QA
-├── index.ts                # Main Pulumi stack program
-├── shared-vpc.ts           # AWS VPC component
-└── docs/                   # Mintlify documentation
+├── packages/
+│   ├── core/                    # @agent-army/core — shared types, constants, registries
+│   │   └── src/
+│   │       ├── schemas/         # Zod schemas (source of truth for types)
+│   │       ├── types.ts         # TypeScript types (z.infer<> re-exports)
+│   │       ├── constants.ts     # Regions, costs, identities, model providers
+│   │       ├── identity.ts      # Git-based identity loader
+│   │       ├── skills.ts        # Skill classification (private vs clawhub)
+│   │       ├── deps.ts          # Dep resolution
+│   │       ├── plugin-registry.ts
+│   │       ├── coding-agent-registry.ts
+│   │       └── dep-registry.ts
+│   ├── cli/                     # Published npm package (agent-army CLI)
+│   │   ├── bin.ts               # Entry point - Commander.js commands
+│   │   ├── commands/            # Command implementations (init, deploy, ssh, etc.)
+│   │   ├── tools/               # Tool implementations (adapter-based)
+│   │   ├── lib/                 # CLI-only utilities (config, pulumi, ui, exec, tailscale)
+│   │   └── adapters/            # Runtime adapters (CLI vs API)
+│   ├── pulumi/                  # @agent-army/pulumi — infrastructure as code
+│   │   └── src/
+│   │       ├── components/
+│   │       │   ├── openclaw-agent.ts    # AWS EC2 agent
+│   │       │   ├── hetzner-agent.ts     # Hetzner Cloud agent
+│   │       │   ├── cloud-init.ts        # User-data script generation
+│   │       │   └── config-generator.ts  # OpenClaw config builder
+│   │       ├── shared-vpc.ts            # AWS VPC component
+│   │       └── index.ts                 # Main Pulumi stack program
+│   └── web/                     # Next.js dashboard (agent-army-web)
+│       └── src/
+│           ├── app/             # App router pages & API routes
+│           ├── components/      # React components (shadcn/ui)
+│           └── lib/             # Server utilities (prisma, auth, crypto)
+├── identities/                  # Built-in agent identities (self-contained)
+├── docs/                        # Mintlify documentation
+├── Pulumi.yaml                  # Points to packages/pulumi/dist/index.js
+└── pnpm-workspace.yaml          # packages: ["packages/*"]
 ```
 
 ## Key Concepts
@@ -41,9 +53,9 @@ The manifest is the source of truth for deployments. Created by `agent-army init
 - Stack name, cloud provider, region, instance type
 - Owner info (name, timezone, working hours)
 - Agent definitions (identity-based or custom)
-- Per-agent plugin list (e.g., `plugins: [openclaw-linear]`)
+- Per-agent plugin config (inline in the manifest under `agent.plugins`)
 
-Plugin configs are stored separately at `~/.agent-army/configs/<stack>/plugins/<plugin>.yaml`.
+Secrets (API keys, tokens) are stored encrypted in Pulumi config, not in the manifest.
 
 ### Pulumi Stack
 Infrastructure is managed via Pulumi. Secrets (API keys, tokens) are stored encrypted in Pulumi config, not in the manifest.
@@ -57,20 +69,18 @@ Each agent gets workspace files injected into `~/.openclaw/workspace/`. These de
 ## Development Commands
 
 ```bash
-# Root (Pulumi components)
-pnpm install           # Install all dependencies
-pnpm build             # Build Pulumi components
-pnpm watch             # Watch mode
+pnpm install                              # Install all dependencies
+pnpm build                                # Build all packages
+pnpm test                                 # Run all tests
 
-# CLI development
-cd cli
-pnpm build             # Build CLI
-pnpm watch             # Watch mode
+# Individual packages
+pnpm --filter @agent-army/core build      # Build core
+pnpm --filter agent-army build            # Build CLI
+pnpm --filter @agent-army/pulumi build    # Build Pulumi
+pnpm --filter agent-army-web dev          # Web dev server (localhost:3000)
 
-# Web development
-cd web
-pnpm dev               # Start dev server (localhost:3000)
-pnpm build             # Production build
+# Watch mode
+cd packages/cli && pnpm watch
 ```
 
 ## Code Conventions
@@ -107,13 +117,15 @@ pnpm build             # Production build
 
 | File | Purpose |
 |------|---------|
-| `cli/commands/init.ts` | Interactive setup wizard (largest command) |
-| `cli/lib/constants.ts` | Built-in identities, regions, instance types, key instructions |
-| `cli/lib/config.ts` | Load/save YAML manifests and plugin configs |
-| `src/components/cloud-init.ts` | Cloud-init script generation (dynamic plugin support) |
-| `src/components/config-generator.ts` | OpenClaw config builder (dynamic plugin entries) |
-| `index.ts` | Main Pulumi program that reads agent-army.yaml manifest |
-| `web/src/lib/deploy.ts` | Pulumi Automation API runner |
+| `packages/cli/commands/init.ts` | Interactive setup wizard (largest command) |
+| `packages/cli/lib/config.ts` | Load/save YAML manifests |
+| `packages/core/src/constants.ts` | Built-in identities, regions, instance types, key instructions |
+| `packages/core/src/schemas/` | Zod schemas (source of truth for all types) |
+| `packages/core/src/identity.ts` | Git-based identity loader |
+| `packages/pulumi/src/components/cloud-init.ts` | Cloud-init script generation (dynamic plugin support) |
+| `packages/pulumi/src/components/config-generator.ts` | OpenClaw config builder (dynamic plugin entries) |
+| `packages/pulumi/src/index.ts` | Main Pulumi program that reads agent-army.yaml manifest |
+| `packages/web/src/lib/deploy.ts` | Pulumi Automation API runner |
 
 ## Testing
 
@@ -130,25 +142,23 @@ Currently minimal test coverage. When adding tests:
 ## Common Tasks
 
 ### Adding a New Built-in Agent Identity
-1. Create directory in `identities/<role>/`
-2. Add identity.yaml with name, role, plugins, pluginDefaults, skills, templateVars
-3. Add workspace files: SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md, AGENTS.md, BOOTSTRAP.md, USER.md
-4. Add skills under `skills/<skill-name>/SKILL.md`
-5. Register in `cli/lib/constants.ts` BUILT_IN_IDENTITIES
+1. Create an identity directory with `identity.yaml` and workspace files
+2. Host in a Git repo (or add to an existing identities repo)
+3. Register in `packages/core/src/constants.ts` under `BUILT_IN_IDENTITIES`
 
 ### Adding a New CLI Command
-1. Create `cli/commands/<name>.ts`
+1. Create `packages/cli/commands/<name>.ts`
 2. Export async function `<name>Command(opts)`
-3. Register in `cli/bin.ts` with Commander
+3. Register in `packages/cli/bin.ts` with Commander
 
 ### Adding a New Cloud Provider
-1. Create component in `src/components/<provider>-agent.ts`
-2. Add provider config to `cli/lib/constants.ts`
-3. Update `index.ts` to handle new provider
+1. Create component in `packages/pulumi/src/components/<provider>-agent.ts`
+2. Add provider config to `packages/core/src/constants.ts`
+3. Update `packages/pulumi/src/index.ts` to handle new provider
 4. Update init command for provider-specific prompts
 
 ### Adding an API Route
-1. Create `web/src/app/api/<path>/route.ts`
+1. Create `packages/web/src/app/api/<path>/route.ts`
 2. Use `getToken()` for authentication
 3. Validate input with Zod schemas
 4. Return `NextResponse.json()`
