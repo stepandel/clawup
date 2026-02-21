@@ -1,4 +1,3 @@
 {
-  "buildCommand": "cd .. && pnpm --filter agent-army build && cd web && next build",
   "framework": "nextjs"
 }
