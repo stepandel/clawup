@@ -2,25 +2,35 @@
   "name": "clawup",
   "version": "0.1.36",
   "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS",
-  "bin": { "clawup": "dist/bin.js" },
-  "files": ["dist", "infra", "scripts"],
+  "bin": {
+    "clawup": "dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "infra",
+    "scripts"
+  ],
   "scripts": {
     "build": "tsc",
+    "build:bundle": "node scripts/bundle.mjs",
     "watch": "tsc --watch",
     "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
-    "@clawup/core": "workspace:*",
     "@clack/prompts": "^0.9",
     "commander": "^13.0",
     "picocolors": "^1.1",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
+    "@clawup/core": "workspace:*",
     "@types/node": "^20.0.0",
+    "esbuild": "^0.27.3",
     "typescript": "^5.0.0"
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",

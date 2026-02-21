@@ -29,22 +29,16 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           cd packages/cli && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
-      - name: Build root Pulumi program
+      - name: Build all packages
         run: pnpm build
+
+      - name: Bundle CLI (inline @clawup/core)
+        run: pnpm --filter ./packages/cli run build:bundle
 
       - name: Bundle infrastructure into CLI
         run: bash scripts/bundle-infra.sh
 
-      - name: Build CLI
-        run: pnpm --filter ./packages/cli build
-
-      - name: Publish @clawup/core to npm
-        run: pnpm publish --provenance --access public --no-git-checks
-        working-directory: packages/core/
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish clawup CLI to npm
+      - name: Publish to npm
         run: pnpm publish --provenance --access public --no-git-checks
         working-directory: packages/cli/
         env:
