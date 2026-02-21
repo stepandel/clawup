@@ -1,32 +1,12 @@
 {
-  "name": "agent-army",
+  "name": "agent-army-root",
   "private": true,
   "packageManager": "pnpm@10.29.2",
-  "description": "Reusable Pulumi components for deploying OpenClaw agents on AWS",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "Agent Army monorepo — deploy fleets of AI agents",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc --watch",
-    "lint": "eslint src/**/*.ts",
+    "build": "pnpm -r build",
     "test": "vitest run",
     "build:cli-infra": "bash scripts/bundle-infra.sh"
-  },
-  "keywords": [
-    "pulumi",
-    "openclaw",
-    "aws",
-    "infrastructure",
-    "ai-agent"
-  ],
-  "author": "",
-  "license": "MIT",
-  "dependencies": {
-    "@pulumi/aws": "^6.0.0",
-    "@pulumi/hcloud": "^1.32.0",
-    "@pulumi/pulumi": "^3.0.0",
-    "@pulumi/tls": "^5.0.0",
-    "yaml": "^2.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

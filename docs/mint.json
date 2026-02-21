@@ -56,6 +56,7 @@
       "group": "Configuration",
       "pages": [
         "configuration/manifest",
+        "configuration/identity",
         "configuration/environment",
         "configuration/cost-estimates"
       ]
@@ -79,7 +80,13 @@
         "architecture/overview",
         "architecture/networking",
         "architecture/cloud-providers",
-        "architecture/agent-presets"
+        "architecture/identities"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/creating-identities"
       ]
     },
     {

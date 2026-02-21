@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 #
-# Bundle infrastructure files into cli/infra/ for npm publishing.
-# Run after `pnpm build` (root) so dist/ exists.
+# Bundle infrastructure files into packages/cli/infra/ for npm publishing.
+# Run after `pnpm -r build` so compiled JS exists.
 #
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-INFRA="$ROOT/cli/infra"
+PULUMI_DIST="$ROOT/packages/pulumi/dist"
+CORE_ROOT="$ROOT/packages/core"
+INFRA="$ROOT/packages/cli/infra"
 
-echo "Bundling infrastructure into cli/infra/ ..."
+echo "Bundling infrastructure into packages/cli/infra/ ..."
 
 # Clean previous bundle
 rm -rf "$INFRA"
-mkdir -p "$INFRA/dist/src/components"
+mkdir -p "$INFRA/dist/components"
 
-# --- Pulumi.yaml (npm instead of pnpm) ---
+# --- Pulumi.yaml (npm instead of pnpm, flat dist structure) ---
 cat > "$INFRA/Pulumi.yaml" <<'EOF'
 name: agent-army
 description: Multi-agent OpenClaw deployment - PM, Engineer, and Tester
@@ -24,12 +26,11 @@ runtime:
     packagemanager: npm
 EOF
 
-# --- package.json (Pulumi SDK deps only) ---
-# Extract dependency versions from root package.json
+# --- package.json (Pulumi SDK deps + yaml) ---
 node -e "
-  const pkg = require('$ROOT/package.json');
+  const pkg = require('$ROOT/packages/pulumi/package.json');
   const deps = {};
-  for (const name of ['@pulumi/pulumi', '@pulumi/aws', '@pulumi/hcloud', '@pulumi/tls']) {
+  for (const name of ['@pulumi/pulumi', '@pulumi/aws', '@pulumi/hcloud', '@pulumi/tls', 'yaml']) {
     if (pkg.dependencies[name]) deps[name] = pkg.dependencies[name];
   }
   const out = { name: 'agent-army-infra', private: true, main: 'dist/index.js', dependencies: deps };
@@ -37,16 +38,17 @@ node -e "
 " > "$INFRA/package.json"
 
 # --- Compiled Pulumi program (.js only) ---
-cp "$ROOT/dist/index.js"      "$INFRA/dist/"
-cp "$ROOT/dist/shared-vpc.js"  "$INFRA/dist/"
-cp "$ROOT/dist/src/index.js"   "$INFRA/dist/src/"
+cp "$PULUMI_DIST/index.js"       "$INFRA/dist/"
+cp "$PULUMI_DIST/shared-vpc.js"  "$INFRA/dist/"
 
-for f in "$ROOT/dist/src/components/"*.js; do
-  [ -f "$f" ] && cp "$f" "$INFRA/dist/src/components/"
+for f in "$PULUMI_DIST/components/"*.js; do
+  [ -f "$f" ] && cp "$f" "$INFRA/dist/components/"
 done
 
-# --- Presets (full copy) ---
-cp -r "$ROOT/presets" "$INFRA/presets"
+# --- @agent-army/core (workspace package, not on npm) ---
+mkdir -p "$INFRA/node_modules/@agent-army/core"
+cp "$CORE_ROOT/package.json" "$INFRA/node_modules/@agent-army/core/"
+cp -r "$CORE_ROOT/dist" "$INFRA/node_modules/@agent-army/core/dist"
 
-echo "Done. Contents of cli/infra/:"
+echo "Done. Contents of packages/cli/infra/:"
 find "$INFRA" -type f | sed "s|$INFRA/||" | sort

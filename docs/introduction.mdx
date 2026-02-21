@@ -1,17 +1,19 @@
 ---
 title: "What is Agent Army?"
-description: "Deploy a team of AI agents that persistently work through your Linear tickets"
+description: "Deploy a fleet of autonomous AI agents on your own cloud infrastructure"
 ---
 
-Agent Army deploys a team of [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner — that persistently work through your Linear tickets. A product manager, an engineer, and a QA tester, running 24/7 on dedicated servers, coordinating through Linear and GitHub to ship real work.
+Agent Army deploys autonomous [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner. Each agent is defined by a composable **identity** that packages personality, skills, model preferences, and tool configuration into a self-contained, reusable unit. Agents run 24/7 on dedicated servers, coordinating through integrations like Linear, GitHub, and Slack.
 
 ## Why Agent Army?
 
-You have a Linear backlog full of tickets. Agent Army gives you a dedicated team that picks them up, breaks them down, writes the code, opens PRs, reviews them, and files bugs — without you babysitting the process.
+You define _what_ your agents do through identities. Agent Army handles _where_ and _how_ they run — provisioning servers, installing tools, configuring networking, and keeping agents operational.
 
-Each agent has a specific role, persistent memory, and the tools to do its job: Linear for ticket tracking, GitHub for code, Claude Code for engineering, and Slack for communication.
+Each agent has a specific role, persistent memory, and the tools to do its job. Use the built-in identities to get started, or create your own for any role you need.
 
-## The Team
+## Built-in Team
+
+Agent Army ships with three built-in identities that form a complete software development team:
 
 <CardGroup cols={3}>
   <Card title="Juno" icon="compass">
@@ -25,26 +27,26 @@ Each agent has a specific role, persistent memory, and the tools to do its job: 
   </Card>
 </CardGroup>
 
-Each agent runs on its own dedicated server with persistent storage, pre-configured with OpenClaw, Claude Code, and all necessary integrations (Linear, GitHub, Slack).
+These are standard identities hosted in a Git repo — the same format as any custom identity you'd create.
 
 ## How It Works
 
-1. **Configure** — Run `agent-army init` to set up your cloud provider, select agents, and connect Linear/GitHub
-2. **Deploy** — Run `agent-army deploy` to provision your team on dedicated servers
-3. **Assign work** — Move tickets through your Linear workflow and agents pick them up automatically. The [Linear plugin](/integrations/linear#linear-plugin) watches for ticket state changes and routes them into per-agent queues — each agent's [queue handler](/architecture/agent-presets#how-work-gets-triggered) processes tickets end-to-end
-4. **Monitor** — Use `agent-army status`, `ssh`, and `validate` to check on your team
+1. **Configure** — Run `agent-army init` to set up your cloud provider, select identities (built-in, Git repo, or local), and connect integrations
+2. **Deploy** — Run `agent-army deploy` to provision your agents on dedicated servers
+3. **Assign work** — Move tickets through your Linear workflow and agents pick them up automatically. The [Linear plugin](/integrations/linear#linear-plugin) watches for ticket state changes and routes them into per-agent queues — each agent's [queue handler](/architecture/identities#how-agents-coordinate) processes tickets end-to-end
+4. **Monitor** — Use `agent-army status`, `ssh`, and `validate` to check on your agents
 
 ## Key Features
 
 <CardGroup cols={2}>
   <Card title="One-Command Deploy" icon="rocket">
-    Interactive wizard configures everything. Deploy your entire team with `agent-army deploy`.
+    Interactive wizard configures everything. Deploy your entire fleet with `agent-army deploy`.
   </Card>
-  <Card title="Linear-Native Workflow" icon="ticket">
-    Agents pick up Linear tickets, update status, create sub-issues, and track progress automatically.
+  <Card title="Composable Identities" icon="sliders">
+    Use built-in identities, create your own, or mix both. Each identity is a self-contained package with personality, skills, and configuration.
   </Card>
-  <Card title="Fully Customizable" icon="sliders">
-    Use the built-in presets, tweak them, or define completely custom agents with your own roles and personalities.
+  <Card title="Integration-Native Workflow" icon="ticket">
+    Agents work with Linear, GitHub, and Slack out of the box. Plugin-driven architecture supports new integrations.
   </Card>
   <Card title="Persistent & Autonomous" icon="clock">
     Agents run on dedicated servers with persistent storage. They keep working through your backlog around the clock.
@@ -55,7 +57,7 @@ Each agent runs on its own dedicated server with persistent storage, pre-configu
 
 <CardGroup cols={2}>
   <Card title="Quick Start" icon="play" href="/quickstart">
-    Get your team running in 5 minutes.
+    Get your agents running in 5 minutes.
   </Card>
   <Card title="Prerequisites" icon="list-check" href="/prerequisites">
     Check what you need before deploying.

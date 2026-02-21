@@ -1,33 +1,43 @@
 ---
 title: "How It Works"
-description: "End-to-end walkthrough of how Agent Army provisions and runs your agent team"
+description: "End-to-end walkthrough of how Agent Army provisions and runs your agents"
 ---
 
-Agent Army uses [Pulumi](https://pulumi.com) to provision cloud infrastructure as code, deploying each agent on a dedicated Ubuntu server with persistent storage, secure networking, and all the tools needed to work through your Linear tickets.
+Agent Army uses [Pulumi](https://pulumi.com) to provision cloud infrastructure as code, deploying each agent on a dedicated Ubuntu server with persistent storage, secure networking, and all the tools defined by its identity.
 
 ## Deploy Flow
 
 When you run `agent-army deploy`, here's what happens:
 
 ```
-agent-army.json         Pulumi Stack          Cloud Provider
-   (Manifest)    ────▶  (TypeScript)   ────▶  (AWS / Hetzner)
-                              │
-                              ▼
-                     Per-agent resources:
-                     • Server (Ubuntu 24.04)
-                     • Security group / firewall
-                     • SSH keypair
-                     • Gateway token
-                     • Cloud-init script
+agent-army.yaml         identity.yaml
+   (Manifest)            (Per-agent)
+  • Provider, region     • Model, coding agent
+  • Instance type        • Plugins & deps
+  • Agent list           • Skills
+  • Owner info           • Workspace files
+        │                      │
+        └──────────┬───────────┘
+                   ▼
+             Pulumi Stack           Cloud Provider
+             (TypeScript)    ────▶  (AWS / Hetzner)
+                   │
+                   ▼
+          Per-agent resources:
+          • Server (Ubuntu 24.04)
+          • Security group / firewall
+          • SSH keypair
+          • Gateway token
+          • Cloud-init script
 ```
 
-1. **Load manifest** — The CLI reads your `agent-army.json` config and shows a deployment summary.
-2. **Select Pulumi stack** — Creates or selects a stack matching your config name.
-3. **Sync config** — Copies the manifest to the project root and sets provider-specific Pulumi config.
-4. **Provision resources** — Pulumi creates infrastructure for each agent: server, firewall, SSH key, and injects a cloud-init bootstrap script as user data.
-5. **Cloud-init runs** — On first boot, each server executes the bootstrap sequence (see below) to install tools, configure OpenClaw, and join the Tailscale mesh.
-6. **Show outputs** — The CLI displays each agent's Tailscale URL, public IP, and instance ID.
+1. **Load manifest** — The CLI reads your `agent-army.yaml` config and shows a deployment summary.
+2. **Fetch identities** — For each agent with an `identity` field, the CLI fetches the identity from the Git repo or local path, validates `identity.yaml`, and collects all workspace files and skills.
+3. **Select Pulumi stack** — Creates or selects a stack matching your config name.
+4. **Sync config** — Copies the manifest to the project root and sets provider-specific Pulumi config.
+5. **Provision resources** — Pulumi creates infrastructure for each agent: server, firewall, SSH key, and injects a cloud-init bootstrap script as user data.
+6. **Cloud-init runs** — On first boot, each server executes the bootstrap sequence (see below) to install tools, configure OpenClaw, and join the Tailscale mesh.
+7. **Show outputs** — The CLI displays each agent's Tailscale URL, public IP, and instance ID.
 
 ## Cloud-Init Bootstrap Sequence
 
@@ -53,16 +63,20 @@ Every agent server runs the same bootstrap script on first boot. The sequence ta
 - Set as default version
 - Install OpenClaw CLI globally via npm
 
-### 4. GitHub CLI
+### 4. Dependencies (from dep registry)
 
-- Install `gh` from the official apt repository
-- Authenticate with the provided GitHub token (`gh auth login`)
-- Configure git integration (`gh auth setup-git`)
+System dependencies declared in the identity's `deps` field are installed. For example:
+- `gh` — GitHub CLI from the official apt repository, authenticated with the provided token
+- `brave-search` — Brave Search API key configured as an environment variable
 
-### 5. Claude Code
+The dep registry (`packages/core/src/dep-registry.ts`) maps each dep name to its install script.
 
-- Install via `claude.ai/install.sh`
-- Added to `~/.local/bin`
+### 5. Coding Agent
+
+The coding agent CLI declared in the identity's `codingAgent` field is installed. For example:
+- `claude-code` — Claude Code installed via `claude.ai/install.sh`, added to `~/.local/bin`
+
+The coding agent registry (`packages/core/src/coding-agent-registry.ts`) maps each agent name to install and model configuration scripts.
 
 ### 6. Tailscale
 
@@ -80,16 +94,20 @@ Every agent server runs the same bootstrap script on first boot. The sequence ta
 - Enable systemd linger for the `ubuntu` user
 - Run `openclaw onboard --non-interactive --accept-risk` (local mode, gateway on loopback)
 
-### 9. Workspace Files & Skills
+### 9. Identity File Injection
 
-- Inject preset files into `~/.openclaw/workspace/` (SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md, USER.md, etc.)
-- Inject skill files into `~/.openclaw/workspace/skills/` (queue handlers, ticket prep, PR workflows)
+- Fetch workspace files from the agent's identity (Git repo or local path)
+- Inject files into `~/.openclaw/workspace/` (SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md, USER.md, AGENTS.md, BOOTSTRAP.md)
+- Inject skill files into `~/.openclaw/workspace/skills/`
+- Substitute template variables (`{{OWNER_NAME}}`, `{{TIMEZONE}}`, etc.) with values from the manifest
 - Files are gzipped and base64-encoded in the cloud-init script for efficiency
 
 ### 10. OpenClaw Configuration & Plugins
 
 - Patch `openclaw.json` with gateway, heartbeat, sandbox, and integration settings (see below)
-- Install the **openclaw-linear plugin** (if Linear is configured) — provides webhook-driven ticket queuing
+- Configure the AI model and backup model from the identity's `model` and `backupModel` fields
+- Configure `cliBackends` from the coding agent registry entry
+- Install plugins declared in the identity's `plugins` field (e.g., openclaw-linear, slack)
 - Install the OpenClaw daemon service
 
 ### 11. Tailscale Serve
@@ -110,10 +128,10 @@ Each agent server ends up with:
 | Docker | Latest | Sandbox code execution |
 | Node.js | 22 | Runtime for OpenClaw |
 | OpenClaw | Latest (npm) | Agent framework — gateway, heartbeat, plugins, daemon |
-| Claude Code | Latest | AI coding assistant |
-| GitHub CLI (`gh`) | Latest | Git operations, PR management |
+| Coding agent CLI | Latest | AI coding assistant (e.g., Claude Code) — from identity's `codingAgent` field |
 | Tailscale | Latest | Mesh VPN, SSH, HTTPS proxy |
-| Deno + Linear CLI | Latest | Linear ticket management (if configured) |
+| System deps | Latest | Per-identity — e.g., GitHub CLI, Brave Search (from `deps` field) |
+| Deno + Linear CLI | Latest | Linear ticket management (if Linear plugin configured) |
 
 ## OpenClaw Configuration
 
@@ -135,7 +153,7 @@ After onboarding, the bootstrap script patches `openclaw.json` with your deploym
 }
 ```
 
-The heartbeat fires every minute in the `main` session, executing each agent's `HEARTBEAT.md` checklist. For most agents this is minimal (bootstrap detection only) — the primary work trigger is the [Linear plugin queue system](/architecture/agent-presets#how-work-gets-triggered).
+The heartbeat fires every minute in the `main` session, executing each agent's `HEARTBEAT.md` checklist. For most agents this is minimal (bootstrap detection only) — the primary work trigger is the [Linear plugin queue system](/architecture/identities#linear-plugin-queue-system).
 
 ### Sandbox
 
@@ -149,7 +167,7 @@ Docker-based sandbox is enabled by default (`enableSandbox: true`), providing is
 - Group policy: open
 
 **Linear** (if configured):
-- **openclaw-linear plugin** installed and configured with API key, webhook secret, agent mapping, and per-role queue routing rules
+- **openclaw-linear plugin** installed and configured with API key, webhook secret, agent mapping, and per-role queue routing rules (from `pluginDefaults` in the identity)
 - Linear CLI available via Deno
 
 ### Environment Variables
@@ -159,11 +177,11 @@ Credentials are auto-detected and set:
 - API keys → `ANTHROPIC_API_KEY`
 - Plus `LINEAR_API_KEY`, `GITHUB_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` as configured
 
-## Preset File Injection
+## Identity File Injection
 
-Each agent gets workspace files injected based on its preset (`pm`, `eng`, or `tester`):
+Each agent gets workspace files injected from its identity source (Git repo or local path):
 
-### Per-Preset Files
+### Identity-Specific Files
 
 | File | Purpose |
 |------|---------|
@@ -172,26 +190,28 @@ Each agent gets workspace files injected based on its preset (`pm`, `eng`, or `t
 | `HEARTBEAT.md` | Periodic checklist — bootstrap detection and polling-based tasks |
 | `TOOLS.md` | Tool-specific notes and common commands |
 
-### Shared Base Files
+### Shared Files
 
 | File | Purpose |
 |------|---------|
 | `USER.md` | Owner information (name, timezone, working hours, notes) |
 | `AGENTS.md` | Shared operational instructions — memory management, safety rules, group chat etiquette |
-| `BOOTSTRAP.md` | First-run integration checks (Linear, GitHub, Claude Code) with self-cleanup |
+| `BOOTSTRAP.md` | First-run integration checks with self-cleanup |
 
 ### Template Variables
 
-Preset files support template variables that get replaced at deploy time:
+Workspace files support template variables that get replaced at deploy time:
 
 | Variable | Example |
 |----------|---------|
-| `{{OWNER_NAME}}` | `"Boss"` |
-| `{{TIMEZONE}}` | `"PST (America/Los_Angeles)"` |
+| `{{OWNER_NAME}}` | `"Jane"` |
+| `{{TIMEZONE}}` | `"America/New_York"` |
 | `{{WORKING_HOURS}}` | `"9am-6pm"` |
 | `{{USER_NOTES}}` | `"No additional notes provided yet."` |
-| `{{LINEAR_TEAM}}` | `"AGE"` |
+| `{{LINEAR_TEAM}}` | `"ENG"` |
 | `{{GITHUB_REPO}}` | `"org/repo"` |
+
+Custom template variables declared in the identity's `templateVars` are also supported.
 
 ## Provider-Specific Differences
 

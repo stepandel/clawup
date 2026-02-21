@@ -1,0 +1,325 @@
+---
+title: "Creating Identities"
+description: "Step-by-step guide to building a custom identity for Agent Army"
+---
+
+This guide walks you through creating a custom identity from scratch. For the full `identity.yaml` field reference, see [Identity Manifest](/configuration/identity).
+
+<Tip>
+The fastest way to get started is to copy the [example identity](https://github.com/stepandel/agent-army/tree/main/examples/identity) and modify it for your use case.
+</Tip>
+
+## Identity Structure
+
+An identity is a self-contained directory with an `identity.yaml` manifest and workspace files:
+
+```
+my-identity/
+├── identity.yaml       # Manifest (required)
+├── SOUL.md             # Personality, approach, boundaries
+├── IDENTITY.md         # Name, role, emoji
+├── HEARTBEAT.md        # Periodic tasks
+├── TOOLS.md            # Tool reference for the agent
+├── AGENTS.md           # Operational instructions
+├── BOOTSTRAP.md        # First-run setup checks
+├── USER.md             # Owner info (templated)
+└── skills/             # Bundled skills
+    └── my-skill/
+        └── SKILL.md
+```
+
+Identities can live in a Git repo, a subdirectory of a monorepo, or a local directory on disk.
+
+## Step 1: Create `identity.yaml`
+
+Start with the required fields:
+
+```yaml
+name: researcher
+displayName: Atlas
+role: researcher
+emoji: telescope
+description: Deep research, source analysis, report generation
+volumeSize: 20
+skills:
+  - research-report
+templateVars:
+  - OWNER_NAME
+  - TIMEZONE
+  - WORKING_HOURS
+  - USER_NOTES
+```
+
+Then add optional configuration as needed:
+
+```yaml
+# AI model (defaults to the stack's model if omitted)
+model: anthropic/claude-sonnet-4-5
+backupModel: anthropic/claude-haiku-4-5
+codingAgent: claude-code
+
+# System dependencies installed on the agent
+deps:
+  - brave-search
+
+# OpenClaw plugins
+plugins:
+  - slack
+
+# Per-plugin default configuration
+pluginDefaults:
+  slack:
+    mode: socket
+    dm:
+      enabled: true
+      policy: open
+```
+
+See the [Identity Manifest Reference](/configuration/identity) for the complete field listing.
+
+## Step 2: Write Workspace Files
+
+### SOUL.md — Personality
+
+The most important file. It shapes how the agent thinks and communicates. Define:
+
+- **Core truths** — fundamental principles that guide behavior
+- **Superpowers** — what this agent excels at
+- **Boundaries** — what the agent should avoid or defer on
+- **Vibe** — one-line personality summary
+- **Continuity** — remind the agent that these files are its memory
+
+Keep it focused — 30-50 lines is plenty. Agents work better with clear, concise personality guidance.
+
+```markdown
+# SOUL.md - Who You Are
+
+_You're not a chatbot. You're a researcher who finds signal in noise._
+
+## Core Truths
+**Depth over breadth.** You don't skim — you dig...
+
+## Your Superpowers
+- **Source evaluation:** You can assess credibility...
+
+## Boundaries
+- Don't present opinions as facts...
+
+## Vibe
+Curious, thorough, intellectually honest.
+
+## Continuity
+Each session, you wake up fresh. These files _are_ your memory.
+```
+
+### IDENTITY.md — Name Card
+
+Short file with the agent's name, role, emoji, and a one-line role description. Keep it to 5-10 lines.
+
+```markdown
+# IDENTITY.md - Who Am I?
+
+- **Name:** Atlas
+- **Creature:** Researcher — AI dedicated to deep investigation
+- **Vibe:** Curious, thorough, intellectually honest.
+- **Emoji:** :telescope:
+
+---
+
+Role: Research topics in depth, analyze sources, produce reports. Report to {{OWNER_NAME}}.
+```
+
+### HEARTBEAT.md — Periodic Tasks
+
+A checklist the agent runs on each heartbeat cycle (every minute). Always include a bootstrap check at the top:
+
+```markdown
+# Heartbeat Checklist
+
+## Always
+- [ ] If `BOOTSTRAP.md` exists in workspace, follow it first.
+- [ ] Check memory files for pending requests or follow-ups.
+- [ ] If nothing needs attention, return `HEARTBEAT_OK`.
+```
+
+### TOOLS.md — Tool Reference
+
+A cheat sheet for the tools available to the agent:
+
+```markdown
+# TOOLS.md - Tool Reference
+
+## Communication
+### Slack
+- Primary way to communicate with {{OWNER_NAME}}
+
+## Research
+### Brave Search
+- Use for web research and fact-checking
+```
+
+### AGENTS.md — Operational Instructions
+
+Shared instructions for multi-agent coordination. Covers session startup, memory management, safety rules, and heartbeat behavior. You can use the [example AGENTS.md](https://github.com/stepandel/agent-army/blob/main/examples/identity/AGENTS.md) as a starting point.
+
+### BOOTSTRAP.md — First-Run Setup
+
+Integration checks that run once when the agent is first deployed. Verify each tool and plugin works, then delete the file. If any check fails, the file stays and the agent reports the failure.
+
+### USER.md — Owner Info
+
+Templated file with the agent owner's details:
+
+```markdown
+# USER.md - Who You're Helping
+
+## Owner
+- **Name:** {{OWNER_NAME}}
+- **Contact:** Slack
+
+## Preferences
+- Timezone: {{TIMEZONE}}
+- Working hours: {{WORKING_HOURS}}
+
+## Notes
+{{USER_NOTES}}
+```
+
+## Step 3: Create Skills
+
+Skills are reusable workflows. Each skill lives in `skills/<skill-name>/SKILL.md` with YAML frontmatter:
+
+```markdown
+---
+name: research-report
+description: Conduct deep research and produce a structured report
+metadata: {"openclaw":{"emoji":":telescope:"}}
+---
+
+# Research Report
+
+## Inputs
+The user provides a research topic via Slack or direct prompt.
+
+## Workflow
+
+### Phase 1: Scope
+1. Parse the research request...
+
+### Phase 2: Gather Sources
+1. Search using Brave Search...
+
+### Phase 3: Write Report
+Structure as Summary → Key Findings → Analysis → Sources...
+
+### Phase 4: Deliver
+1. Save report to memory
+2. Send summary via Slack
+```
+
+### Frontmatter Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Skill identifier |
+| `description` | Yes | One-line summary |
+| `metadata` | No | JSON string — `openclaw.emoji` sets UI icon, `openclaw.requires.bins` declares binary deps |
+| `user-invocable` | No | Whether users can trigger directly (default: `true`). Set `false` for system-triggered skills like queue handlers. |
+
+### Private vs Public Skills
+
+```yaml
+skills:
+  - my-private-skill          # Loaded from skills/my-private-skill/SKILL.md
+  - clawhub:org/public-skill  # Fetched from ClawHub registry
+```
+
+## Step 4: Use Your Identity
+
+### During Development (Local Path)
+
+```yaml
+# agent-army.yaml
+agents:
+  - name: agent-researcher
+    displayName: Atlas
+    role: researcher
+    identity: "./my-identities/researcher"
+    volumeSize: 20
+```
+
+### For Production (Git Repository)
+
+Push your identity to a Git repo:
+
+```yaml
+agents:
+  - name: agent-researcher
+    displayName: Atlas
+    role: researcher
+    identity: "https://github.com/your-org/your-identities#researcher"
+    identityVersion: "v1.0.0"
+    volumeSize: 20
+```
+
+### Monorepo Layout
+
+Multiple identities can share a single repo:
+
+```
+my-identities/
+├── researcher/
+│   ├── identity.yaml
+│   ├── SOUL.md
+│   └── ...
+├── analyst/
+│   └── ...
+└── writer/
+    └── ...
+```
+
+Reference each with `https://github.com/org/my-identities#researcher`, `#analyst`, etc.
+
+## Template Variables
+
+Workspace files support `{{VARIABLE}}` substitution.
+
+### How It Works
+
+1. Declare variables in `templateVars` in `identity.yaml`
+2. Use `{{VARIABLE_NAME}}` in any workspace file
+3. During `agent-army init`, the wizard prompts for values
+4. Values are substituted before files are injected into the agent
+
+### Standard Variables
+
+| Variable | Description |
+|----------|-------------|
+| `OWNER_NAME` | Name of the agent's owner |
+| `TIMEZONE` | Owner's timezone (e.g., `America/New_York`) |
+| `WORKING_HOURS` | Working hours (e.g., `9am-6pm`) |
+| `USER_NOTES` | Free-form notes for the agent |
+
+### Custom Variables
+
+You can define any variable name:
+
+```yaml
+templateVars:
+  - OWNER_NAME
+  - TIMEZONE
+  - WORKING_HOURS
+  - USER_NOTES
+  - LINEAR_TEAM      # Custom: default Linear team ID
+  - GITHUB_REPO      # Custom: default GitHub repository
+```
+
+Then reference them in workspace files: `Check open issues in {{LINEAR_TEAM}}`.
+
+## Tips
+
+- **Start with the example.** Copy `examples/identity/` from the Agent Army repo and modify it.
+- **Keep SOUL.md focused.** 30-50 lines is plenty. Agents work better with clear, concise personality guidance.
+- **Test locally first.** Use a local path identity during development, switch to Git URL for production.
+- **One skill per workflow.** Each skill should handle one complete workflow. If a skill is doing too much, split it.
+- **Use `user-invocable: false`** for skills that are triggered by the system (queue handlers, routers) rather than by users.

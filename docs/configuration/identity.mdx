@@ -1,0 +1,264 @@
+---
+title: "Identity Manifest Reference"
+description: "identity.yaml configuration file reference"
+---
+
+The `identity.yaml` manifest is the core of every identity. It declares the agent's model, plugins, dependencies, skills, and template variables. It lives at the root of an identity directory and is read during deployment.
+
+For a step-by-step guide to creating an identity, see [Creating Identities](/guides/creating-identities).
+
+## Schema
+
+```typescript
+interface IdentityManifest {
+  name: string;              // Machine-readable identifier
+  displayName: string;       // Human-readable name
+  role: string;              // Functional role
+  emoji: string;             // GitHub shortcode (e.g., "telescope")
+  description: string;       // One-line summary
+  volumeSize: number;        // Default disk size in GB
+  skills: string[];          // Bundled skill directory names
+  templateVars: string[];    // Template variables used in workspace files
+  model?: string;            // AI model identifier
+  backupModel?: string;      // Fallback model
+  codingAgent?: string;      // Coding agent CLI (e.g., "claude-code")
+  instanceType?: string;     // Cloud instance type override
+  deps?: string[];           // System dependencies
+  plugins?: string[];        // OpenClaw plugins
+  pluginDefaults?: Record<string, Record<string, unknown>>;
+}
+```
+
+## Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Machine-readable identifier. Used in resource names and logging. Examples: `eng`, `researcher`, `pm` |
+| `displayName` | string | Human-readable name shown in the UI and Slack messages. Examples: `Titus`, `Atlas`, `Juno` |
+| `role` | string | Functional role identifier. Used for agent resolution (`agent-army ssh <role>`). Examples: `pm`, `eng`, `tester`, `researcher` |
+| `emoji` | string | GitHub emoji shortcode without colons. Used in the OpenClaw UI. Examples: `telescope`, `clipboard`, `building_construction`, `mag` |
+| `description` | string | One-line summary of the agent's purpose. Shown during `agent-army init` and in status output. |
+| `volumeSize` | number | Default persistent storage in GB. Can be overridden per-agent in the deployment manifest. Engineers typically need more (50GB) for repos; research/PM roles need less (20-30GB). |
+| `skills` | string[] | List of skill directory names bundled with this identity. Each entry corresponds to a `skills/<name>/SKILL.md` file. Supports `clawhub:` prefix for public skills. |
+| `templateVars` | string[] | Template variable names used in workspace files (e.g., `SOUL.md`, `USER.md`). Values are collected during `agent-army init` and substituted at deploy time. |
+
+## Optional Fields
+
+### Model Configuration
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `model` | string | — | Primary AI model identifier. Format: `provider/model-name` (e.g., `anthropic/claude-opus-4-6`). If omitted, uses the stack-level default. |
+| `backupModel` | string | — | Fallback model used when the primary is unavailable. Same format as `model`. |
+| `codingAgent` | string | `claude-code` | Coding agent CLI to install on the cloud instance. Must match a key in the [coding agent registry](/architecture/identities#coding-agent-registry). |
+
+### Infrastructure
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `instanceType` | string | — | Override the default cloud instance type for agents using this identity. Provider-specific (e.g., `t3.large` for AWS, `cx32` for Hetzner). |
+
+### Dependencies
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `deps` | string[] | `[]` | System-level tools installed on the agent. Each entry must match a key in the [dep registry](/architecture/identities#dep-registry). |
+| `plugins` | string[] | `[]` | OpenClaw plugins to configure. Each entry must match a key in the [plugin registry](/architecture/identities#plugin-registry). |
+| `pluginDefaults` | object | `{}` | Per-plugin default configuration. Keyed by plugin name, values are plugin-specific config objects. Can be overridden per-deployment via plugin config files. |
+
+## Examples
+
+### Minimal Identity
+
+The smallest valid `identity.yaml` — only required fields:
+
+```yaml
+name: greeter
+displayName: Gabi
+role: greeter
+emoji: wave
+description: Friendly welcome bot
+volumeSize: 10
+skills: []
+templateVars:
+  - OWNER_NAME
+```
+
+### Research Agent
+
+A research-focused agent with Brave Search and Slack:
+
+```yaml
+name: researcher
+displayName: Atlas
+role: researcher
+emoji: telescope
+description: Deep research, source analysis, report generation
+volumeSize: 20
+model: anthropic/claude-sonnet-4-5
+codingAgent: claude-code
+
+deps:
+  - brave-search
+
+plugins:
+  - slack
+
+pluginDefaults:
+  slack:
+    mode: socket
+    dm:
+      enabled: true
+      policy: open
+
+skills:
+  - research-report
+
+templateVars:
+  - OWNER_NAME
+  - TIMEZONE
+  - WORKING_HOURS
+  - USER_NOTES
+```
+
+### Full-Featured Engineering Agent
+
+A production engineer identity with all fields used:
+
+```yaml
+name: eng
+displayName: Titus
+role: eng
+emoji: building_construction
+description: Lead engineering, coding, shipping
+volumeSize: 50
+instanceType: t3.large
+
+model: anthropic/claude-opus-4-6
+backupModel: anthropic/claude-sonnet-4-5
+codingAgent: claude-code
+
+deps:
+  - gh
+  - brave-search
+
+plugins:
+  - openclaw-linear
+  - slack
+
+pluginDefaults:
+  openclaw-linear:
+    stateActions:
+      triage: remove
+      backlog: add
+      started: add
+      completed: remove
+      cancelled: remove
+  slack:
+    mode: socket
+    userTokenReadOnly: true
+    groupPolicy: open
+    dm:
+      enabled: true
+      policy: open
+      allowFrom:
+        - "*"
+
+skills:
+  - eng-queue-handler
+  - eng-ticket-workflow
+  - eng-pr-tester
+  - pr-review-resolver
+
+templateVars:
+  - OWNER_NAME
+  - TIMEZONE
+  - WORKING_HOURS
+  - USER_NOTES
+  - LINEAR_TEAM
+  - GITHUB_REPO
+```
+
+## Available Registries
+
+### Coding Agent Registry
+
+The `codingAgent` field selects which coding CLI is installed.
+
+| Key | CLI Binary | Description |
+|-----|-----------|-------------|
+| `claude-code` | `claude` | Claude Code CLI (default) |
+
+Each entry provides an install script, model configuration, and OpenClaw `cliBackends` config. Defined in `packages/core/src/coding-agent-registry.ts`.
+
+### Dep Registry
+
+System-level tools declared via the `deps` field.
+
+| Key | What It Installs |
+|-----|-----------------|
+| `gh` | GitHub CLI — installed from official apt repo, authenticated with provided token |
+| `brave-search` | Brave Search API key — config-only, sets environment variable for API access |
+
+Defined in `packages/core/src/dep-registry.ts`.
+
+### Plugin Registry
+
+OpenClaw plugins declared via the `plugins` field.
+
+| Key | What It Does |
+|-----|-------------|
+| `openclaw-linear` | Linear issue tracking — webhook-driven ticket queuing, per-agent routing rules, state management |
+| `slack` | Slack bot integration — Socket Mode, DMs, group chats, emoji reactions |
+
+Defined in `packages/core/src/plugin-registry.ts`.
+
+## Plugin Defaults
+
+The `pluginDefaults` field sets per-plugin configuration that ships with the identity. This is the primary way to configure how plugins behave for a specific role.
+
+```yaml
+pluginDefaults:
+  openclaw-linear:
+    stateActions:
+      backlog: add        # Add to queue when ticket enters Backlog
+      started: add        # Add to queue when ticket enters Started
+      completed: remove   # Remove from queue when completed
+  slack:
+    mode: socket
+    dm:
+      enabled: true
+      policy: open
+```
+
+### Override Hierarchy
+
+Plugin configuration is resolved in this order (later wins):
+
+1. **Identity defaults** — `pluginDefaults` in `identity.yaml`
+2. **Deployment overrides** — Plugin config files at `~/.agent-army/configs/<stack>/plugins/<plugin>.yaml`
+
+## Identity vs Deployment Manifest
+
+The `identity.yaml` and `agent-army.yaml` serve different purposes:
+
+| Concern | `identity.yaml` | `agent-army.yaml` |
+|---------|-----------------|-------------------|
+| What the agent _is_ | Name, personality, skills, model | — |
+| What the agent _needs_ | Deps, plugins, plugin defaults | Plugin/dep overrides |
+| Where the agent _runs_ | — | Provider, region, instance type |
+| How much storage | Default `volumeSize` | Per-agent `volumeSize` override |
+| Template variable _names_ | Declared in `templateVars` | — |
+| Template variable _values_ | — | Owner fields (`ownerName`, `timezone`, etc.) |
+
+When both files specify `plugins` or `deps`, the deployment manifest values take precedence. This lets you override identity defaults per-deployment without forking the identity.
+
+## Validation
+
+Agent Army validates `identity.yaml` at deploy time. The following checks are enforced:
+
+- All required fields must be present and non-empty
+- `name`, `displayName`, `role`, `emoji`, `description` must be strings
+- `volumeSize` must be a positive number
+- `skills` and `templateVars` must be arrays
+- Each skill listed must have a corresponding `skills/<name>/SKILL.md` file (private skills) or valid `clawhub:` prefix (public skills)

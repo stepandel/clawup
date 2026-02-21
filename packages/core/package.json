@@ -1,0 +1,46 @@
+{
+  "name": "@agent-army/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared types, constants, and utilities for Agent Army",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./constants": "./dist/constants.js",
+    "./types": "./dist/types.js",
+    "./identity": "./dist/identity.js",
+    "./skills": "./dist/skills.js",
+    "./deps": "./dist/deps.js",
+    "./dep-registry": "./dist/dep-registry.js",
+    "./plugin-registry": "./dist/plugin-registry.js",
+    "./coding-agent-registry": "./dist/coding-agent-registry.js",
+    "./schemas": "./dist/schemas/index.js"
+  },
+  "typesVersions": {
+    "*": {
+      "identity": ["dist/identity.d.ts"],
+      "constants": ["dist/constants.d.ts"],
+      "types": ["dist/types.d.ts"],
+      "skills": ["dist/skills.d.ts"],
+      "deps": ["dist/deps.d.ts"],
+      "dep-registry": ["dist/dep-registry.d.ts"],
+      "plugin-registry": ["dist/plugin-registry.d.ts"],
+      "coding-agent-registry": ["dist/coding-agent-registry.d.ts"],
+      "schemas": ["dist/schemas/index.d.ts"]
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "yaml": "^2.7.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "license": "MIT"
+}

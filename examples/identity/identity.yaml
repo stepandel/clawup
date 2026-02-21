@@ -1,0 +1,30 @@
+name: researcher
+displayName: Atlas
+role: researcher
+emoji: telescope
+description: Deep research, source analysis, report generation
+volumeSize: 20
+model: anthropic/claude-sonnet-4-5
+codingAgent: claude-code
+
+deps:
+  - brave-search
+
+plugins:
+  - slack
+
+pluginDefaults:
+  slack:
+    mode: socket
+    dm:
+      enabled: true
+      policy: open
+
+skills:
+  - research-report
+
+templateVars:
+  - OWNER_NAME
+  - TIMEZONE
+  - WORKING_HOURS
+  - USER_NOTES

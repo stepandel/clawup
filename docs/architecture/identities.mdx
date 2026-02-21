@@ -1,0 +1,370 @@
+---
+title: "Identities & Customization"
+description: "How identities work, how agents coordinate, and how to create your own"
+---
+
+Agent Army uses an **identity system** to define agent behavior. Each identity is a self-contained directory with an `identity.yaml` manifest and workspace files — everything an agent needs to operate: personality, skills, model preferences, plugin configuration, and dependencies.
+
+For a complete field-by-field reference, see [Identity Manifest Reference](/configuration/identity). For a step-by-step creation guide, see [Creating Identities](/guides/creating-identities).
+
+## Identity Structure
+
+```
+my-identity/
+├── identity.yaml       # Manifest: model, plugins, deps, skills, template vars
+├── SOUL.md             # Personality, approach, boundaries
+├── IDENTITY.md         # Name, role, emoji
+├── HEARTBEAT.md        # Periodic tasks
+├── TOOLS.md            # Tool reference
+├── AGENTS.md           # Operational instructions
+├── BOOTSTRAP.md        # First-run setup
+├── USER.md             # Owner info (templated)
+└── skills/
+    └── my-skill/
+        └── SKILL.md
+```
+
+Identities can live in a **Git repo**, a **monorepo subdirectory** (using `repo#subfolder` syntax), or a **local directory**.
+
+## `identity.yaml` Reference
+
+The identity manifest declares the agent's configuration defaults.
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Machine-readable identifier (e.g., `eng`, `researcher`) |
+| `displayName` | string | Human-readable name (e.g., `Titus`, `Atlas`) |
+| `role` | string | Functional role (e.g., `pm`, `eng`, `tester`, `researcher`) |
+| `emoji` | string | GitHub shortcode without colons (e.g., `telescope`, `clipboard`) |
+| `description` | string | One-line summary of what the agent does |
+| `volumeSize` | number | Default disk size in GB |
+| `skills` | string[] | Bundled skill directory names |
+| `templateVars` | string[] | Template variables used in workspace files |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `model` | string | AI model identifier (e.g., `anthropic/claude-opus-4-6`) |
+| `backupModel` | string | Fallback model if primary is unavailable |
+| `codingAgent` | string | Coding agent CLI to install (`claude-code`, `codex`, `amp`, etc.) |
+| `instanceType` | string | Default cloud instance type override |
+| `deps` | string[] | System dependencies from the dep registry |
+| `plugins` | string[] | OpenClaw plugins from the plugin registry |
+| `pluginDefaults` | object | Per-plugin default configuration |
+
+### Full Example
+
+```yaml
+name: eng
+displayName: Titus
+role: eng
+emoji: building_construction
+description: Lead engineering, coding, shipping
+volumeSize: 50
+
+model: anthropic/claude-opus-4-6
+backupModel: anthropic/claude-sonnet-4-5
+codingAgent: claude-code
+
+deps:
+  - gh
+  - brave-search
+
+plugins:
+  - openclaw-linear
+  - slack
+
+pluginDefaults:
+  openclaw-linear:
+    stateActions:
+      triage: remove
+      backlog: add
+      started: add
+      completed: remove
+  slack:
+    mode: socket
+    dm:
+      enabled: true
+      policy: open
+
+skills:
+  - eng-queue-handler
+  - eng-ticket-workflow
+  - eng-pr-tester
+  - pr-review-resolver
+
+templateVars:
+  - OWNER_NAME
+  - TIMEZONE
+  - WORKING_HOURS
+  - USER_NOTES
+  - LINEAR_TEAM
+  - GITHUB_REPO
+```
+
+## Registries
+
+Identity fields like `codingAgent`, `deps`, and `plugins` reference entries from built-in registries. Each registry maps a name to install scripts and configuration.
+
+### Coding Agent Registry
+
+The `codingAgent` field selects which coding CLI is installed and configured on the agent's cloud instance.
+
+| Agent | CLI | Description |
+|-------|-----|-------------|
+| `claude-code` | `claude` | Claude Code CLI (default) |
+
+Each entry provides an install script, model configuration script, and OpenClaw `cliBackends` config. New coding agents can be added by extending the registry in `packages/core/src/coding-agent-registry.ts`.
+
+### Dep Registry
+
+System-level tools installed on agents. Declared via the `deps` field.
+
+| Dep | What It Installs |
+|-----|-----------------|
+| `gh` | GitHub CLI (with token-based auth) |
+| `brave-search` | Brave Search API key (config-only, no binary) |
+
+New deps can be added in `packages/core/src/dep-registry.ts`.
+
+### Plugin Registry
+
+OpenClaw plugins configured per-agent. Declared via the `plugins` field.
+
+| Plugin | What It Does |
+|--------|-------------|
+| `openclaw-linear` | Linear issue tracking with webhook-driven ticket queuing |
+| `slack` | Slack bot integration (Socket Mode) |
+
+Plugin metadata is defined in `packages/core/src/plugin-registry.ts`. Plugin configuration defaults can be set in `pluginDefaults` in the identity manifest, and overridden per-deployment in the agent's `plugins` field in the manifest.
+
+## Workspace Files
+
+Workspace files are injected into `~/.openclaw/workspace/` on the agent's cloud instance. They define everything about how the agent behaves.
+
+### Identity-Specific Files
+
+| File | What It Does |
+|------|-------------|
+| `SOUL.md` | Core personality — approach, values, superpowers, boundaries, vibe. This is who the agent *is*. |
+| `IDENTITY.md` | Name, role label, emoji, avatar. Short identification metadata. |
+| `HEARTBEAT.md` | Periodic checklist executed every minute. Handles bootstrap detection and polling-based tasks. |
+| `TOOLS.md` | Tool-specific notes and common commands. Cheat sheet for the agent's toolchain. |
+
+### Shared Files
+
+These files follow the same conventions across identities:
+
+| File | What It Does |
+|------|-------------|
+| `USER.md` | Owner information — name, timezone, working hours, custom notes. Populated from template variables. |
+| `AGENTS.md` | Operational instructions — session startup, memory management, safety rules, group chat etiquette. |
+| `BOOTSTRAP.md` | First-run checklist — verifies integrations work, then deletes itself. |
+
+## Skills
+
+Skills are reusable workflows bundled with an identity. Each skill lives in `skills/<skill-name>/SKILL.md`.
+
+### SKILL.md Format
+
+Every skill file has YAML frontmatter followed by markdown instructions:
+
+```markdown
+---
+name: research-report
+description: Conduct deep research and produce a structured report
+metadata: {"openclaw":{"emoji":":telescope:"}}
+---
+
+# Research Report
+
+Step-by-step workflow instructions here...
+```
+
+### Frontmatter Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Skill identifier |
+| `description` | Yes | One-line summary |
+| `metadata` | No | JSON string — `openclaw.emoji` sets UI icon, `openclaw.requires.bins` declares binary deps |
+| `user-invocable` | No | Whether users can trigger directly (default: `true`). Set `false` for system-triggered skills like queue handlers. |
+
+### Private vs Public Skills
+
+```yaml
+skills:
+  - my-private-skill          # Loaded from skills/my-private-skill/SKILL.md
+  - clawhub:org/public-skill  # Fetched from ClawHub registry
+```
+
+- **Private skills** — directory name in the `skills/` folder, bundled with the identity
+- **Public skills** — prefixed with `clawhub:`, fetched from the ClawHub public registry at deploy time
+
+## Template Variables
+
+Workspace files support `{{VARIABLE}}` substitution. Variables declared in `templateVars` are populated from values collected during `agent-army init`.
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `{{OWNER_NAME}}` | Agent owner name | `Jane` |
+| `{{TIMEZONE}}` | Owner timezone | `America/New_York` |
+| `{{WORKING_HOURS}}` | Working hours | `9am-6pm` |
+| `{{USER_NOTES}}` | Custom notes | `Prefers detailed status updates` |
+| `{{LINEAR_TEAM}}` | Linear team identifier | `ENG` |
+| `{{GITHUB_REPO}}` | Target repository | `myorg/myrepo` |
+
+You can define custom variables beyond these — any name listed in `templateVars` will be prompted during `agent-army init` and substituted at deploy time.
+
+## Built-in Identities
+
+Agent Army ships with three built-in identities hosted at [github.com/stepandel/army-identities](https://github.com/stepandel/army-identities):
+
+| Identity | Agent | Role | Volume | Model |
+|----------|-------|------|--------|-------|
+| `pm` | Juno | Product Manager — breaks down tickets, coordinates work, communicates via Slack | 30 GB | Claude Opus 4.6 |
+| `eng` | Titus | Engineer — writes code, opens PRs, iterates on review feedback | 50 GB | Claude Opus 4.6 |
+| `tester` | Scout | QA Tester — reviews PRs, tests changes, files bugs back to Linear | 30 GB | Claude Opus 4.6 |
+
+These are standard identities in the same format as any custom identity. They serve as both production-ready defaults and reference implementations.
+
+### Built-in Skills
+
+| Skill | Used By | Purpose |
+|-------|---------|---------|
+| `pm-queue-handler` | PM | Processes inbound tickets — routes, preps, and assigns |
+| `linear-ticket-prep` | PM | Multi-phase ticket preparation — sizing, research, context, prompt generation |
+| `linear-ticket-routing` | PM | Routes tickets by labels to the appropriate workflow |
+| `eng-queue-handler` | Engineer | Delegates to coding agent, monitors execution, ships PRs |
+| `eng-ticket-workflow` | Engineer | Structured ticket implementation workflow |
+| `eng-pr-tester` | Engineer | PR testing and validation |
+| `pr-review-resolver` | Engineer, QA | PR review comment resolution |
+| `tester-queue-handler` | QA | Reviews PRs against acceptance criteria, runs tests, reports results |
+
+## How Agents Coordinate
+
+The built-in identities coordinate asynchronously through Linear and GitHub. Work is driven by the **[openclaw-linear plugin](/integrations/linear#linear-plugin)**, which watches for ticket state changes via webhooks and routes tickets into per-agent queues.
+
+```
+Linear Ticket (state change)
+     │
+     ▼
+openclaw-linear plugin (webhook)
+     │
+     ├── Backlog/Unstarted → PM's queue
+     ├── Backlog/Started   → Engineer's queue
+     └── Started           → Tester's queue
+     │
+     ▼
+Queue handler skill runs automatically
+     │
+     ├── PM: preps ticket, assigns to Engineer
+     ├── Engineer: delegates to Claude Code, opens PR, assigns Tester
+     └── Tester: reviews PR, runs tests, reports results
+```
+
+### Linear Plugin Queue System
+
+The `pluginDefaults` for `openclaw-linear` in each identity define routing rules — which ticket states add or remove tickets from the agent's queue:
+
+| Agent | Queue Adds On | Queue Removes On |
+|-------|---------------|-----------------|
+| PM | Backlog, Unstarted | Triage, Started, Completed, Cancelled |
+| Engineer | Backlog, Started | Triage, Completed, Cancelled |
+| Tester | Started | Triage, Completed, Cancelled |
+
+When a ticket enters an agent's queue, the plugin triggers that agent's queue handler skill automatically.
+
+### Heartbeat
+
+The heartbeat fires every minute and executes the agent's `HEARTBEAT.md` checklist. For most agents this is minimal — just a bootstrap check. The primary work trigger is the Linear plugin queue.
+
+The tester identity has a more active heartbeat that also handles PR review comment resolution (scanning open PRs for unresolved comments and applying fixes).
+
+## Using Identities
+
+### Git Repository
+
+```yaml
+agents:
+  - name: agent-researcher
+    displayName: Atlas
+    role: researcher
+    identity: "https://github.com/your-org/your-identities#researcher"
+    identityVersion: "v1.0.0"    # optional: pin to tag or commit
+    volumeSize: 20
+```
+
+### Local Directory
+
+```yaml
+agents:
+  - name: agent-researcher
+    displayName: Atlas
+    role: researcher
+    identity: "./my-identities/researcher"
+    volumeSize: 20
+```
+
+### Monorepo Layout
+
+Multiple identities can share a single Git repo, each in a subdirectory:
+
+```
+my-identities/
+├── researcher/
+│   ├── identity.yaml
+│   └── ...
+├── analyst/
+│   ├── identity.yaml
+│   └── ...
+└── writer/
+    ├── identity.yaml
+    └── ...
+```
+
+Reference each with `https://github.com/org/my-identities#researcher`, `#analyst`, etc.
+
+Identities are cached locally at `~/.agent-army/identity-cache/` and re-fetched on each deploy.
+
+## Customization
+
+### Override Plugins and Deps
+
+The manifest can override an identity's default plugins and deps per-agent:
+
+```yaml
+agents:
+  - name: agent-eng
+    displayName: Titus
+    role: eng
+    identity: "https://github.com/stepandel/army-identities#eng"
+    volumeSize: 50
+    plugins:
+      - slack              # Only Slack, skip Linear
+    deps:
+      - gh                 # Only GitHub CLI, skip Brave Search
+```
+
+### Override Volume and Instance Type
+
+```yaml
+agents:
+  - name: agent-eng
+    displayName: Titus
+    role: eng
+    identity: "https://github.com/stepandel/army-identities#eng"
+    volumeSize: 100              # More space for large repos
+    instanceType: t3.large       # More compute
+```
+
+### Create a New Identity
+
+To create an agent with a completely custom role, create a new identity directory. See the [example identity](https://github.com/stepandel/agent-army/tree/main/examples/identity) for a minimal starting point, or the [Creating Identities](/guides/creating-identities) guide for a full walkthrough.
+
+<Tip>
+Start by copying the example identity and modifying it for your use case. The key files to customize are `SOUL.md` (personality), `HEARTBEAT.md` (periodic tasks), and any skills you want to bundle.
+</Tip>

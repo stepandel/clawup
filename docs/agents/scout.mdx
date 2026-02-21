@@ -56,25 +56,35 @@ He also receives the shared base files (`USER.md`, `AGENTS.md`, `BOOTSTRAP.md`) 
 
 ## Configuration
 
-Scout uses the `tester` preset in your manifest:
+Scout uses the `tester` identity:
 
-```json
-{
-  "name": "agent-tester",
-  "displayName": "Scout",
-  "role": "tester",
-  "preset": "tester",
-  "volumeSize": 30
-}
+```yaml
+- name: agent-tester
+  displayName: Scout
+  role: tester
+  identity: "https://github.com/stepandel/army-identities#tester"
+  volumeSize: 30
+  plugins:
+    - openclaw-linear
+    - slack
+  deps:
+    - gh
+    - brave-search
 ```
 
 | Field | Default | Notes |
 |-------|---------|-------|
-| `preset` | `tester` | Built-in QA tester preset |
+| `identity` | `army-identities#tester` | Built-in QA tester identity |
 | `volumeSize` | 30 GB | Persistent storage — Scout checks out PR branches but doesn't need as much space |
-| `instanceType` | Provider default | Override if needed |
-| `envVars` | — | Add agent-specific environment variables |
+| `model` | Claude Opus 4.6 | Set in `identity.yaml` |
+| `codingAgent` | `claude-code` | Set in `identity.yaml` |
 
 ## Customization
 
-You can customize Scout by editing the preset files in the `presets/` directory, or by overriding fields in the manifest. To create a completely custom QA agent, set `preset: null` and provide your own `soulContent` and `identityContent`. See [Agent Roles & Customization](/architecture/agent-presets#customization) for details.
+You can customize Scout by forking the [army-identities](https://github.com/stepandel/army-identities) repo and modifying the `tester/` directory, or by creating a new identity from scratch. Point your manifest at the new identity source:
+
+```yaml
+identity: "https://github.com/your-org/your-identities#tester"
+```
+
+See [Identities & Customization](/architecture/identities) for details.

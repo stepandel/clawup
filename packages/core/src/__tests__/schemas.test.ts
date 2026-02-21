@@ -1,0 +1,141 @@
+import { describe, it, expect } from "vitest";
+import {
+  AgentDefinitionSchema,
+  ArmyManifestSchema,
+  IdentityManifestSchema,
+} from "../schemas";
+
+describe("AgentDefinitionSchema", () => {
+  const validAgent = {
+    name: "agent-pm",
+    displayName: "Juno",
+    role: "pm",
+    identity: "https://github.com/org/identities#pm",
+    volumeSize: 30,
+  };
+
+  it("accepts a valid agent definition", () => {
+    expect(() => AgentDefinitionSchema.parse(validAgent)).not.toThrow();
+  });
+
+  it("accepts agent with optional fields", () => {
+    const result = AgentDefinitionSchema.parse({
+      ...validAgent,
+      identityVersion: "v1.0",
+      instanceType: "t3.large",
+      envVars: { FOO: "bar" },
+      plugins: { "openclaw-linear": { agentId: "agent-pm" } },
+    });
+    expect(result.plugins).toEqual({ "openclaw-linear": { agentId: "agent-pm" } });
+  });
+
+  it("rejects empty object with descriptive errors", () => {
+    const result = AgentDefinitionSchema.safeParse({});
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path[0]);
+      expect(paths).toContain("name");
+      expect(paths).toContain("displayName");
+      expect(paths).toContain("role");
+      expect(paths).toContain("identity");
+      expect(paths).toContain("volumeSize");
+    }
+  });
+
+  it("rejects non-positive volumeSize", () => {
+    const result = AgentDefinitionSchema.safeParse({ ...validAgent, volumeSize: 0 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty name", () => {
+    const result = AgentDefinitionSchema.safeParse({ ...validAgent, name: "" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("ArmyManifestSchema", () => {
+  const validManifest = {
+    stackName: "dev",
+    provider: "aws",
+    region: "us-east-1",
+    instanceType: "t3.medium",
+    ownerName: "Boss",
+    agents: [
+      {
+        name: "agent-pm",
+        displayName: "Juno",
+        role: "pm",
+        identity: "https://github.com/org/identities#pm",
+        volumeSize: 30,
+      },
+    ],
+  };
+
+  it("accepts a valid manifest", () => {
+    expect(() => ArmyManifestSchema.parse(validManifest)).not.toThrow();
+  });
+
+  it("rejects manifest with no agents", () => {
+    const result = ArmyManifestSchema.safeParse({ ...validManifest, agents: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid provider", () => {
+    const result = ArmyManifestSchema.safeParse({ ...validManifest, provider: "gcp" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("IdentityManifestSchema", () => {
+  const validIdentity = {
+    name: "juno",
+    displayName: "Juno",
+    role: "pm",
+    emoji: "clipboard",
+    description: "Product manager agent",
+    volumeSize: 30,
+    skills: ["pm-queue-handler"],
+    templateVars: ["OWNER_NAME"],
+  };
+
+  it("accepts a valid identity manifest", () => {
+    expect(() => IdentityManifestSchema.parse(validIdentity)).not.toThrow();
+  });
+
+  it("rejects identity missing required fields", () => {
+    const result = IdentityManifestSchema.safeParse({ name: "only-name" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map((i) => i.path[0]);
+      expect(paths).toContain("role");
+      expect(paths).toContain("volumeSize");
+      expect(paths).toContain("skills");
+    }
+  });
+
+  it("rejects non-positive volumeSize", () => {
+    const result = IdentityManifestSchema.safeParse({ ...validIdentity, volumeSize: 0 });
+    expect(result.success).toBe(false);
+  });
+
+  it("validates plugins as array of non-empty strings", () => {
+    const result = IdentityManifestSchema.safeParse({
+      ...validIdentity,
+      plugins: ["openclaw-linear", ""],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts optional fields", () => {
+    const result = IdentityManifestSchema.parse({
+      ...validIdentity,
+      model: "anthropic/claude-opus-4-6",
+      backupModel: "anthropic/claude-sonnet-4-5",
+      codingAgent: "claude-code",
+      deps: ["gh"],
+      pluginDefaults: { "openclaw-linear": { key: "value" } },
+    });
+    expect(result.model).toBe("anthropic/claude-opus-4-6");
+    expect(result.deps).toEqual(["gh"]);
+  });
+});

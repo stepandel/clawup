@@ -1,9 +1,9 @@
 ---
 title: "Quick Start"
-description: "Deploy your agent team in 5 minutes"
+description: "Deploy your agents in 5 minutes"
 ---
 
-Get a team of AI agents working through your Linear tickets in minutes.
+Get AI agents running on your own cloud infrastructure in minutes.
 
 ## 1. Install
 
@@ -37,8 +37,10 @@ The interactive wizard walks you through:
 3. **Region** — Where to deploy your servers
 4. **Instance type** — Server size (affects cost)
 5. **Owner info** — Your name, timezone, working hours
-6. **Agent selection** — Pick your team (Product Manager, Engineer, QA Tester)
+6. **Agent selection** — Pick from built-in identities, point to a Git repo or local directory, or mix both
 7. **Review** — Confirm config and estimated costs
+
+This generates an `agent-army.yaml` manifest and sets all Pulumi config values automatically.
 
 ## 4. Deploy
 
@@ -46,7 +48,7 @@ The interactive wizard walks you through:
 agent-army deploy
 ```
 
-Pulumi provisions your team: dedicated servers, persistent storage, networking, and agent bootstrap with all integrations.
+Pulumi provisions your agents: dedicated servers, persistent storage, networking, and bootstrap with all integrations.
 
 <Note>
 First deployment takes 3-5 minutes. Subsequent deployments are incremental.
@@ -59,7 +61,7 @@ First deployment takes 3-5 minutes. Subsequent deployments are incremental.
 agent-army status
 
 # SSH to an agent
-agent-army ssh titus
+agent-army ssh <agent-name>
 
 # Validate health
 agent-army validate
@@ -69,5 +71,6 @@ agent-army validate
 
 - [CLI Reference](/cli/overview) — Full command documentation
 - [Configuration](/configuration/manifest) — Customize your manifest
-- [Architecture](/architecture/overview) — Understand how it works
+- [Identities](/architecture/identities) — Understand the identity system
+- [Architecture](/architecture/overview) — How provisioning works
 - [Cost Estimates](/configuration/cost-estimates) — Pricing by provider

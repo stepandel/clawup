@@ -1,5 +1,6 @@
 name: agent-army
 description: Multi-agent OpenClaw deployment - PM, Engineer, and Tester
+main: packages/pulumi/dist/index.js
 runtime:
   name: nodejs
   options:

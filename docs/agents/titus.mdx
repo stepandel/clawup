@@ -53,25 +53,35 @@ He also receives the shared base files (`USER.md`, `AGENTS.md`, `BOOTSTRAP.md`) 
 
 ## Configuration
 
-Titus uses the `eng` preset in your manifest:
+Titus uses the `eng` identity:
 
-```json
-{
-  "name": "agent-eng",
-  "displayName": "Titus",
-  "role": "eng",
-  "preset": "eng",
-  "volumeSize": 50
-}
+```yaml
+- name: agent-eng
+  displayName: Titus
+  role: eng
+  identity: "https://github.com/stepandel/army-identities#eng"
+  volumeSize: 50
+  plugins:
+    - openclaw-linear
+    - slack
+  deps:
+    - gh
+    - brave-search
 ```
 
 | Field | Default | Notes |
 |-------|---------|-------|
-| `preset` | `eng` | Built-in engineer preset |
+| `identity` | `army-identities#eng` | Built-in engineer identity |
 | `volumeSize` | 50 GB | Larger volume — Titus clones repos and runs builds |
-| `instanceType` | Provider default | Override for compute-heavy workloads |
-| `envVars` | — | Add agent-specific environment variables |
+| `model` | Claude Opus 4.6 | Set in `identity.yaml` |
+| `codingAgent` | `claude-code` | Set in `identity.yaml` |
 
 ## Customization
 
-You can customize Titus by editing the preset files in the `presets/` directory, or by overriding fields in the manifest. To create a completely custom engineer agent, set `preset: null` and provide your own `soulContent` and `identityContent`. See [Agent Roles & Customization](/architecture/agent-presets#customization) for details.
+You can customize Titus by forking the [army-identities](https://github.com/stepandel/army-identities) repo and modifying the `eng/` directory, or by creating a new identity from scratch. Point your manifest at the new identity source:
+
+```yaml
+identity: "https://github.com/your-org/your-identities#eng"
+```
+
+See [Identities & Customization](/architecture/identities) for details.

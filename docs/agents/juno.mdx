@@ -50,25 +50,35 @@ She also receives the shared base files (`USER.md`, `AGENTS.md`, `BOOTSTRAP.md`)
 
 ## Configuration
 
-Juno uses the `pm` preset in your manifest:
+Juno uses the `pm` identity:
 
-```json
-{
-  "name": "agent-pm",
-  "displayName": "Juno",
-  "role": "pm",
-  "preset": "pm",
-  "volumeSize": 30
-}
+```yaml
+- name: agent-pm
+  displayName: Juno
+  role: pm
+  identity: "https://github.com/stepandel/army-identities#pm"
+  volumeSize: 30
+  plugins:
+    - openclaw-linear
+    - slack
+  deps:
+    - gh
+    - brave-search
 ```
 
 | Field | Default | Notes |
 |-------|---------|-------|
-| `preset` | `pm` | Built-in PM preset |
+| `identity` | `army-identities#pm` | Built-in PM identity |
 | `volumeSize` | 30 GB | Persistent storage — Juno doesn't need as much since she's not cloning large repos |
-| `instanceType` | Provider default | Override if needed |
-| `envVars` | — | Add agent-specific environment variables |
+| `model` | Claude Opus 4.6 | Set in `identity.yaml` |
+| `codingAgent` | `claude-code` | Set in `identity.yaml` |
 
 ## Customization
 
-You can customize Juno by editing the preset files in the `presets/` directory, or by overriding fields in the manifest. To create a completely custom PM agent, set `preset: null` and provide your own `soulContent` and `identityContent`. See [Agent Roles & Customization](/architecture/agent-presets#customization) for details.
+You can customize Juno by forking the [army-identities](https://github.com/stepandel/army-identities) repo and modifying the `pm/` directory, or by creating a new identity from scratch. Point your manifest at the new identity source:
+
+```yaml
+identity: "https://github.com/your-org/your-identities#pm"
+```
+
+See [Identities & Customization](/architecture/identities) for details.
