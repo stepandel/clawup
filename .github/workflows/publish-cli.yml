@@ -39,7 +39,7 @@ jobs:
         run: pnpm --filter ./packages/cli build
 
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: pnpm publish --provenance --access public --no-git-checks
         working-directory: packages/cli/
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
