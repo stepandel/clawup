@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-const agents = [
+const presets = [
   {
     name: "Juno",
     role: "Product Manager",
@@ -46,24 +46,117 @@ const agents = [
 const steps = [
   {
     number: "01",
-    title: "Install",
-    command: "npm install -g agent-army",
-    description: "One command to get the CLI on your machine.",
+    title: "Define",
+    description:
+      "Declare your agent's identity, model, tools, and skills in a simple YAML file.",
+    command: "vim atlas.yaml",
   },
   {
     number: "02",
-    title: "Configure",
-    command: "agent-army init",
-    description: "Interactive wizard sets up your cloud, integrations, and team.",
+    title: "Deploy",
+    description:
+      "One command provisions cloud infrastructure and launches your agents.",
+    command: "agent-army deploy",
   },
   {
     number: "03",
-    title: "Deploy",
-    command: "agent-army deploy",
-    description: "Provisions your fleet in minutes. Agents start working immediately.",
+    title: "Manage",
+    description:
+      "Monitor, update, and scale your fleet from the terminal. Changes tracked in git.",
+    command: "agent-army status",
   },
 ];
 
+const features = [
+  {
+    icon: "📁",
+    title: "Git-Trackable Identity",
+    description:
+      "Agent definitions live in your repo. Review changes in PRs, roll back with git revert.",
+  },
+  {
+    icon: "☁️",
+    title: "Multi-Cloud",
+    description:
+      "Deploy to AWS or Hetzner today. Bring your own infrastructure tomorrow.",
+  },
+  {
+    icon: "🔓",
+    title: "Open Source",
+    description:
+      "MIT licensed. Fork it, extend it, contribute back. No vendor lock-in.",
+  },
+  {
+    icon: "⌨️",
+    title: "Single CLI",
+    description:
+      "One tool to init, deploy, update, and manage your entire agent fleet.",
+  },
+  {
+    icon: "🦞",
+    title: "OpenClaw Native",
+    description:
+      "Built on OpenClaw — the open runtime for autonomous AI agents.",
+  },
+  {
+    icon: "🧩",
+    title: "Extensible Skills",
+    description:
+      "Attach reusable skill packs to any agent. Share them across your fleet.",
+  },
+];
+
+const identityFiles = [
+  {
+    file: "SOUL.md",
+    description: "Personality, values, and behavioral guidelines",
+  },
+  {
+    file: "IDENTITY.md",
+    description: "Name, role, emoji, and display metadata",
+  },
+  {
+    file: "HEARTBEAT.md",
+    description: "Recurring checks and autonomous task loops",
+  },
+];
+
+const yamlSnippet = `name: researcher
+displayName: Atlas
+role: researcher
+emoji: telescope
+model: anthropic/claude-sonnet-4-5
+codingAgent: claude-code
+
+deps:
+  - brave-search
+
+plugins:
+  - slack
+
+skills:
+  - research-report`;
+
+const customYamlSnippet = `name: ops-monitor
+displayName: Sentinel
+role: infrastructure-monitor
+emoji: satellite
+model: anthropic/claude-sonnet-4-5
+
+deps:
+  - brave-search
+
+plugins:
+  - slack
+  - pagerduty
+
+skills:
+  - healthcheck
+  - incident-response
+
+templateVars:
+  - OWNER_NAME
+  - ESCALATION_CHANNEL`;
 
 export default function Home() {
   const [showBanner, setShowBanner] = useState(true);
@@ -77,15 +170,21 @@ export default function Home() {
   return (
     <div className="min-h-screen overflow-hidden">
       {/* Beta Banner */}
-      <div className={`fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center px-4 py-2 text-sm font-semibold transition-transform duration-300 ${showBanner ? "translate-y-0" : "-translate-y-full"}`}>
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-black text-center px-4 py-2 text-sm font-semibold transition-transform duration-300 ${showBanner ? "translate-y-0" : "-translate-y-full"}`}
+      >
         ⚠️ This is a beta product — use at your own risk.
       </div>
 
       {/* Nav */}
-      <nav className={`fixed left-0 right-0 z-50 flex items-center justify-between px-8 py-4 backdrop-blur-md bg-background/80 border-b border-border transition-[top] duration-300 ${showBanner ? "top-10" : "top-0"}`}>
+      <nav
+        className={`fixed left-0 right-0 z-50 flex items-center justify-between px-8 py-4 backdrop-blur-md bg-background/80 border-b border-border transition-[top] duration-300 ${showBanner ? "top-10" : "top-0"}`}
+      >
         <a href="/" className="flex items-center gap-2.5">
           <span className="text-xl">🪖</span>
-          <span className="text-base font-bold tracking-tight">Agent Army</span>
+          <span className="text-base font-bold tracking-tight">
+            Agent Army
+          </span>
         </a>
         <div className="flex items-center gap-6">
           <a
@@ -121,47 +220,73 @@ export default function Home() {
             variant="outline"
             className="mb-7 px-4 py-1.5 text-xs font-medium text-primary border-primary/30 bg-primary/8"
           >
-            Open source &middot; Deploy in minutes
+            Open source &middot; Infrastructure as Code
           </Badge>
         </div>
 
         <h1 className="animate-fade-in-up-1 text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[1.1] tracking-tighter mb-4 bg-gradient-to-b from-white to-white/50 bg-clip-text text-transparent">
-          Your AI dev team,
+          Define, deploy, and manage
           <br />
-          deployed in minutes
+          AI agent fleets
         </h1>
+
+        <p className="animate-fade-in-up-1 text-[clamp(1rem,2vw,1.35rem)] text-muted-foreground max-w-2xl mx-auto mb-3 leading-relaxed">
+          All from your terminal.
+        </p>
 
         <a
           href="https://openclaw.ai"
           target="_blank"
           rel="noopener noreferrer"
-          className="animate-fade-in-up-1 inline-flex items-center gap-1.5 text-base text-muted-foreground hover:text-foreground transition-colors mb-8"
+          className="animate-fade-in-up-1 inline-flex items-center gap-1.5 text-base text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
-          Powered by <span className="font-semibold text-foreground/80">OpenClaw</span> 🦞
+          Powered by{" "}
+          <span className="font-semibold text-foreground/80">OpenClaw</span> 🦞
         </a>
 
-        <p className="animate-fade-in-up-2 text-[clamp(1rem,2vw,1.25rem)] text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
-          A PM, an engineer, and a QA tester — each running on their own cloud
-          instance, coordinating through Linear, Slack, and GitHub.
+        <p className="animate-fade-in-up-2 text-[clamp(0.9rem,1.8vw,1.1rem)] text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
+          Declare agent identities in YAML. Deploy to AWS or Hetzner with one
+          command. Track changes in git.
         </p>
 
         {/* Install command */}
         <div className="animate-fade-in-up-3 max-w-md mx-auto mb-10">
           <div className="flex items-center gap-3 px-6 py-4 rounded-xl bg-[#0c0c0c] border border-border font-mono text-sm">
             <span className="text-accent-emerald">$</span>
-            <code className="text-foreground flex-1 text-left">npm install -g agent-army</code>
+            <code className="text-foreground flex-1 text-left">
+              npm install -g agent-army
+            </code>
             <button
-              onClick={() => navigator.clipboard.writeText("npm install -g agent-army")}
+              onClick={() =>
+                navigator.clipboard.writeText("npm install -g agent-army")
+              }
               className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
               title="Copy to clipboard"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+              </svg>
             </button>
           </div>
         </div>
 
         <div className="animate-fade-in-up-3 flex justify-center gap-4 flex-wrap">
-          <Button asChild size="lg" className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]">
+          <Button
+            asChild
+            size="lg"
+            className="shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]"
+          >
             <a
               href="https://github.com/stepandel/agent-army"
               target="_blank"
@@ -176,7 +301,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Terminal Preview */}
+      {/* Terminal Preview — YAML-first flow */}
       <section className="max-w-2xl mx-auto mb-24 px-8">
         <div className="animate-fade-in-up-3 bg-[#0c0c0c] border border-border rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
           {/* Title bar */}
@@ -184,31 +309,45 @@ export default function Home() {
             <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
             <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
             <div className="w-3 h-3 rounded-full bg-[#28c840]" />
-            <span className="ml-2 text-xs text-muted-foreground">Terminal</span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              Terminal
+            </span>
           </div>
           {/* Content */}
-          <div className="p-6 font-mono text-sm leading-8">
-            <div>
+          <div className="p-6 font-mono text-sm leading-7">
+            <div className="mb-1">
+              <span className="text-accent-emerald">$</span>{" "}
+              <span className="text-foreground">cat atlas.yaml</span>
+            </div>
+            <div className="text-muted-foreground pl-2 mb-3 whitespace-pre leading-6 text-xs">
+              {yamlSnippet.split("\n").map((line, i) => {
+                const colonIdx = line.indexOf(":");
+                if (colonIdx > 0 && !line.trimStart().startsWith("-") && !line.trimStart().startsWith("#")) {
+                  const key = line.slice(0, colonIdx);
+                  const value = line.slice(colonIdx);
+                  return (
+                    <div key={i}>
+                      <span className="text-accent-blue">{key}</span>
+                      <span className="text-muted-foreground">{value}</span>
+                    </div>
+                  );
+                }
+                return <div key={i}>{line || "\u00A0"}</div>;
+              })}
+            </div>
+            <div className="mb-1">
               <span className="text-accent-emerald">$</span>{" "}
               <span className="text-foreground">agent-army deploy</span>
             </div>
             <div className="text-muted-foreground">
-              Deploying 3 agents to Hetzner (nbg1)...
+              Deploying 1 agent to Hetzner (nbg1)...
             </div>
             <div>
-              <span className="text-accent-purple">&#x2713;</span>{" "}
-              <span className="text-muted-foreground">Juno (PM) — </span>
-              <span className="text-accent-purple">ready</span>
-            </div>
-            <div>
-              <span className="text-accent-blue">&#x2713;</span>{" "}
-              <span className="text-muted-foreground">Titus (Eng) — </span>
-              <span className="text-accent-blue">ready</span>
-            </div>
-            <div>
-              <span className="text-accent-green">&#x2713;</span>{" "}
-              <span className="text-muted-foreground">Scout (QA) — </span>
-              <span className="text-accent-green">ready</span>
+              <span className="text-accent-emerald">✓</span>{" "}
+              <span className="text-muted-foreground">
+                Atlas (researcher) —{" "}
+              </span>
+              <span className="text-accent-emerald">ready</span>
             </div>
             <div className="mt-1">
               <span className="text-accent-emerald">$</span>{" "}
@@ -220,20 +359,56 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Meet the Team */}
+      {/* How It Works */}
+      <section className="max-w-3xl mx-auto px-8 py-20">
+        <div className="text-center mb-14">
+          <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold tracking-tight mb-4">
+            How it works
+          </h2>
+          <p className="text-base text-muted-foreground max-w-md mx-auto">
+            From YAML definition to running agent in minutes.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {steps.map((step) => (
+            <div
+              key={step.number}
+              className="group flex items-center gap-7 px-8 py-7 rounded-xl border border-border bg-card/30 transition-all duration-200 hover:bg-card/60 hover:border-primary/30"
+            >
+              <span className="text-3xl font-extrabold text-border/80 tabular-nums shrink-0 w-13 transition-colors duration-200 group-hover:text-primary">
+                {step.number}
+              </span>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-foreground mb-1">
+                  {step.title}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {step.description}
+                </p>
+              </div>
+              <code className="text-xs font-mono text-accent-emerald bg-accent-emerald/6 border border-accent-emerald/12 px-4 py-2 rounded-lg whitespace-nowrap shrink-0">
+                {step.command}
+              </code>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Starter Templates */}
       <section className="max-w-5xl mx-auto px-8 py-20">
         <div className="text-center mb-14">
           <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold tracking-tight mb-4">
-            Three agents. One workflow.
+            Battle-tested starter templates
           </h2>
           <p className="text-base text-muted-foreground max-w-lg mx-auto">
-            Each agent has a specialized role, its own cloud instance, and a
-            heartbeat loop that runs every 60 seconds.
+            Get started in seconds with preset agent identities — or define your
+            own from scratch.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {agents.map((agent) => (
+          {presets.map((agent) => (
             <a
               key={agent.name}
               href={agent.docsUrl}
@@ -275,37 +450,98 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="max-w-3xl mx-auto px-8 py-20">
+      {/* Build Your Own */}
+      <section className="max-w-4xl mx-auto px-8 py-20">
         <div className="text-center mb-14">
           <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold tracking-tight mb-4">
-            Up and running in 3 steps
+            Build your own agent
           </h2>
-          <p className="text-base text-muted-foreground max-w-md mx-auto">
-            From zero to a fully autonomous dev team in under 10 minutes.
+          <p className="text-base text-muted-foreground max-w-lg mx-auto">
+            Define any agent in YAML. Give it a soul, an identity, and a
+            heartbeat. Deploy it anywhere.
           </p>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {steps.map((step) => (
-            <div
-              key={step.number}
-              className="group flex items-center gap-7 px-8 py-7 rounded-xl border border-border bg-card/30 transition-all duration-200 hover:bg-card/60 hover:border-primary/30"
-            >
-              <span className="text-3xl font-extrabold text-border/80 tabular-nums shrink-0 w-13 transition-colors duration-200 group-hover:text-primary">
-                {step.number}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* YAML snippet */}
+          <div className="bg-[#0c0c0c] border border-border rounded-2xl overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+              <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
+              <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
+              <div className="w-3 h-3 rounded-full bg-[#28c840]" />
+              <span className="ml-2 text-xs text-muted-foreground">
+                sentinel.yaml
               </span>
-              <div className="flex-1">
-                <h3 className="text-base font-semibold text-foreground mb-1">
-                  {step.title}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {step.description}
+            </div>
+            <div className="p-6 font-mono text-xs leading-6 whitespace-pre text-muted-foreground">
+              {customYamlSnippet.split("\n").map((line, i) => {
+                const colonIdx = line.indexOf(":");
+                if (
+                  colonIdx > 0 &&
+                  !line.trimStart().startsWith("-") &&
+                  !line.trimStart().startsWith("#")
+                ) {
+                  const key = line.slice(0, colonIdx);
+                  const value = line.slice(colonIdx);
+                  return (
+                    <div key={i}>
+                      <span className="text-accent-blue">{key}</span>
+                      <span className="text-muted-foreground">{value}</span>
+                    </div>
+                  );
+                }
+                return <div key={i}>{line || "\u00A0"}</div>;
+              })}
+            </div>
+          </div>
+
+          {/* Identity files */}
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground mb-2">
+              Each agent gets its own identity files — version-controlled
+              markdown that defines who the agent is and how it behaves:
+            </p>
+            {identityFiles.map((item) => (
+              <div
+                key={item.file}
+                className="flex items-start gap-4 px-6 py-5 rounded-xl border border-border bg-card/30"
+              >
+                <code className="text-sm font-mono text-accent-emerald bg-accent-emerald/6 border border-accent-emerald/12 px-3 py-1 rounded-lg whitespace-nowrap shrink-0">
+                  {item.file}
+                </code>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {item.description}
                 </p>
               </div>
-              <code className="text-xs font-mono text-accent-emerald bg-accent-emerald/6 border border-accent-emerald/12 px-4 py-2 rounded-lg whitespace-nowrap shrink-0">
-                {step.command}
-              </code>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why Agent Army */}
+      <section className="max-w-5xl mx-auto px-8 py-20">
+        <div className="text-center mb-14">
+          <h2 className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold tracking-tight mb-4">
+            Why Agent Army
+          </h2>
+          <p className="text-base text-muted-foreground max-w-lg mx-auto">
+            You&apos;ve built your agents. Now ship them.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {features.map((feature) => (
+            <div
+              key={feature.title}
+              className="rounded-2xl border border-border bg-card/30 p-7 transition-all duration-200 hover:bg-card/60 hover:border-primary/30"
+            >
+              <div className="text-2xl mb-4">{feature.icon}</div>
+              <h3 className="text-base font-semibold text-foreground mb-2">
+                {feature.title}
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {feature.description}
+              </p>
             </div>
           ))}
         </div>
@@ -327,7 +563,11 @@ export default function Home() {
                   label: "GitHub",
                   href: "https://github.com/stepandel/agent-army",
                 },
-                { label: "Documentation", href: "https://docs.agent-army.ai" },
+                {
+                  label: "Documentation",
+                  href: "https://docs.agent-army.ai",
+                },
+                { label: "OpenClaw", href: "https://openclaw.ai" },
               ].map((link) => (
                 <a
                   key={link.label}
