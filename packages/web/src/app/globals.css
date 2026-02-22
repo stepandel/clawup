@@ -17,7 +17,7 @@
   --color-accent-emerald: #10b981;
   --color-accent-coral: #F87171;
 
-  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+  --font-mono: "Geist Mono", "SF Mono", "Fira Code", ui-monospace, monospace;
 }
 
 @theme inline {
