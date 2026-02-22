@@ -345,17 +345,7 @@ openclaw onboard --non-interactive --accept-risk \\
 ${workspaceFilesScript}
 ${pluginInstallScript}
 ${clawhubSkillsScript}
-# Install daemon service with XDG_RUNTIME_DIR set
-echo "Installing OpenClaw daemon..."
-sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
-export HOME=/home/ubuntu
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-openclaw daemon install || echo "WARNING: Daemon install failed. Run openclaw daemon install manually."
-'
-
-# Configure gateway for Tailscale Serve
+# Configure gateway for Tailscale Serve (BEFORE daemon install so token matches)
 echo "Configuring OpenClaw gateway..."
 sudo -H -u ubuntu \\
   GATEWAY_TOKEN="\${GATEWAY_TOKEN}" \\
@@ -367,7 +357,17 @@ sudo -H -u ubuntu \\
 ${configPatchScript}
 PYTHON_SCRIPT
 ${tailscaleProxySection}
-# Run openclaw doctor to fix any missing config
+# Install daemon service AFTER config patch so gateway token matches
+echo "Installing OpenClaw daemon..."
+sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+openclaw daemon install || echo "WARNING: Daemon install failed. Run openclaw daemon install manually."
+'
+
+# Run openclaw doctor to fix any remaining config issues
 echo "Running openclaw doctor..."
 sudo -H -u ubuntu bash -c '
 export HOME=/home/ubuntu

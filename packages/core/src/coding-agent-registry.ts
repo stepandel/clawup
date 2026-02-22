@@ -67,10 +67,10 @@ echo "Claude Code default model set to \${MODEL} (fast mode)"
     cliBackend: {
       command: "claude",
       args: ["-p", "--output-format", "stream-json", "--verbose"],
-      output: "stream-json",
+      output: "jsonl",
       modelArg: "--model",
       sessionArg: "--resume",
-      sessionMode: "id",
+      sessionMode: "always",
       systemPromptArg: "--append-system-prompt",
       systemPromptWhen: "always",
     },

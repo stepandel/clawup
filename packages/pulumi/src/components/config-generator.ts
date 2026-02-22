@@ -23,6 +23,9 @@ export interface PluginEntry {
   secretEnvVars?: Record<string, string>;
 }
 
+/** Keys that are clawup-internal metadata and should NOT be written to OpenClaw config */
+const INTERNAL_PLUGIN_KEYS = new Set(["agentId", "linearUserUuid"]);
+
 /**
  * Convert a JS value to a Python literal string (recursive).
  * Booleans: true→True, false→False. null/undefined→None.
@@ -95,7 +98,10 @@ export interface OpenClawConfig {
   };
   model?: string;
   web?: {
-    braveApiKey: string;
+    search: {
+      provider: string;
+      apiKey: string;
+    };
   };
   [key: string]: unknown;
 }
@@ -135,7 +141,7 @@ export function generateOpenClawConfig(options: OpenClawConfigOptions): OpenClaw
   // Note: model config is now handled in generateConfigPatchScript() via agents.defaults.model
 
   if (options.braveApiKey) {
-    config.web = { braveApiKey: options.braveApiKey };
+    config.web = { search: { provider: "brave", apiKey: options.braveApiKey } };
   }
 
   // Merge custom config
@@ -175,8 +181,9 @@ function generatePluginPython(plugin: PluginEntry): string {
     }
   }
 
-  // Non-secret config values
+  // Non-secret config values (filter out clawup-internal metadata)
   for (const [key, value] of Object.entries(plugin.config)) {
+    if (INTERNAL_PLUGIN_KEYS.has(key)) continue;
     configEntries.push(`        "${key}": ${toPythonLiteral(value)}`);
   }
 
@@ -216,6 +223,14 @@ function generateSlackPluginPython(plugin: PluginEntry): string {
 
   // Non-secret config values (mode, userTokenReadOnly, groupPolicy, dm, etc.)
   for (const [key, value] of Object.entries(plugin.config)) {
+    if (INTERNAL_PLUGIN_KEYS.has(key)) continue;
+    // Flatten dm nested object → top-level dmPolicy/allowFrom (OpenClaw schema)
+    if (key === "dm" && typeof value === "object" && value !== null) {
+      const dm = value as Record<string, unknown>;
+      if (dm.policy) channelEntries.push(`    "dmPolicy": ${toPythonLiteral(dm.policy)}`);
+      if (dm.allowFrom) channelEntries.push(`    "allowFrom": ${toPythonLiteral(dm.allowFrom)}`);
+      continue;
+    }
     channelEntries.push(`    "${key}": ${toPythonLiteral(value)}`);
   }
 
@@ -358,7 +373,8 @@ if agent_name:
 # Configure web search (Brave API key) if available
 brave_api_key = os.environ.get("BRAVE_API_KEY", "")
 if brave_api_key:
-    config["web"] = {"braveApiKey": brave_api_key}
+    config.setdefault("web", {})
+    config["web"]["search"] = {"provider": "brave", "apiKey": brave_api_key}
     print("Configured web search with Brave API key")
 
 with open(config_path, "w") as f:
