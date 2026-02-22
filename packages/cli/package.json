@@ -1,6 +1,6 @@
 {
   "name": "clawup",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS",
   "bin": {
     "clawup": "dist/bin.js"
