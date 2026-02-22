@@ -88,8 +88,25 @@ export default function Home() {
               className="text-foreground/80 font-medium hover:text-foreground transition-colors"
             >
               OpenClaw
-            </a>{" "}
-            — the open-source runtime for autonomous AI agents.
+            </a>
+            {" "}&middot; Infrastructure via{" "}
+            <a
+              href="https://www.pulumi.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground/80 font-medium hover:text-foreground transition-colors"
+            >
+              Pulumi
+            </a>
+            {" "}&middot; Secure networking via{" "}
+            <a
+              href="https://tailscale.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground/80 font-medium hover:text-foreground transition-colors"
+            >
+              Tailscale
+            </a>
           </p>
         </section>
 
