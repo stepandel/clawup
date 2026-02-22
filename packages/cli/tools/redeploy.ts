@@ -11,6 +11,7 @@ import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
 import { getConfig } from "../lib/tool-helpers";
 import { formatAgentList } from "../lib/ui";
+import { qualifiedStackName } from "../lib/pulumi";
 import pc from "picocolors";
 
 export interface RedeployOptions {
@@ -54,17 +55,18 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     process.exit(1);
   }
 
-  // Try to select existing stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
+  // Try to select existing stack (use org-qualified name if organization is set)
+  const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   const stackExists = selectResult.exitCode === 0;
 
   if (!stackExists) {
     // Stack doesn't exist — fall back to regular deploy flow
     ui.log.warn(`Stack "${manifest.stackName}" does not exist. Falling back to fresh deploy.`);
 
-    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName], cwd);
+    const initResult = exec.capture("pulumi", ["stack", "init", pulumiStack], cwd);
     if (initResult.exitCode !== 0) {
-      ui.log.error(initResult.stderr || `Could not create Pulumi stack "${manifest.stackName}".`);
+      ui.log.error(initResult.stderr || `Could not create Pulumi stack "${pulumiStack}".`);
       process.exit(1);
     }
   }

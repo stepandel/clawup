@@ -6,6 +6,15 @@ import { capture, stream } from "./exec";
 import type { VoidResult } from "@clawup/core";
 
 /**
+ * Build the fully-qualified Pulumi stack name.
+ * When an organization is provided, returns "org/stackName";
+ * otherwise returns just "stackName".
+ */
+export function qualifiedStackName(stackName: string, organization?: string): string {
+  return organization ? `${organization}/${stackName}` : stackName;
+}
+
+/**
  * Get the current Pulumi stack name
  */
 export function currentStack(cwd?: string): string | null {

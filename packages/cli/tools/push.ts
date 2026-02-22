@@ -13,7 +13,7 @@ import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapter
 import { loadManifest, resolveConfigName } from "../lib/config";
 import { AGENT_ALIASES, SSH_USER, tailscaleHostname } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
-import { getConfig, selectOrCreateStack } from "../lib/pulumi";
+import { getConfig, selectOrCreateStack, qualifiedStackName } from "../lib/pulumi";
 import type { AgentDefinition } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
 import { classifySkills } from "@clawup/core";
@@ -148,10 +148,11 @@ export const pushTool: ToolImplementation<PushOptions> = async (
     throw new Error(`Config '${configName}' could not be loaded.`);
   }
 
-  // Select Pulumi stack to read tailnet config
-  const stackResult = selectOrCreateStack(manifest.stackName, cwd);
+  // Select Pulumi stack to read tailnet config (use org-qualified name if organization is set)
+  const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const stackResult = selectOrCreateStack(pulumiStack, cwd);
   if (!stackResult.ok) {
-    throw new Error(`Could not select Pulumi stack "${manifest.stackName}".`);
+    throw new Error(`Could not select Pulumi stack "${pulumiStack}".`);
   }
 
   // Get tailnet DNS name

@@ -29,7 +29,7 @@ import { fetchIdentity } from "@clawup/core/identity";
 import * as os from "os";
 import * as path from "path";
 import { checkPrerequisites } from "../lib/prerequisites";
-import { selectOrCreateStack, setConfig } from "../lib/pulumi";
+import { selectOrCreateStack, setConfig, qualifiedStackName } from "../lib/pulumi";
 import { saveManifest } from "../lib/config";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, handleCancel, exitWithError, formatCost, formatAgentList } from "../lib/ui";
@@ -67,6 +67,13 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     defaultValue: "dev",
   });
   handleCancel(stackName);
+
+  const organization = await p.text({
+    message: "Pulumi organization (leave empty for personal account)",
+    placeholder: "my-org",
+    defaultValue: "",
+  });
+  handleCancel(organization);
 
   const provider = await p.select({
     message: "Cloud provider",
@@ -144,8 +151,11 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   });
   handleCancel(userNotes);
 
+  const orgValue = (organization as string).trim() || undefined;
+
   const basicConfig = {
     stackName: stackName as string,
+    organization: orgValue,
     provider: provider as "aws" | "hetzner",
     region,
     instanceType,
@@ -683,13 +693,14 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   s.stop("Workspace ready");
   const cwd = getWorkspaceDir();
 
-  // Select/create stack
+  // Select/create stack (use org-qualified name if organization is set)
+  const pulumiStack = qualifiedStackName(basicConfig.stackName, basicConfig.organization);
   s.start("Selecting Pulumi stack...");
-  const stackResult = selectOrCreateStack(basicConfig.stackName, cwd);
+  const stackResult = selectOrCreateStack(pulumiStack, cwd);
   if (!stackResult.ok) {
     s.stop("Failed to select/create stack");
     if (stackResult.error) p.log.error(stackResult.error);
-    exitWithError(`Could not select or create Pulumi stack "${basicConfig.stackName}".`);
+    exitWithError(`Could not select or create Pulumi stack "${pulumiStack}".`);
   }
   s.stop("Pulumi stack ready");
 
@@ -745,6 +756,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   const manifest: ClawupManifest = {
     stackName: configName,
+    organization: basicConfig.organization,
     provider: basicConfig.provider,
     region: basicConfig.region,
     instanceType: basicConfig.instanceType,

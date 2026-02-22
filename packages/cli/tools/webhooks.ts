@@ -12,6 +12,7 @@ import { loadManifest, resolveConfigName } from "../lib/config";
 import { SSH_USER, tailscaleHostname } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, getStackOutputs } from "../lib/tool-helpers";
+import { qualifiedStackName } from "../lib/pulumi";
 import pc from "picocolors";
 
 export interface WebhooksSetupOptions {
@@ -77,10 +78,11 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
     process.exit(1);
   }
 
-  // Select stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
+  // Select stack (use org-qualified name if organization is set)
+  const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   if (selectResult.exitCode !== 0) {
-    ui.log.error(`Could not select Pulumi stack "${manifest.stackName}". Run ${pc.cyan("clawup deploy")} first.`);
+    ui.log.error(`Could not select Pulumi stack "${pulumiStack}". Run ${pc.cyan("clawup deploy")} first.`);
     process.exit(1);
   }
 

@@ -10,6 +10,7 @@ import { cleanupTailscaleDevices } from "../lib/tailscale";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig } from "../lib/tool-helpers";
 import { formatAgentList } from "../lib/ui";
+import { qualifiedStackName } from "../lib/pulumi";
 
 export interface DestroyOptions {
   /** Skip confirmation prompts (dangerous!) */
@@ -52,12 +53,13 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
     process.exit(1);
   }
 
-  // Select/create stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
+  // Select/create stack (use org-qualified name if organization is set)
+  const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   if (selectResult.exitCode !== 0) {
-    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName], cwd);
+    const initResult = exec.capture("pulumi", ["stack", "init", pulumiStack], cwd);
     if (initResult.exitCode !== 0) {
-      ui.log.error(`Could not select Pulumi stack "${manifest.stackName}".`);
+      ui.log.error(`Could not select Pulumi stack "${pulumiStack}".`);
       process.exit(1);
     }
   }

@@ -10,6 +10,7 @@ import { SSH_USER, tailscaleHostname } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleRunning } from "../lib/tailscale";
 import { getConfig, getStackOutputs } from "../lib/tool-helpers";
+import { qualifiedStackName } from "../lib/pulumi";
 
 export interface StatusOptions {
   /** Output as JSON */
@@ -111,14 +112,15 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
     process.exit(1);
   }
 
-  // Select/create stack
-  const selectResult = exec.capture("pulumi", ["stack", "select", manifest.stackName], cwd);
+  // Select/create stack (use org-qualified name if organization is set)
+  const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   if (selectResult.exitCode !== 0) {
-    const initResult = exec.capture("pulumi", ["stack", "init", manifest.stackName], cwd);
+    const initResult = exec.capture("pulumi", ["stack", "init", pulumiStack], cwd);
     if (initResult.exitCode !== 0) {
       if (!options.json) {
         ui.log.error(initResult.stderr || selectResult.stderr);
-        ui.log.error(`Could not select Pulumi stack "${manifest.stackName}".`);
+        ui.log.error(`Could not select Pulumi stack "${pulumiStack}".`);
       }
       process.exit(1);
     }
