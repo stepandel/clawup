@@ -311,11 +311,11 @@ else
 fi
 ${(config.plugins ?? [])
     .flatMap((p) => Object.values(p.secretEnvVars ?? {}))
-    .map((envVar) => `\\\${${envVar}:+echo 'export ${envVar}="\\\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
+    .map((envVar) => `[ -n "\${${envVar}:-}" ] && echo 'export ${envVar}="\${${envVar}:-}"' >> /home/ubuntu/.bashrc`)
     .join("\n")}
 ${(config.deps ?? [])
     .flatMap(d => Object.values(d.secrets).map(s => s.envVar))
-    .map(envVar => `\\\${${envVar}:+echo 'export ${envVar}="\\\${${envVar}}"' >> /home/ubuntu/.bashrc}`)
+    .map(envVar => `[ -n "\${${envVar}:-}" ] && echo 'export ${envVar}="\${${envVar}:-}"' >> /home/ubuntu/.bashrc`)
     .join("\n")}
 ${additionalEnvVars}
 ${depPostInstallScript}
