@@ -15,12 +15,22 @@ const WORKSPACE_DIR = path.join(os.homedir(), ".clawup", "workspace");
 const VERSION_FILE = ".cli-version";
 
 /**
- * Read the CLI package version from cli/package.json at build time.
- * At runtime this resolves to cli/dist/lib/workspace.js → ../../package.json.
+ * Resolve the CLI package root directory.
+ * Works for both tsc output (dist/lib/workspace.js → ../../) and
+ * esbuild bundle (dist/bin.js → ../).
+ */
+function getCliPackageRoot(): string {
+  const oneUp = path.resolve(__dirname, "..");
+  if (fs.existsSync(path.join(oneUp, "package.json"))) return oneUp;
+  return path.resolve(__dirname, "..", "..");
+}
+
+/**
+ * Read the CLI package version from cli/package.json.
  */
 function cliVersion(): string {
-  const pkgPath = path.join(__dirname, "..", "..", "package.json");
   try {
+    const pkgPath = path.join(getCliPackageRoot(), "package.json");
     return JSON.parse(fs.readFileSync(pkgPath, "utf-8")).version as string;
   } catch {
     return "unknown";
@@ -29,10 +39,9 @@ function cliVersion(): string {
 
 /**
  * Resolve the bundled infra directory shipped inside the npm package.
- * From cli/dist/lib/ → ../../infra/
  */
 function getBundledInfraDir(): string {
-  return path.join(__dirname, "..", "..", "infra");
+  return path.join(getCliPackageRoot(), "infra");
 }
 
 /**
@@ -40,8 +49,7 @@ function getBundledInfraDir(): string {
  * Detected by the presence of Pulumi.yaml AND node_modules/@pulumi at the repo root.
  */
 export function isDevMode(): boolean {
-  // cli/dist/lib/ → 3 levels up → repo root
-  const repoRoot = path.resolve(__dirname, "..", "..", "..");
+  const repoRoot = path.resolve(getCliPackageRoot(), "..");
   return (
     fs.existsSync(path.join(repoRoot, "Pulumi.yaml")) &&
     fs.existsSync(path.join(repoRoot, "node_modules", "@pulumi"))
