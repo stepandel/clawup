@@ -233,9 +233,14 @@ function buildPluginsForAgent(
     const secretMapping = registryEntry?.secretEnvVars ?? {};
 
     // Merge registry defaultConfig as lowest-priority defaults
-    const mergedConfig = registryEntry?.defaultConfig
+    let mergedConfig = registryEntry?.defaultConfig
       ? { ...registryEntry.defaultConfig, ...agentSection }
       : agentSection;
+
+    // Apply registry transform (e.g., build agentMapping from linearUserUuid)
+    if (registryEntry?.transformConfig) {
+      mergedConfig = registryEntry.transformConfig(mergedConfig);
+    }
 
     plugins.push({
       name: pluginName,

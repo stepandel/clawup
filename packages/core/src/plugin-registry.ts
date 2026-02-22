@@ -17,6 +17,13 @@ export interface PluginRegistryEntry {
    * e.g., { "$AGENT_NAME": "default" } → {os.environ.get("AGENT_NAME", ""): "default"}
    */
   defaultConfig?: Record<string, unknown>;
+  /**
+   * Transform the raw plugin config before it's passed to the config generator.
+   * Runs at deploy time (in Node.js) after defaults are merged.
+   * Use this for config values that depend on other config fields
+   * (e.g., building agentMapping from linearUserUuid).
+   */
+  transformConfig?: (config: Record<string, unknown>) => Record<string, unknown>;
 }
 
 export const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {
@@ -27,8 +34,20 @@ export const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {
     },
     installable: true,
     needsFunnel: true,
-    defaultConfig: {
-      agentMapping: { "$AGENT_NAME": "default" },
+    transformConfig: (config) => {
+      // Build agentMapping from linearUserUuid: the Linear plugin routes
+      // webhook events by looking up the assignee's UUID in agentMapping.
+      // Include both UUID and display name ($AGENT_NAME env var at runtime)
+      // so the plugin can match by either identifier.
+      const uuid = config.linearUserUuid as string | undefined;
+      const mapping: Record<string, string> = {};
+      if (uuid) {
+        mapping[uuid] = "default";
+      }
+      // $AGENT_NAME is resolved at runtime via toPythonLiteral() → os.environ.get()
+      mapping["$AGENT_NAME"] = "default";
+      config.agentMapping = mapping;
+      return config;
     },
   },
   slack: {
