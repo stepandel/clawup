@@ -15,6 +15,7 @@
   --color-accent-green-faded: rgba(52, 211, 153, 0.1);
   --color-accent-green-border: rgba(52, 211, 153, 0.25);
   --color-accent-emerald: #10b981;
+  --color-accent-coral: #F87171;
 
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
 }
@@ -68,7 +69,7 @@
   --card-foreground: oklch(0.93 0 0);
   --popover: oklch(0.18 0 0);
   --popover-foreground: oklch(0.93 0 0);
-  --primary: #6366f1;
+  --primary: #F87171;
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.22 0 0);
   --secondary-foreground: oklch(0.85 0 0);
@@ -79,7 +80,7 @@
   --destructive: oklch(0.65 0.2 25);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: #6366f1;
+  --ring: #F87171;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -87,12 +88,12 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.16 0 0);
   --sidebar-foreground: oklch(0.93 0 0);
-  --sidebar-primary: #6366f1;
+  --sidebar-primary: #F87171;
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.22 0 0);
   --sidebar-accent-foreground: oklch(0.93 0 0);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: #6366f1;
+  --sidebar-ring: #F87171;
 }
 
 @layer base {

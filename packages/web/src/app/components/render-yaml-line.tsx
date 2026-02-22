@@ -5,7 +5,7 @@ function renderYamlPart(text: string) {
     const value = text.slice(colonIdx);
     return (
       <>
-        <span className="text-accent-blue">{key}</span>
+        <span className="text-accent-coral">{key}</span>
         <span className="text-muted-foreground">{value}</span>
       </>
     );
@@ -33,7 +33,7 @@ export function renderYamlLine(line: string, i: number) {
     const value = line.slice(colonIdx);
     return (
       <div key={i}>
-        <span className="text-accent-blue">{key}</span>
+        <span className="text-accent-coral">{key}</span>
         <span className="text-muted-foreground">{value}</span>
       </div>
     );
