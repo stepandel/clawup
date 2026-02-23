@@ -343,6 +343,8 @@ openclaw onboard --non-interactive --accept-risk \\
   --skip-skills || echo "WARNING: OpenClaw onboarding failed. Run openclaw onboard manually."
 '
 ${workspaceFilesScript}
+${pluginInstallScript}
+${clawhubSkillsScript}
 # Configure gateway for Tailscale Serve (BEFORE daemon install so token matches)
 echo "Configuring OpenClaw gateway..."
 sudo -H -u ubuntu \\
@@ -354,8 +356,6 @@ sudo -H -u ubuntu \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
-${pluginInstallScript}
-${clawhubSkillsScript}
 ${tailscaleProxySection}
 # Install daemon service AFTER config patch so gateway token matches
 echo "Installing OpenClaw daemon..."
