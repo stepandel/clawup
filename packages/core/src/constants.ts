@@ -132,7 +132,41 @@ export const MODEL_PROVIDERS = {
       { value: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5" },
     ],
   },
+  openai: {
+    name: "OpenAI",
+    envVar: "OPENAI_API_KEY",
+    keyPrefix: "sk-",
+    models: [
+      { value: "openai/gpt-4o", label: "GPT-4o" },
+      { value: "openai/o3", label: "o3" },
+      { value: "openai/o4-mini", label: "o4-mini" },
+    ],
+  },
+  google: {
+    name: "Google Gemini",
+    envVar: "GOOGLE_API_KEY",
+    keyPrefix: "",
+    models: [
+      { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+      { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    ],
+  },
+  openrouter: {
+    name: "OpenRouter",
+    envVar: "OPENROUTER_API_KEY",
+    keyPrefix: "sk-or-",
+    models: [] as ReadonlyArray<{ value: string; label: string }>,
+  },
 } as const;
+
+/**
+ * Extract the provider key from a model string (e.g., "anthropic/claude-opus-4-6" → "anthropic").
+ * Returns everything before the first slash, or the full string if no slash is present.
+ */
+export function getProviderForModel(modelString: string): string {
+  const slashIndex = modelString.indexOf("/");
+  return slashIndex === -1 ? modelString : modelString.substring(0, slashIndex);
+}
 
 /**
  * Build the Tailscale hostname for an agent.
@@ -152,6 +186,34 @@ export const KEY_INSTRUCTIONS = {
       "1. Go to https://console.anthropic.com/account/keys",
       "2. Click \"Create Key\"",
       "3. Copy the key (starts with sk-ant-)",
+    ],
+  },
+  openaiApiKey: {
+    title: "OpenAI API Key",
+    steps: [
+      "To get your OpenAI API key:",
+      "1. Go to https://platform.openai.com/api-keys",
+      "2. Click \"Create new secret key\"",
+      "3. Copy the key (starts with sk-)",
+    ],
+  },
+  googleApiKey: {
+    title: "Google Gemini API Key",
+    steps: [
+      "To get your Google Gemini API key:",
+      "1. Go to https://aistudio.google.com/apikey",
+      "2. Click \"Create API key\"",
+      "3. Select or create a Google Cloud project",
+      "4. Copy the key",
+    ],
+  },
+  openrouterApiKey: {
+    title: "OpenRouter API Key",
+    steps: [
+      "To get your OpenRouter API key:",
+      "1. Go to https://openrouter.ai/keys",
+      "2. Click \"Create Key\"",
+      "3. Copy the key (starts with sk-or-)",
     ],
   },
   tailscaleAuthKey: {
