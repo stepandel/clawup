@@ -10,6 +10,8 @@ export interface DepSecret {
   envVar: string;
   /** Whether the secret is per-agent or shared globally */
   scope: "agent" | "global";
+  /** SSH command to verify this secret is configured. Exit 0 = configured. */
+  checkCommand: string;
 }
 
 export interface DepRegistryEntry {
@@ -48,7 +50,11 @@ else
 fi
 `,
     secrets: {
-      GithubToken: { envVar: "GITHUB_TOKEN", scope: "agent" },
+      GithubToken: {
+        envVar: "GITHUB_TOKEN",
+        scope: "agent",
+        checkCommand: "gh auth status 2>&1 | grep -qi 'logged in'",
+      },
     },
   },
   "brave-search": {
@@ -56,7 +62,11 @@ fi
     installScript: "",      // config-only, no binary to install
     postInstallScript: "",  // config patching stays in config-generator.ts
     secrets: {
-      BraveApiKey: { envVar: "BRAVE_API_KEY", scope: "global" },
+      BraveApiKey: {
+        envVar: "BRAVE_API_KEY",
+        scope: "global",
+        checkCommand: `test -n "$(jq -r '.tools.web.search.apiKey // empty' /home/ubuntu/.openclaw/openclaw.json)"`,
+      },
     },
   },
 };

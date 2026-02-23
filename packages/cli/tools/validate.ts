@@ -262,14 +262,13 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
             const secretCheck = runSshCheck(
               exec,
               host,
-              `grep -q '"${secret.envVar}"' /home/${SSH_USER}/.openclaw/openclaw.json && echo 'found' || echo 'missing'`,
+              secret.checkCommand,
               timeout
             );
-            const hasSecret = secretCheck.ok && secretCheck.output.trim().includes("found");
             checks.push({
               name: `${depEntry.displayName} auth`,
-              passed: hasSecret,
-              detail: hasSecret ? "configured" : `${secret.envVar} not found in openclaw.json`,
+              passed: secretCheck.ok,
+              detail: secretCheck.ok ? "configured" : `${secret.envVar} not configured`,
             });
           }
         }
@@ -283,17 +282,20 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
           }
 
           for (const [key, envVar] of Object.entries(pluginEntry.secretEnvVars)) {
+            // Slack secrets live at .channels.slack.<key>; other plugins at .plugins.entries["<name>"].config.<key>
+            const jqPath = plugin === "slack"
+              ? `.channels.slack.${key}`
+              : `.plugins.entries["${plugin}"].config.${key}`;
             const secretCheck = runSshCheck(
               exec,
               host,
-              `grep -q '"${envVar}"' /home/${SSH_USER}/.openclaw/openclaw.json && echo 'found' || echo 'missing'`,
+              `test -n "$(jq -r '${jqPath} // empty' /home/${SSH_USER}/.openclaw/openclaw.json)"`,
               timeout
             );
-            const hasSecret = secretCheck.ok && secretCheck.output.trim().includes("found");
             checks.push({
               name: `${plugin} secret (${envVar})`,
-              passed: hasSecret,
-              detail: hasSecret ? "configured" : `${envVar} not found in openclaw.json`,
+              passed: secretCheck.ok,
+              detail: secretCheck.ok ? "configured" : `${envVar} not configured`,
             });
           }
         }
