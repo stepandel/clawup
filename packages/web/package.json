@@ -10,15 +10,16 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@clawup/core": "workspace:*",
     "@auth/prisma-adapter": "^2.11.1",
+    "@clawup/core": "workspace:*",
     "@prisma/client": "5.22.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@vercel/analytics": "^1.6.1",
-    "clawup": "workspace:*",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
+    "clawup": "workspace:*",
     "clsx": "^2.1.1",
+    "geist": "^1.7.0",
     "lucide-react": "^0.563.0",
     "next": "^14.2.0",
     "next-auth": "5.0.0-beta.30",

@@ -42,3 +42,6 @@ esc/clawup-secrets.yaml
 
 # Vendored CLI binaries
 packages/cli/vendor/
+
+# Deprecation shim (published separately, not part of the monorepo)
+/deprecation/
