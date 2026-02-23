@@ -283,13 +283,13 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
 
           for (const [key, envVar] of Object.entries(pluginEntry.secretEnvVars)) {
             // Slack secrets live at .channels.slack.<key>; other plugins at .plugins.entries["<name>"].config.<key>
-            const jqPath = plugin === "slack"
-              ? `.channels.slack.${key}`
-              : `.plugins.entries["${plugin}"].config.${key}`;
+            const pyPath = plugin === "slack"
+              ? `c.get('channels',{}).get('slack',{}).get('${key}')`
+              : `c.get('plugins',{}).get('entries',{}).get('${plugin}',{}).get('config',{}).get('${key}')`;
             const secretCheck = runSshCheck(
               exec,
               host,
-              `test -n "$(jq -r '${jqPath} // empty' /home/${SSH_USER}/.openclaw/openclaw.json)"`,
+              `python3 -c "import json,sys;c=json.load(open('/home/${SSH_USER}/.openclaw/openclaw.json'));sys.exit(0 if ${pyPath} else 1)"`,
               timeout
             );
             checks.push({
