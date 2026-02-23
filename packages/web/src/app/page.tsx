@@ -60,10 +60,25 @@ export default function Home() {
             <span className="text-accent-emerald">$</span>
             <code className="text-foreground">npm install -g clawup</code>
             <button
-              onClick={() =>
-                navigator.clipboard?.writeText("npm install -g clawup").catch(() => {})
-              }
-              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              onClick={(e) => {
+                const text = "npm install -g clawup";
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(text).catch(() => {});
+                } else {
+                  const ta = document.createElement("textarea");
+                  ta.value = text;
+                  ta.style.position = "fixed";
+                  ta.style.opacity = "0";
+                  document.body.appendChild(ta);
+                  ta.select();
+                  document.execCommand("copy");
+                  document.body.removeChild(ta);
+                }
+                const btn = e.currentTarget;
+                btn.setAttribute("data-copied", "true");
+                setTimeout(() => btn.removeAttribute("data-copied"), 1500);
+              }}
+              className="group text-muted-foreground hover:text-foreground transition-colors shrink-0 data-[copied]:text-accent-emerald"
               title="Copy to clipboard"
             >
               <svg
@@ -76,9 +91,24 @@ export default function Home() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                className="group-data-[copied]:hidden"
               >
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+              </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="hidden group-data-[copied]:block"
+              >
+                <polyline points="20 6 9 17 4 12" />
               </svg>
             </button>
           </div>
