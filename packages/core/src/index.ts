@@ -44,7 +44,7 @@ export type { PluginRegistryEntry } from "./plugin-registry";
 export { PLUGIN_REGISTRY } from "./plugin-registry";
 
 // Coding agent registry
-export type { CodingAgentEntry } from "./coding-agent-registry";
+export type { CodingAgentEntry, CodingAgentSecret } from "./coding-agent-registry";
 export { CODING_AGENT_REGISTRY } from "./coding-agent-registry";
 
 // Dep registry

@@ -5,6 +5,13 @@
  * that OpenClaw uses as its backend for AI-assisted coding sessions.
  */
 
+export interface CodingAgentSecret {
+  /** Environment variable name (e.g., "ANTHROPIC_API_KEY") */
+  envVar: string;
+  /** Whether the secret is per-agent or shared globally */
+  scope: "agent" | "global";
+}
+
 export interface CodingAgentEntry {
   /** Human-readable display name */
   displayName: string;
@@ -15,6 +22,8 @@ export interface CodingAgentEntry {
    * Receives ${MODEL} variable with the stripped model name (e.g., "claude-opus-4-6").
    */
   configureModelScript: string;
+  /** Secret env vars this coding agent needs. Key = config key suffix, value = env var details. */
+  secrets: Record<string, CodingAgentSecret>;
   /** OpenClaw cliBackends entry for openclaw.json */
   cliBackend: {
     command: string;
@@ -33,6 +42,10 @@ export interface CodingAgentEntry {
 export const CODING_AGENT_REGISTRY: Record<string, CodingAgentEntry> = {
   "claude-code": {
     displayName: "Claude Code",
+    secrets: {
+      AnthropicApiKey: { envVar: "ANTHROPIC_API_KEY", scope: "agent" },
+      ClaudeCodeOAuthToken: { envVar: "CLAUDE_CODE_OAUTH_TOKEN", scope: "agent" },
+    },
     installScript: `
 # Install Claude Code CLI for ubuntu user
 echo "Installing Claude Code..."
