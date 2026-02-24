@@ -35,9 +35,32 @@ export function configPath(name: string): string {
 }
 
 /**
+ * Rewrite relative identity paths (starting with ./ or ../) in agent definitions
+ * to absolute paths resolved against projectRoot. Git URLs and already-absolute
+ * paths are left unchanged.
+ */
+export function resolveIdentityPaths(manifest: ClawupManifest, projectRoot: string): ClawupManifest {
+  if (!manifest.agents) return manifest;
+
+  return {
+    ...manifest,
+    agents: manifest.agents.map((agent) => {
+      if (agent.identity.startsWith("./") || agent.identity.startsWith("../")) {
+        return {
+          ...agent,
+          identity: path.resolve(projectRoot, agent.identity),
+        };
+      }
+      return agent;
+    }),
+  };
+}
+
+/**
  * Copy the manifest so the Pulumi program can read it.
  *
- * Project mode: copies <projectRoot>/clawup.yaml → <projectRoot>/.clawup/clawup.yaml
+ * Project mode: reads <projectRoot>/clawup.yaml, resolves relative identity
+ *               paths, and writes to <projectRoot>/.clawup/clawup.yaml
  * Global mode:  copies ~/.clawup/configs/<name>.yaml → <projectDir|cwd>/clawup.yaml
  */
 export function syncManifestToProject(name: string, projectDir?: string): void {
@@ -47,7 +70,15 @@ export function syncManifestToProject(name: string, projectDir?: string): void {
     ? path.join(projectRoot, MANIFEST_FILE)
     : configPath(name);
   const dest = path.join(projectDir ?? process.cwd(), MANIFEST_FILE);
-  fs.copyFileSync(src, dest);
+
+  if (projectRoot !== null) {
+    const raw = fs.readFileSync(src, "utf-8");
+    const manifest = YAML.parse(raw) as ClawupManifest;
+    const resolved = resolveIdentityPaths(manifest, projectRoot);
+    fs.writeFileSync(dest, YAML.stringify(resolved), "utf-8");
+  } else {
+    fs.copyFileSync(src, dest);
+  }
 }
 
 /**
