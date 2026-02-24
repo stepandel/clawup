@@ -21,7 +21,7 @@ npm install -g clawup
 | [`ssh`](/cli/ssh) | SSH to an agent by name or alias |
 | [`validate`](/cli/validate) | Health check agents via Tailscale SSH |
 | [`destroy`](/cli/destroy) | Tear down all resources |
-| [`list`](/cli/list) | List all saved configs |
+| [`list`](/cli/list) | Show project config |
 
 ## Global Options
 
@@ -31,6 +31,6 @@ clawup --help       # Show help
 clawup <cmd> --help # Show command-specific help
 ```
 
-## Config Management
+## Project-Based Config
 
-Configs are stored in `~/.clawup/configs/<stack>/clawup.yaml`. The CLI auto-detects your config if only one exists; use `-c <name>` to specify when you have multiple.
+Every deployment lives in a project directory with `clawup.yaml` at its root. Run commands from within your project directory and the CLI auto-detects the config.

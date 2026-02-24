@@ -155,7 +155,7 @@ The wizard walks you through:
 - **Optional integrations** — Slack, Linear, GitHub per agent
 - **Review & confirm** — see full config and estimated monthly cost
 
-This generates a `clawup.yaml` manifest and sets all Pulumi config values automatically.
+This generates a `clawup.yaml` manifest in your project directory and sets all Pulumi config values automatically.
 
 ### 3. Deploy
 
@@ -195,12 +195,11 @@ Run `clawup --help` for the full list.
 | `clawup redeploy` | Update agents in-place (`pulumi up --refresh`) |
 | `clawup redeploy -y` | Redeploy without confirmation prompt |
 | `clawup destroy -y` | Tear down without confirmation |
-| `clawup list` | List saved configurations |
+| `clawup list` | Show project config |
 | `clawup config show` | Display current config |
 | `clawup config show --json` | Config in JSON format |
 | `clawup config set <key> <value>` | Update a config value |
 | `clawup config set <key> <value> -a <agent>` | Update a per-agent config value |
-| `clawup config migrate` | Migrate old plugin config files into manifest |
 | `clawup secrets set <key> <value>` | Set a Pulumi secret (e.g. API keys) |
 | `clawup secrets list` | Show which secrets are configured (redacted) |
 | `clawup push` | Push workspace files, skills, and config to running agents |

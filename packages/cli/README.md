@@ -43,7 +43,6 @@ Deploy your agents with `pulumi up`. Runs prerequisite checks before deploying.
 ```bash
 clawup deploy             # Deploy with confirmation prompt
 clawup deploy -y          # Skip confirmation
-clawup deploy -c staging  # Deploy a specific config
 ```
 
 ### `clawup status`
@@ -53,7 +52,6 @@ Show agent statuses from Pulumi stack outputs.
 ```bash
 clawup status             # Pretty-printed output
 clawup status --json      # JSON output
-clawup status -c staging  # Status for a specific config
 ```
 
 ### `clawup ssh <agent>`
@@ -77,7 +75,6 @@ Options:
 | Flag | Description |
 |------|-------------|
 | `-u, --user <user>` | SSH user (default: `ubuntu`) |
-| `-c, --config <name>` | Config name (auto-detected if only one) |
 
 ### `clawup validate`
 
@@ -86,7 +83,6 @@ Health check all agents via Tailscale SSH.
 ```bash
 clawup validate            # Default 30-second timeout
 clawup validate -t 60      # 60-second timeout
-clawup validate -c staging # Validate a specific config
 ```
 
 ### `clawup destroy`
@@ -96,7 +92,6 @@ Tear down all resources with safety confirmations.
 ```bash
 clawup destroy             # With confirmation prompts
 clawup destroy -y          # Skip confirmations (dangerous!)
-clawup destroy -c staging  # Destroy a specific config
 ```
 
 ### `clawup redeploy`
@@ -106,7 +101,6 @@ Update agents in-place without destroying infrastructure. Runs `pulumi up --refr
 ```bash
 clawup redeploy             # With confirmation prompt
 clawup redeploy -y          # Skip confirmation
-clawup redeploy -c staging  # Redeploy a specific config
 ```
 
 ### `clawup config show`
@@ -116,7 +110,6 @@ Display current configuration in a human-readable format.
 ```bash
 clawup config show             # Pretty-printed output
 clawup config show --json      # Full JSON output
-clawup config show -c staging  # Show a specific config
 ```
 
 ### `clawup config set <key> <value>`
@@ -144,9 +137,8 @@ Per-agent keys (use `--agent`): `slackBotToken`, `slackAppToken`, `linearApiKey`
 
 ```bash
 clawup secrets set braveApiKey BSA_xxx
-clawup secrets set braveApiKey BSA_xxx -c team-h3
 clawup secrets set slackBotToken xoxb-xxx --agent eng
-clawup secrets set githubToken ghp_xxx --agent pm -c staging
+clawup secrets set githubToken ghp_xxx --agent pm
 ```
 
 ### `clawup secrets list`
@@ -154,13 +146,12 @@ clawup secrets set githubToken ghp_xxx --agent pm -c staging
 Show which secrets are configured (values redacted).
 
 ```bash
-clawup secrets list              # Auto-detect config
-clawup secrets list -c team-h3   # Specific config
+clawup secrets list
 ```
 
 ### `clawup list`
 
-List all saved configurations.
+Show the project configuration.
 
 ```bash
 clawup list          # Pretty-printed output
