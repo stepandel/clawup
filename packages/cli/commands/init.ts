@@ -830,9 +830,19 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<void> {
   // Load and validate the existing manifest
   const manifestPath = path.join(projectRoot, MANIFEST_FILE);
-  const raw = fs.readFileSync(manifestPath, "utf-8");
-  const parsed = YAML.parse(raw);
-  const validation = ClawupManifestSchema.safeParse(parsed);
+  let validation: ReturnType<typeof ClawupManifestSchema.safeParse>;
+  try {
+    const raw = fs.readFileSync(manifestPath, "utf-8");
+    const parsed = YAML.parse(raw);
+    validation = ClawupManifestSchema.safeParse(parsed);
+  } catch (err) {
+    exitWithError(
+      `Failed to read/parse ${MANIFEST_FILE} at ${manifestPath}: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+    return;
+  }
   if (!validation.success) {
     const issues = validation.error.issues.map((i) => i.message).join(", ");
     exitWithError(`Invalid ${MANIFEST_FILE} at ${manifestPath}: ${issues}`);
@@ -853,8 +863,18 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
   const identitySpinner = p.spinner();
   identitySpinner.start("Resolving agent identities...");
   for (const agent of agents) {
-    const identity = await fetchIdentity(agent.identity, identityCacheDir);
-    fetchedIdentities.push({ agent, manifest: identity.manifest });
+    try {
+      const identity = await fetchIdentity(agent.identity, identityCacheDir);
+      fetchedIdentities.push({ agent, manifest: identity.manifest });
+    } catch (err) {
+      identitySpinner.stop(`Failed to resolve identity for ${agent.name}`);
+      exitWithError(
+        `Failed to resolve identity "${agent.identity}": ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      return;
+    }
   }
   identitySpinner.stop(
     `Resolved ${fetchedIdentities.length} agent identit${fetchedIdentities.length === 1 ? "y" : "ies"}`
