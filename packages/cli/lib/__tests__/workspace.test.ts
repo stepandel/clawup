@@ -13,13 +13,6 @@ vi.mock("../project", () => ({
 import { findProjectRoot } from "../project";
 import { getWorkspaceDir, isDevMode, ensureWorkspace } from "../workspace";
 
-// Also mock syncManifestToProject's dependency
-vi.mock("../project", async () => {
-  return {
-    findProjectRoot: vi.fn(() => null),
-  };
-});
-
 const mockedFindProjectRoot = vi.mocked(findProjectRoot);
 
 describe("getWorkspaceDir", () => {

@@ -1326,6 +1326,7 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
 
   saveManifest(configName, manifest);
   s.stop("Config saved");
+  fs.writeFileSync(manifestPath, YAML.stringify(manifest), "utf-8");
 
   if (opts.deploy) {
     p.log.success("Config saved! Starting deployment...\n");

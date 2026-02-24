@@ -41,7 +41,8 @@ export function configPath(name: string): string {
  * Global mode:  copies ~/.clawup/configs/<name>.yaml → <projectDir|cwd>/clawup.yaml
  */
 export function syncManifestToProject(name: string, projectDir?: string): void {
-  const projectRoot = findProjectRoot();
+  const startDir = projectDir ?? process.cwd();
+  const projectRoot = findProjectRoot(startDir);
   const src = projectRoot !== null
     ? path.join(projectRoot, MANIFEST_FILE)
     : configPath(name);

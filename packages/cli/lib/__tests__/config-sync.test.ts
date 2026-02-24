@@ -16,13 +16,18 @@ const mockedFindProjectRoot = vi.mocked(findProjectRoot);
 
 describe("syncManifestToProject", () => {
   let tmpDir: string;
+  let originalHome: string | undefined;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), "config-sync-test-"));
     mockedFindProjectRoot.mockReturnValue(null);
+    // Isolate HOME so configsDir() doesn't touch real ~/.clawup/configs/
+    originalHome = process.env.HOME;
+    process.env.HOME = tmpDir;
   });
 
   afterEach(() => {
+    process.env.HOME = originalHome;
     rmSync(tmpDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
