@@ -10,8 +10,9 @@ import * as path from "path";
 import * as os from "os";
 import { execSync } from "child_process";
 import type { VoidResult } from "@clawup/core";
+import { findProjectRoot } from "./project";
 
-const WORKSPACE_DIR = path.join(os.homedir(), ".clawup", "workspace");
+const GLOBAL_WORKSPACE_DIR = path.join(os.homedir(), ".clawup", "workspace");
 const VERSION_FILE = ".cli-version";
 
 /**
@@ -57,11 +58,18 @@ export function isDevMode(): boolean {
 }
 
 /**
- * Returns the workspace directory for installed mode, or undefined in dev mode.
+ * Returns the workspace directory based on the current mode:
+ * - Dev mode: undefined (use repo root directly)
+ * - Project mode: <projectRoot>/.clawup/
+ * - Global mode: ~/.clawup/workspace/
  */
 export function getWorkspaceDir(): string | undefined {
   if (isDevMode()) return undefined;
-  return WORKSPACE_DIR;
+  const projectRoot = findProjectRoot();
+  if (projectRoot !== null) {
+    return path.join(projectRoot, ".clawup");
+  }
+  return GLOBAL_WORKSPACE_DIR;
 }
 
 /**
@@ -70,6 +78,8 @@ export function getWorkspaceDir(): string | undefined {
  */
 export function ensureWorkspace(): VoidResult {
   if (isDevMode()) return { ok: true };
+
+  const workspaceDir = getWorkspaceDir()!;
 
   const bundled = getBundledInfraDir();
   if (!fs.existsSync(bundled)) {
@@ -80,7 +90,7 @@ export function ensureWorkspace(): VoidResult {
   }
 
   const version = cliVersion();
-  const versionFile = path.join(WORKSPACE_DIR, VERSION_FILE);
+  const versionFile = path.join(workspaceDir, VERSION_FILE);
   const currentVersion = fs.existsSync(versionFile)
     ? fs.readFileSync(versionFile, "utf-8").trim()
     : null;
@@ -91,35 +101,35 @@ export function ensureWorkspace(): VoidResult {
   }
 
   // Create workspace directory
-  fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+  fs.mkdirSync(workspaceDir, { recursive: true });
 
   // Preserve user state files across re-sync
   const preservePatterns = ["Pulumi.*.yaml", "clawup.yaml"];
   const preserved = new Map<string, Buffer>();
   for (const pattern of preservePatterns) {
     // Simple glob: Pulumi.*.yaml
-    const files = fs.readdirSync(WORKSPACE_DIR).filter((f) => {
+    const files = fs.readdirSync(workspaceDir).filter((f) => {
       if (pattern === "clawup.yaml") return f === "clawup.yaml";
       // Match Pulumi.<stack>.yaml but not Pulumi.yaml itself
       return f.startsWith("Pulumi.") && f.endsWith(".yaml") && f !== "Pulumi.yaml";
     });
     for (const f of files) {
-      preserved.set(f, fs.readFileSync(path.join(WORKSPACE_DIR, f)));
+      preserved.set(f, fs.readFileSync(path.join(workspaceDir, f)));
     }
   }
 
   // Sync bundled infra → workspace (overwrite everything except preserved files)
-  copyDirSync(bundled, WORKSPACE_DIR);
+  copyDirSync(bundled, workspaceDir);
 
   // Restore preserved files
   for (const [name, content] of preserved) {
-    fs.writeFileSync(path.join(WORKSPACE_DIR, name), content);
+    fs.writeFileSync(path.join(workspaceDir, name), content);
   }
 
   // Install Pulumi SDK deps
   try {
     execSync("npm install --production", {
-      cwd: WORKSPACE_DIR,
+      cwd: workspaceDir,
       stdio: "pipe",
       timeout: 300_000, // 5 minutes
     });
@@ -135,7 +145,7 @@ export function ensureWorkspace(): VoidResult {
   // not in package.json (it's a private workspace package, not on npm).
   const bundledCore = path.join(bundled, "node_modules", "@clawup", "core");
   if (fs.existsSync(bundledCore)) {
-    const destCore = path.join(WORKSPACE_DIR, "node_modules", "@clawup", "core");
+    const destCore = path.join(workspaceDir, "node_modules", "@clawup", "core");
     fs.mkdirSync(destCore, { recursive: true });
     copyDirSync(bundledCore, destCore);
   }

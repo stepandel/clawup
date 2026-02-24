@@ -8,6 +8,7 @@ import * as os from "os";
 import YAML from "yaml";
 import type { ClawupManifest, PluginConfigFile } from "@clawup/core";
 import { CONFIG_DIR, MANIFEST_FILE, PLUGINS_DIR } from "@clawup/core";
+import { findProjectRoot } from "./project";
 
 /**
  * Get the configs directory path (~/.clawup/configs/)
@@ -34,11 +35,16 @@ export function configPath(name: string): string {
 }
 
 /**
- * Copy a named config to clawup.yaml so the Pulumi program can read it.
- * When projectDir is provided, writes there instead of process.cwd().
+ * Copy the manifest so the Pulumi program can read it.
+ *
+ * Project mode: copies <projectRoot>/clawup.yaml → <projectRoot>/.clawup/clawup.yaml
+ * Global mode:  copies ~/.clawup/configs/<name>.yaml → <projectDir|cwd>/clawup.yaml
  */
 export function syncManifestToProject(name: string, projectDir?: string): void {
-  const src = configPath(name);
+  const projectRoot = findProjectRoot();
+  const src = projectRoot !== null
+    ? path.join(projectRoot, MANIFEST_FILE)
+    : configPath(name);
   const dest = path.join(projectDir ?? process.cwd(), MANIFEST_FILE);
   fs.copyFileSync(src, dest);
 }
