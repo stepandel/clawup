@@ -2,6 +2,8 @@ export const CUSTOM_YAML_SNIPPET = `name: ops-monitor
 displayName: Sentinel
 role: infrastructure-monitor
 emoji: satellite
+description: Infrastructure monitoring and incident response
+volumeSize: 20
 model: anthropic/claude-sonnet-4-5
 
 deps:
@@ -9,7 +11,6 @@ deps:
 
 plugins:
   - slack
-  - pagerduty
 
 skills:
   - healthcheck
@@ -19,20 +20,25 @@ templateVars:
   - OWNER_NAME
   - ESCALATION_CHANNEL`;
 
-export const CONFIG_YAML_SNIPPET = `stack: my-team
-cloud: hetzner
+export const CONFIG_YAML_SNIPPET = `stackName: my-team
+provider: hetzner
 region: nbg1
 instanceType: cpx31
-
-owner:
-  name: Jordan
-  timezone: America/New_York
-  workingHours: "09:00-17:00"
+ownerName: Jordan
+timezone: America/New_York
+workingHours: "09:00-17:00"
 
 agents:
-  - identity: juno    # PM — preps tickets, assigns work
-  - identity: titus   # Engineer — implements, opens PRs
-  - identity: scout   # QA — reviews PRs, auto-fixes`;
+  - name: agent-pm
+    displayName: Juno
+    role: pm
+    identity: "github.com/myorg/identities#pm"
+    volumeSize: 30
+  - name: agent-eng
+    displayName: Titus
+    role: eng
+    identity: "github.com/myorg/identities#eng"
+    volumeSize: 50`;
 
 export const WORKSPACE_FILES = [
   { file: "SOUL.md", description: "Personality, values, behavioral guidelines" },
