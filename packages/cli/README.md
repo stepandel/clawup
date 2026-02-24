@@ -28,7 +28,7 @@ Interactive setup wizard that walks you through the full configuration:
 6. **Optional integrations** — Slack, Linear, GitHub per agent
 7. **Summary & confirmation** — review config and estimated cost before proceeding
 
-Outputs a `clawup.yaml` manifest and sets all Pulumi config values.
+Outputs a `clawup.yaml` manifest in the current directory and sets all Pulumi config values. Pulumi state and workspace files are stored in a `.clawup/` directory alongside the manifest.
 
 ```bash
 clawup init              # Interactive wizard
@@ -172,9 +172,18 @@ You can also define fully custom agents during `init`.
 
 ## Configuration
 
+Clawup uses a project-based configuration model. All commands auto-detect the project root by walking up from the current directory looking for `clawup.yaml`. Run commands from anywhere inside your project directory.
+
+```
+my-project/
+├── clawup.yaml          # Deployment manifest (created by clawup init)
+├── .clawup/             # Pulumi state, workspace files (git-ignored)
+└── ...
+```
+
 ### `clawup.yaml`
 
-The `init` command generates a `clawup.yaml` manifest:
+The `init` command generates a `clawup.yaml` manifest at the project root:
 
 ```yaml
 stackName: dev
