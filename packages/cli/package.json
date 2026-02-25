@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.9",
+    "@scarf/scarf": "^1.4.0",
     "commander": "^13.0",
     "picocolors": "^1.1",
     "yaml": "^2.7.0"
