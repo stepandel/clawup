@@ -106,46 +106,74 @@ describe("Redeploy existing stack (in-place update)", () => {
     createTestProject({ stackName, dir: tempDir });
     await setupCommand({ envFile: path.join(tempDir, ".env") });
 
-    const { adapter } = createTestAdapter();
-    await deployTool(adapter, { yes: true, local: true });
-
-    expect(isContainerRunning(containerName)).toBe(true);
+    const { adapter, dispose } = createTestAdapter();
+    try {
+      await deployTool(adapter, { yes: true, local: true });
+      expect(isContainerRunning(containerName)).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 360_000);
 
   it("redeploy updates the existing stack in-place", async () => {
-    const { adapter, ui } = createTestAdapter();
+    const { adapter, ui, dispose } = createTestAdapter();
 
-    await redeployTool(adapter, { yes: true, local: true });
+    try {
+      await redeployTool(adapter, { yes: true, local: true });
 
-    // Assert: uses in-place update mode
-    expect(ui.hasNote("Redeploy Summary")).toBe(true);
-    expect(ui.hasNoteContent("In-place update")).toBe(true);
+      // Assert: uses in-place update mode
+      expect(ui.hasNote("Redeploy Summary")).toBe(true);
+      const summaryContent = ui.getNoteContent("Redeploy Summary")!;
+      expect(summaryContent).toContain("In-place update");
+      expect(summaryContent).toContain(stackName);
+      expect(summaryContent).toContain("TestBot");
 
-    // Assert: container still running
-    expect(isContainerRunning(containerName)).toBe(true);
+      // Assert: pulumi up --refresh was used (step log)
+      expect(ui.hasLog("step", "--refresh")).toBe(true);
 
-    // Assert: success
-    expect(ui.hasLog("success", "Redeploy complete!")).toBe(true);
+      // Assert: container still running
+      expect(isContainerRunning(containerName)).toBe(true);
+
+      // Assert: success + outro
+      expect(ui.hasLog("success", "Redeploy complete!")).toBe(true);
+      expect(ui.outros.some((m) => m.includes("validate"))).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 300_000);
 
   it("validate passes after redeploy", async () => {
     await new Promise((r) => setTimeout(r, 3_000));
 
-    const { adapter, ui } = createTestAdapter();
+    const { adapter, ui, dispose } = createTestAdapter();
 
     try {
       await validateTool(adapter, { local: true, timeout: "60" });
     } catch (err) {
       if (!(err instanceof ProcessExitError)) throw err;
+    } finally {
+      dispose();
     }
 
+    // Assert: validation ran with correct structure
     expect(ui.hasNote("Validation Summary")).toBe(true);
+    const summary = ui.getValidationSummary();
+    expect(summary).not.toBeNull();
+    expect(summary!.total).toBe(1);
+
+    // Assert: container running check was performed
+    expect(ui.hasConsoleOutput("Container running")).toBe(true);
   }, 120_000);
 
   it("cleanup: destroy removes containers", async () => {
-    const { adapter } = createTestAdapter();
-    await destroyTool(adapter, { yes: true, local: true });
-    expect(containerExists(containerName)).toBe(false);
+    const { adapter, ui, dispose } = createTestAdapter();
+    try {
+      await destroyTool(adapter, { yes: true, local: true });
+      expect(containerExists(containerName)).toBe(false);
+      expect(ui.hasLog("success", "has been destroyed")).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 120_000);
 });
 
@@ -185,26 +213,40 @@ describe("Redeploy with no existing stack (fresh deploy fallback)", () => {
   }, 60_000);
 
   it("redeploy falls back to fresh deploy", async () => {
-    const { adapter, ui } = createTestAdapter();
+    const { adapter, ui, dispose } = createTestAdapter();
 
-    await redeployTool(adapter, { yes: true, local: true });
+    try {
+      await redeployTool(adapter, { yes: true, local: true });
 
-    // Assert: warns about missing stack and falls back
-    expect(ui.hasLog("warn", "does not exist")).toBe(true);
+      // Assert: warns about missing -local stack and falls back
+      expect(ui.hasLog("warn", "does not exist")).toBe(true);
 
-    // Assert: fresh deploy mode
-    expect(ui.hasNoteContent("Fresh deploy")).toBe(true);
+      // Assert: summary shows fresh deploy mode
+      expect(ui.hasNote("Redeploy Summary")).toBe(true);
+      const summaryContent = ui.getNoteContent("Redeploy Summary")!;
+      expect(summaryContent).toContain("Fresh deploy");
+      expect(summaryContent).toContain("TestBot");
 
-    // Assert: container created
-    expect(isContainerRunning(containerName)).toBe(true);
+      // Assert: container created and running
+      expect(containerExists(containerName)).toBe(true);
+      expect(isContainerRunning(containerName)).toBe(true);
 
-    // Assert: success
-    expect(ui.hasLog("success", "Redeploy complete!")).toBe(true);
+      // Assert: success + outro
+      expect(ui.hasLog("success", "Redeploy complete!")).toBe(true);
+      expect(ui.outros.some((m) => m.includes("validate"))).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 300_000);
 
   it("cleanup: destroy removes containers", async () => {
-    const { adapter } = createTestAdapter();
-    await destroyTool(adapter, { yes: true, local: true });
-    expect(containerExists(containerName)).toBe(false);
+    const { adapter, ui, dispose } = createTestAdapter();
+    try {
+      await destroyTool(adapter, { yes: true, local: true });
+      expect(containerExists(containerName)).toBe(false);
+      expect(ui.hasLog("success", "has been destroyed")).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 120_000);
 });

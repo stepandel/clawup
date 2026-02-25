@@ -121,6 +121,8 @@ export class TestUIAdapter implements UIAdapter {
   intros: string[] = [];
   outros: string[] = [];
   cancels: string[] = [];
+  /** Captured console.log output lines */
+  consoleOutput: string[] = [];
 
   private textAnswers: string[];
   private confirmAnswers: boolean[];
@@ -130,12 +132,31 @@ export class TestUIAdapter implements UIAdapter {
   private confirmIndex = 0;
   private selectIndex = 0;
   private multiSelectIndex = 0;
+  private originalConsoleLog: typeof console.log;
+  private consoleIntercepted = false;
 
   constructor(answers: PromptAnswers = {}) {
     this.textAnswers = answers.text ?? [];
     this.confirmAnswers = answers.confirm ?? [];
     this.selectAnswers = answers.select ?? [];
     this.multiSelectAnswers = answers.multiSelect ?? [];
+
+    // Intercept console.log to capture tool output (e.g., validate PASS/FAIL lines)
+    this.originalConsoleLog = console.log;
+    this.consoleIntercepted = true;
+    console.log = (...args: unknown[]) => {
+      const line = args.map(String).join(" ");
+      this.consoleOutput.push(line);
+      this.originalConsoleLog.apply(console, args);
+    };
+  }
+
+  /** Stop intercepting console.log. Call this when done with the adapter. */
+  dispose(): void {
+    if (this.consoleIntercepted) {
+      console.log = this.originalConsoleLog;
+      this.consoleIntercepted = false;
+    }
   }
 
   intro(message: string): void {
@@ -240,6 +261,47 @@ export class TestUIAdapter implements UIAdapter {
     );
   }
 
+  /** Get the content of a note by title */
+  getNoteContent(title: string): string | undefined {
+    return this.notes.find((n) => n.title === title)?.content;
+  }
+
+  /**
+   * Parse the "Validation Summary" note and return pass/fail/total counts.
+   * Returns null if the note doesn't exist.
+   */
+  getValidationSummary(): { total: number; passed: number; failed: number } | null {
+    const content = this.getNoteContent("Validation Summary");
+    if (!content) return null;
+    const total = parseInt(content.match(/Total:\s+(\d+)/)?.[1] ?? "0", 10);
+    const passed = parseInt(content.match(/Passed:\s+(\d+)/)?.[1] ?? "0", 10);
+    const failed = parseInt(content.match(/Failed:\s+(\d+)/)?.[1] ?? "0", 10);
+    return { total, passed, failed };
+  }
+
+  /**
+   * Check if a specific console.log line matches a pattern.
+   * Useful for validate tool's PASS/FAIL check lines.
+   */
+  hasConsoleOutput(pattern: string | RegExp): boolean {
+    return this.consoleOutput.some((line) =>
+      typeof pattern === "string"
+        ? line.includes(pattern)
+        : pattern.test(line),
+    );
+  }
+
+  /**
+   * Get all console.log lines matching a pattern.
+   */
+  getConsoleLines(pattern: string | RegExp): string[] {
+    return this.consoleOutput.filter((line) =>
+      typeof pattern === "string"
+        ? line.includes(pattern)
+        : pattern.test(line),
+    );
+  }
+
   reset(): void {
     this.logs = [];
     this.notes = [];
@@ -247,6 +309,7 @@ export class TestUIAdapter implements UIAdapter {
     this.intros = [];
     this.outros = [];
     this.cancels = [];
+    this.consoleOutput = [];
     this.textIndex = 0;
     this.confirmIndex = 0;
     this.selectIndex = 0;
@@ -262,6 +325,8 @@ export interface TestAdapterResult {
   adapter: RuntimeAdapter;
   ui: TestUIAdapter;
   exec: ExecAdapter;
+  /** Stop intercepting console.log. Call when done with this adapter. */
+  dispose: () => void;
 }
 
 export function createTestAdapter(answers?: PromptAnswers): TestAdapterResult {
@@ -272,5 +337,10 @@ export function createTestAdapter(answers?: PromptAnswers): TestAdapterResult {
     exec,
     platform: "test",
   };
-  return { adapter, ui, exec };
+  return {
+    adapter,
+    ui,
+    exec,
+    dispose: () => ui.dispose(),
+  };
 }

@@ -86,14 +86,15 @@ afterEach(() => {
 
 describe("deploy without manifest", () => {
   it("exits with error when no clawup.yaml exists", async () => {
-    // findProjectRoot returns null → no manifest
     projectRootOverride = null;
 
-    const { adapter, ui } = createTestAdapter();
-
-    await expect(deployTool(adapter, { yes: true })).rejects.toThrow(ProcessExitError);
-
-    expect(ui.hasLog("error", "clawup.yaml")).toBe(true);
+    const { adapter, ui, dispose } = createTestAdapter();
+    try {
+      await expect(deployTool(adapter, { yes: true })).rejects.toThrow(ProcessExitError);
+      expect(ui.hasLog("error", "clawup.yaml")).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 30_000);
 });
 
@@ -101,11 +102,13 @@ describe("destroy without manifest", () => {
   it("exits with error when no clawup.yaml exists", async () => {
     projectRootOverride = null;
 
-    const { adapter, ui } = createTestAdapter();
-
-    await expect(destroyTool(adapter, { yes: true })).rejects.toThrow(ProcessExitError);
-
-    expect(ui.hasLog("error", "clawup.yaml")).toBe(true);
+    const { adapter, ui, dispose } = createTestAdapter();
+    try {
+      await expect(destroyTool(adapter, { yes: true })).rejects.toThrow(ProcessExitError);
+      expect(ui.hasLog("error", "clawup.yaml")).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 30_000);
 });
 
@@ -113,11 +116,13 @@ describe("validate without manifest", () => {
   it("exits with error when no clawup.yaml exists", async () => {
     projectRootOverride = null;
 
-    const { adapter, ui } = createTestAdapter();
-
-    await expect(validateTool(adapter, {})).rejects.toThrow(ProcessExitError);
-
-    expect(ui.hasLog("error", "clawup.yaml")).toBe(true);
+    const { adapter, ui, dispose } = createTestAdapter();
+    try {
+      await expect(validateTool(adapter, {})).rejects.toThrow(ProcessExitError);
+      expect(ui.hasLog("error", "clawup.yaml")).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 30_000);
 });
 
@@ -152,9 +157,12 @@ describe("deploy cancelled by user", () => {
     );
 
     // User answers "no" to confirmation
-    const { adapter } = createTestAdapter({ confirm: [false] });
-
-    await expect(deployTool(adapter, {})).rejects.toThrow(TestCancelError);
+    const { adapter, dispose } = createTestAdapter({ confirm: [false] });
+    try {
+      await expect(deployTool(adapter, {})).rejects.toThrow(TestCancelError);
+    } finally {
+      dispose();
+    }
   }, 30_000);
 });
 
@@ -185,12 +193,15 @@ describe("destroy cancelled by user", () => {
 
     // Destroy requires: text (type stack name), then confirm (yes/no)
     // Set confirm to false → cancel
-    const { adapter } = createTestAdapter({
+    const { adapter, dispose } = createTestAdapter({
       text: ["e2e-cancel-test"],
       confirm: [false],
     });
-
-    await expect(destroyTool(adapter, {})).rejects.toThrow(TestCancelError);
+    try {
+      await expect(destroyTool(adapter, {})).rejects.toThrow(TestCancelError);
+    } finally {
+      dispose();
+    }
   }, 30_000);
 });
 

@@ -18,7 +18,6 @@ import { dockerContainerName } from "@clawup/core";
 let tempDir: string;
 let stackName: string;
 let containerName: string;
-const repoRoot = path.resolve(__dirname, "..", "..", "..");
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before imports that use them
@@ -170,19 +169,30 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
   // -------------------------------------------------------------------------
 
   it("deploy --local creates Docker container", async () => {
-    const { adapter, ui } = createTestAdapter();
+    const { adapter, ui, dispose } = createTestAdapter();
 
-    await deployTool(adapter, { yes: true, local: true });
+    try {
+      await deployTool(adapter, { yes: true, local: true });
 
-    // Assert: container exists and is running
-    expect(containerExists(containerName)).toBe(true);
-    expect(isContainerRunning(containerName)).toBe(true);
+      // Assert: container exists and is running
+      expect(containerExists(containerName)).toBe(true);
+      expect(isContainerRunning(containerName)).toBe(true);
 
-    // Assert: UI shows deployment summary
-    expect(ui.hasNote("Deployment Summary")).toBe(true);
+      // Assert: UI shows deployment summary with correct details
+      expect(ui.hasNote("Deployment Summary")).toBe(true);
+      const summaryContent = ui.getNoteContent("Deployment Summary")!;
+      expect(summaryContent).toContain(stackName);
+      expect(summaryContent).toContain("Local Docker");
+      expect(summaryContent).toContain("TestBot");
 
-    // Assert: UI shows success
-    expect(ui.hasLog("success", "Deployment complete!")).toBe(true);
+      // Assert: UI shows success message
+      expect(ui.hasLog("success", "Deployment complete!")).toBe(true);
+
+      // Assert: outro with next steps
+      expect(ui.outros.some((m) => m.includes("validate"))).toBe(true);
+    } finally {
+      dispose();
+    }
   }, 300_000);
 
   // -------------------------------------------------------------------------
@@ -193,26 +203,44 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
     // Wait briefly for container to stabilize
     await new Promise((r) => setTimeout(r, 3_000));
 
-    const { adapter, ui } = createTestAdapter();
+    const { adapter, ui, dispose } = createTestAdapter();
 
-    // Validate — some checks may fail (dummy API key) but container check should pass
+    // Validate — some checks may fail (dummy API key) but container check should pass.
     // The validate tool calls process.exit(1) if any agent fails.
-    // With a dummy key, auth checks will fail. Catch the exit.
     try {
       await validateTool(adapter, { local: true, timeout: "60" });
     } catch (err) {
       // Expected — validation may fail on auth checks with dummy key
       if (!(err instanceof ProcessExitError)) throw err;
+    } finally {
+      dispose();
     }
 
-    // Assert: validation ran and container was detected as running
+    // Assert: validation summary note was generated
     expect(ui.hasNote("Validation Summary")).toBe(true);
 
-    // The container running check should pass
-    const containerCheck = ui.logs.some(
-      (l) => l.message.includes("TestBot") || l.message.includes("tester"),
-    );
-    expect(containerCheck).toBe(true);
+    // Assert: summary has correct agent count
+    const summary = ui.getValidationSummary();
+    expect(summary).not.toBeNull();
+    expect(summary!.total).toBe(1);
+
+    // Assert: agent name was logged (ui.log.info with agent display name)
+    expect(ui.hasLog("info", "TestBot")).toBe(true);
+
+    // Assert: "Container running" check passed (printed via console.log)
+    expect(ui.hasConsoleOutput("Container running")).toBe(true);
+    // The PASS line includes "running" detail
+    const containerLines = ui.getConsoleLines("Container running");
+    expect(containerLines.length).toBeGreaterThan(0);
+    expect(containerLines[0]).toContain("running");
+
+    // Assert: "Workspace files" check ran (SOUL.md + HEARTBEAT.md)
+    expect(ui.hasConsoleOutput("Workspace files")).toBe(true);
+
+    // Assert: "Claude Code CLI" or coding agent check ran
+    expect(
+      ui.hasConsoleOutput("Claude Code") || ui.hasConsoleOutput("coding agent"),
+    ).toBe(true);
   }, 120_000);
 
   // -------------------------------------------------------------------------
@@ -220,14 +248,30 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
   // -------------------------------------------------------------------------
 
   it("destroy --local removes Docker container", async () => {
-    const { adapter, ui } = createTestAdapter();
+    const { adapter, ui, dispose } = createTestAdapter();
 
-    await destroyTool(adapter, { yes: true, local: true });
+    try {
+      await destroyTool(adapter, { yes: true, local: true });
 
-    // Assert: container no longer exists
-    expect(containerExists(containerName)).toBe(false);
+      // Assert: container no longer exists
+      expect(containerExists(containerName)).toBe(false);
+      expect(isContainerRunning(containerName)).toBe(false);
 
-    // Assert: UI shows success
-    expect(ui.hasLog("success", "has been destroyed")).toBe(true);
+      // Assert: "Destruction Plan" note was shown with correct details
+      expect(ui.hasNote("Destruction Plan")).toBe(true);
+      const planContent = ui.getNoteContent("Destruction Plan")!;
+      expect(planContent).toContain(stackName);
+      expect(planContent).toContain("Local Docker");
+      expect(planContent).toContain("Docker containers");
+      expect(planContent).toContain("TestBot");
+
+      // Assert: success message with stack name
+      expect(ui.hasLog("success", "has been destroyed")).toBe(true);
+
+      // Assert: outro
+      expect(ui.outros.length).toBeGreaterThan(0);
+    } finally {
+      dispose();
+    }
   }, 120_000);
 });
