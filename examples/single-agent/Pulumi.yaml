@@ -1,3 +1,0 @@
-name: openclaw-single-agent
-runtime: nodejs
-description: Example deployment of a single OpenClaw agent on AWS

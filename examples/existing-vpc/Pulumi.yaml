@@ -1,3 +1,0 @@
-name: openclaw-existing-vpc
-runtime: nodejs
-description: Deploy OpenClaw agent into an existing VPC
