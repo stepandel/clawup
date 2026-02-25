@@ -6,6 +6,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "vitest run",
+    "test:e2e": "vitest run --config packages/cli/__e2e__/vitest.e2e.config.ts",
     "build:cli-infra": "bash scripts/bundle-infra.sh"
   },
   "devDependencies": {

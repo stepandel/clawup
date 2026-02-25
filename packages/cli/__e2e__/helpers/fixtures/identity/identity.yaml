@@ -1,0 +1,11 @@
+name: e2e-test
+displayName: TestBot
+role: tester
+emoji: test_tube
+description: Minimal agent for E2E testing
+volumeSize: 10
+model: anthropic/claude-sonnet-4-5
+codingAgent: claude-code
+skills: []
+templateVars:
+  - OWNER_NAME
