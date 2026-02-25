@@ -17,6 +17,7 @@ clawup init [options]
 |--------|-------------|
 | `--deploy` | Deploy immediately after init completes |
 | `-y, --yes` | Skip confirmation prompt (used with `--deploy`) |
+| `--env-file <path>` | Path to `.env` file (defaults to `.env` in project root) |
 
 ## Wizard Steps
 
@@ -65,6 +66,14 @@ clawup init --deploy
 clawup init --deploy --yes
 ```
 
+## `.env` File Support
+
+If a `.env` file exists in the project root (or is specified via `--env-file`), the wizard loads it before prompting for secrets. Any values found in the `.env` file are used automatically, skipping the interactive prompt for that secret.
+
+The init command also generates a `.env.example` alongside `clawup.yaml`, listing all required env var names with empty values. Copy it to `.env` and fill in values for a prompt-free experience on subsequent runs.
+
+See [Environment Variables](/configuration/environment) for full details on the `${env:VAR}` reference system.
+
 ## Output
 
-Creates `clawup.yaml` in your current directory with the full manifest, along with a `.clawup/` workspace directory (added to `.gitignore` automatically).
+Creates `clawup.yaml` in your current directory with the full manifest, along with a `.clawup/` workspace directory and `.env.example` file (`.clawup/` and `.env` are added to `.gitignore` automatically).

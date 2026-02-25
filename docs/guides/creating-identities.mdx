@@ -73,6 +73,10 @@ pluginDefaults:
     dm:
       enabled: true
       policy: open
+
+# Additional secrets not covered by plugins/deps
+requiredSecrets:
+  - notionApiKey
 ```
 
 See the [Identity Manifest Reference](/configuration/identity) for the complete field listing.
@@ -315,6 +319,27 @@ templateVars:
 ```
 
 Then reference them in workspace files: `Check open issues in {{LINEAR_TEAM}}`.
+
+## Declaring Additional Secrets
+
+If your identity needs secrets beyond what its `plugins` and `deps` imply (e.g., a Notion API key, a Sentry DSN), declare them in `requiredSecrets`:
+
+```yaml
+plugins:
+  - slack              # → slackBotToken, slackAppToken (automatic)
+deps:
+  - gh                 # → githubToken (automatic)
+
+requiredSecrets:
+  - notionApiKey       # → <ROLE>_NOTION_API_KEY
+  - customWebhookUrl   # → <ROLE>_CUSTOM_WEBHOOK_URL
+```
+
+Each camelCase key is converted to `SCREAMING_SNAKE_CASE` and prefixed with the agent's role for the env var name. During `clawup init`, the wizard checks `.env` for pre-populated values and prompts for any that are missing.
+
+This is additive — plugin/dep-implied secrets are always included. If a key appears in both `requiredSecrets` and is already implied by a plugin, it won't be duplicated.
+
+See [Environment Variables](/configuration/environment#identity-requiredsecrets) for full details on secret resolution.
 
 ## Tips
 

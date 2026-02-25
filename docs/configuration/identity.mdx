@@ -26,6 +26,7 @@ interface IdentityManifest {
   deps?: string[];           // System dependencies
   plugins?: string[];        // OpenClaw plugins
   pluginDefaults?: Record<string, Record<string, unknown>>;
+  requiredSecrets?: string[];  // Additional secret keys beyond plugins/deps
 }
 ```
 
@@ -65,6 +66,12 @@ interface IdentityManifest {
 | `deps` | string[] | `[]` | System-level tools installed on the agent. Each entry must match a key in the [dep registry](/architecture/identities#dep-registry). |
 | `plugins` | string[] | `[]` | OpenClaw plugins to configure. Each entry must match a key in the [plugin registry](/architecture/identities#plugin-registry). |
 | `pluginDefaults` | object | `{}` | Per-plugin default configuration. Keyed by plugin name, values are plugin-specific config objects. Can be overridden per-deployment via plugin config files. |
+
+### Secrets
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `requiredSecrets` | string[] | `[]` | Additional secret keys this identity needs beyond what `plugins` and `deps` imply. Each entry is a camelCase key (e.g., `notionApiKey`) that maps to a `<ROLE>_SCREAMING_SNAKE_CASE` env var. See [Environment Variables](/configuration/environment#identity-requiredsecrets). |
 
 ## Examples
 
@@ -177,7 +184,14 @@ templateVars:
   - USER_NOTES
   - LINEAR_TEAM
   - GITHUB_REPO
+
+# Secrets not covered by plugins/deps above
+requiredSecrets:
+  - sentryDsn
+  - datadogApiKey
 ```
+
+The `requiredSecrets` entries above will generate per-agent env vars like `ENG_SENTRY_DSN` and `ENG_DATADOG_API_KEY` during `clawup init`.
 
 ## Available Registries
 

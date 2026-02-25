@@ -107,6 +107,10 @@ templateVars:
   - TIMEZONE
   - WORKING_HOURS
   - USER_NOTES
+
+# Additional secrets not covered by plugins/deps
+requiredSecrets:
+  - notionApiKey       # → <ROLE>_NOTION_API_KEY in .env
 ```
 
 ### Built-in Identities
@@ -150,12 +154,12 @@ The wizard walks you through:
 - **Prerequisites check** — verifies Pulumi, Node.js, cloud provider CLI, and Tailscale
 - **Cloud provider** — AWS or Hetzner Cloud
 - **Region & instance type** — with cost estimates shown inline
-- **Secrets** — Anthropic API key, Tailscale auth key (with instructions for each)
+- **Secrets** — Anthropic API key, Tailscale auth key (auto-loaded from `.env` if present)
 - **Agent selection** — pick from built-in identities, point to a Git repo or local directory, or mix both
 - **Optional integrations** — Slack, Linear, GitHub per agent
 - **Review & confirm** — see full config and estimated monthly cost
 
-This generates a `clawup.yaml` manifest in your project directory and sets all Pulumi config values automatically.
+This generates a `clawup.yaml` manifest and `.env.example` in your project directory and sets all Pulumi config values automatically. If a `.env` file exists, secrets are loaded from it — skipping interactive prompts for pre-populated values.
 
 ### 3. Deploy
 
@@ -353,12 +357,20 @@ instanceType: t3.medium
 ownerName: Your Name
 timezone: America/New_York
 workingHours: 9am-6pm
+secrets:
+  anthropicApiKey: "${env:ANTHROPIC_API_KEY}"
+  tailscaleAuthKey: "${env:TAILSCALE_AUTH_KEY}"
+  tailnetDnsName: "${env:TAILNET_DNS_NAME}"
+  tailscaleApiKey: "${env:TAILSCALE_API_KEY}"
 agents:
   - name: agent-pm
     displayName: Juno
     role: pm
     identity: "https://github.com/your-org/army-identities#pm"
     volumeSize: 30
+    secrets:
+      slackBotToken: "${env:PM_SLACK_BOT_TOKEN}"
+      slackAppToken: "${env:PM_SLACK_APP_TOKEN}"
     plugins:
       - openclaw-linear
       - slack
@@ -372,7 +384,7 @@ agents:
     volumeSize: 20
 ```
 
-Model, backup model, and coding agent are configured in the identity (not the manifest). The manifest defines _which_ agents to deploy and _where_.
+The `secrets` section uses `${env:VAR}` references — actual values are loaded from a `.env` file at init time. A `.env.example` is generated alongside the manifest. Model, backup model, and coding agent are configured in the identity (not the manifest). The manifest defines _which_ agents to deploy and _where_.
 
 ### Pulumi Config
 

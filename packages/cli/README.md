@@ -23,17 +23,19 @@ Interactive setup wizard that walks you through the full configuration:
 1. **Prerequisites check** — verifies Pulumi CLI, Node.js, cloud provider CLI, and Tailscale are installed
 2. **Cloud provider** — AWS or Hetzner Cloud
 3. **Region & instance type** — with cost estimates shown inline
-4. **Secrets** — Anthropic API key, Tailscale auth key (with inline instructions for each)
-5. **Agent selection** — choose from presets, define custom agents, or mix both
+4. **Secrets** — Anthropic API key, Tailscale auth key (auto-loaded from `.env` if present)
+5. **Agent selection** — choose from built-in identities, point to a Git repo or local directory, or mix both
 6. **Optional integrations** — Slack, Linear, GitHub per agent
-7. **Summary & confirmation** — review config and estimated cost before proceeding
+7. **Identity secrets** — any additional secrets declared by identities via `requiredSecrets`
+8. **Summary & confirmation** — review config and estimated cost before proceeding
 
-Outputs a `clawup.yaml` manifest in the current directory and sets all Pulumi config values. Pulumi state and workspace files are stored in a `.clawup/` directory alongside the manifest.
+Outputs a `clawup.yaml` manifest and `.env.example` in the current directory and sets all Pulumi config values. Pulumi state and workspace files are stored in a `.clawup/` directory alongside the manifest. If a `.env` file exists, secrets are loaded from it — skipping interactive prompts for pre-populated values.
 
 ```bash
 clawup init              # Interactive wizard
 clawup init --deploy     # Deploy immediately after setup
 clawup init --deploy -y  # Deploy without confirmation
+clawup init --env-file /path/to/.env  # Custom .env file location
 ```
 
 ### `clawup deploy`
@@ -191,12 +193,19 @@ provider: aws
 region: us-east-1
 instanceType: t3.medium
 ownerName: Your Name
+secrets:
+  anthropicApiKey: "${env:ANTHROPIC_API_KEY}"
+  tailscaleAuthKey: "${env:TAILSCALE_AUTH_KEY}"
+  tailnetDnsName: "${env:TAILNET_DNS_NAME}"
 agents:
   - name: agent-pm
     displayName: Juno
     role: pm
     identity: "https://github.com/your-org/army-identities#pm"
     volumeSize: 30
+    secrets:
+      slackBotToken: "${env:PM_SLACK_BOT_TOKEN}"
+      slackAppToken: "${env:PM_SLACK_APP_TOKEN}"
     plugins:
       openclaw-linear:
         agentId: agent-pm
@@ -204,7 +213,7 @@ agents:
         mode: socket
 ```
 
-This manifest is read by the Pulumi program at deploy time to dynamically create the agent stack.
+The `secrets` section uses `${env:VAR}` references — actual values come from a `.env` file. This manifest is read by the Pulumi program at deploy time to dynamically create the agent stack.
 
 ### Pulumi Config
 
@@ -226,6 +235,7 @@ packages/cli/
 ├── tools/              # Tool implementations (adapter-based: deploy, destroy, redeploy, status, validate, push, webhooks)
 ├── lib/                # CLI-only utilities
 │   ├── config.ts       # Load/save clawup.yaml manifest
+│   ├── env.ts          # .env parser, ${env:VAR} resolver, secret builder
 │   ├── exec.ts         # Shell command execution
 │   ├── prerequisites.ts # Prerequisite checks
 │   ├── process.ts      # Graceful shutdown handling

@@ -1,49 +1,158 @@
 ---
-title: "Environment Variables"
-description: "Required and optional environment variables for Clawup"
+title: "Environment Variables & Secrets"
+description: "How Clawup manages secrets via .env files and ${env:VAR} references"
 ---
 
-Clawup uses environment variables for secrets and provider credentials. These are set during `clawup init` and stored securely in Pulumi config.
+Clawup uses a `.env` file to manage secrets outside of your manifest. The `clawup.yaml` manifest declares which env vars to read using `${env:VAR_NAME}` syntax — making the YAML self-documenting while keeping actual values out of version control.
 
-## Required
+## How It Works
 
-| Variable | Description |
-|----------|-------------|
-| `ANTHROPIC_API_KEY` | Anthropic API key for agent LLM access (starts with `sk-ant-`) |
+1. `clawup init` generates a `clawup.yaml` with `${env:VAR}` references in the `secrets` section
+2. A `.env.example` file is generated alongside the manifest showing all required variables
+3. You copy `.env.example` to `.env` and fill in values
+4. On subsequent runs, `clawup init` loads `.env` and skips prompts for any pre-populated values
 
-## Provider-Specific
+```yaml
+# clawup.yaml — secrets section (auto-generated)
+secrets:
+  anthropicApiKey: "${env:ANTHROPIC_API_KEY}"
+  tailscaleAuthKey: "${env:TAILSCALE_AUTH_KEY}"
+  tailnetDnsName: "${env:TAILNET_DNS_NAME}"
+  tailscaleApiKey: "${env:TAILSCALE_API_KEY}"
+agents:
+  - name: agent-pm
+    role: pm
+    secrets:
+      slackBotToken: "${env:PM_SLACK_BOT_TOKEN}"
+      slackAppToken: "${env:PM_SLACK_APP_TOKEN}"
+```
 
-### AWS
-
-| Variable | Description |
-|----------|-------------|
-| `AWS_ACCESS_KEY_ID` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
-| `AWS_REGION` | Default region (can also be set via `aws configure`) |
-
-### Hetzner
-
-| Variable | Description |
-|----------|-------------|
-| `HCLOUD_TOKEN` | Hetzner Cloud API token |
-
-## Optional
-
-| Variable | Description |
-|----------|-------------|
-| `TAILSCALE_AUTH_KEY` | Pre-authenticated Tailscale key (otherwise prompted) |
-| `LINEAR_API_KEY` | Linear API key for ticket integration |
-| `GITHUB_TOKEN` | GitHub token for repo access |
-
-## Agent Environment
-
-Each agent receives these environment variables on its server:
-
-- `ANTHROPIC_API_KEY` — For LLM access
-- `LINEAR_API_KEY` — If configured
-- `GITHUB_TOKEN` — If configured
-- Any custom `envVars` from the agent definition
+```bash
+# .env — actual values (git-ignored)
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+TAILSCALE_AUTH_KEY=tskey-auth-xxxxx
+TAILNET_DNS_NAME=tail12345.ts.net
+TAILSCALE_API_KEY=tskey-api-xxxxx
+PM_SLACK_BOT_TOKEN=xoxb-xxxxx
+PM_SLACK_APP_TOKEN=xapp-xxxxx
+```
 
 <Note>
-Secrets are stored encrypted in Pulumi state and injected into agent servers via cloud-init. They are never written to the manifest file.
+The `.env` file is automatically added to `.gitignore` by `clawup init`. Actual secret values are stored encrypted in Pulumi config — the `.env` file is a convenience for skipping interactive prompts.
 </Note>
+
+## Resolution Order
+
+When resolving `${env:VAR}` references, values are checked in this order:
+
+1. **`process.env`** — Shell environment variables (highest priority)
+2. **`.env` file** — Loaded from the project root (or path specified by `--env-file`)
+
+This matches standard dotenv behavior — shell variables always take precedence.
+
+## Global Secrets
+
+These are shared across all agents and always included in the manifest:
+
+| Secret Key | Env Variable | Required | Description |
+|------------|-------------|----------|-------------|
+| `anthropicApiKey` | `ANTHROPIC_API_KEY` | Yes | Anthropic API key or OAuth token |
+| `tailscaleAuthKey` | `TAILSCALE_AUTH_KEY` | Yes | Reusable Tailscale auth key |
+| `tailnetDnsName` | `TAILNET_DNS_NAME` | Yes | Your tailnet DNS name (e.g., `tail12345.ts.net`) |
+| `tailscaleApiKey` | `TAILSCALE_API_KEY` | No | Tailscale API key for device management |
+| `hcloudToken` | `HCLOUD_TOKEN` | Hetzner only | Hetzner Cloud API token |
+| `braveApiKey` | `BRAVE_API_KEY` | If using `brave-search` dep | Brave Search API key |
+
+## Per-Agent Secrets
+
+Per-agent secrets are scoped by role. The env var name follows the pattern `<ROLE>_<SECRET_SUFFIX>`:
+
+| Secret Key | Env Variable Pattern | Triggered By |
+|------------|---------------------|-------------|
+| `slackBotToken` | `<ROLE>_SLACK_BOT_TOKEN` | `slack` plugin |
+| `slackAppToken` | `<ROLE>_SLACK_APP_TOKEN` | `slack` plugin |
+| `linearApiKey` | `<ROLE>_LINEAR_API_KEY` | `openclaw-linear` plugin |
+| `linearWebhookSecret` | `<ROLE>_LINEAR_WEBHOOK_SECRET` | `openclaw-linear` plugin |
+| `githubToken` | `<ROLE>_GITHUB_TOKEN` | `gh` dep |
+
+For example, if the PM agent (role `pm`) has the Slack plugin, the expected env vars are `PM_SLACK_BOT_TOKEN` and `PM_SLACK_APP_TOKEN`.
+
+## Identity `requiredSecrets`
+
+Identities can declare additional secrets beyond what plugins and deps imply using the `requiredSecrets` field in `identity.yaml`:
+
+```yaml
+# identity.yaml
+plugins:
+  - slack              # implicitly → slackBotToken, slackAppToken
+deps:
+  - gh                 # implicitly → githubToken
+
+# Additional secrets not covered by plugins/deps
+requiredSecrets:
+  - notionApiKey
+  - customWebhookSecret
+```
+
+The camelCase key is converted to `SCREAMING_SNAKE_CASE` and prefixed with the agent's role. For example, `notionApiKey` on a `pm` agent becomes `PM_NOTION_API_KEY`.
+
+This is **additive** — secrets implied by plugins/deps are always included. `requiredSecrets` adds extras on top. If a key in `requiredSecrets` is already implied by a plugin/dep, it won't be duplicated.
+
+## `.env.example`
+
+The `.env.example` file is generated automatically by `clawup init`. It lists all required env var names with empty values, organized by scope:
+
+```bash
+# Clawup Secrets — copy to .env and fill in values
+# See clawup.yaml 'secrets' section for which keys map where
+
+# ── Required ─────────────────────────────────
+ANTHROPIC_API_KEY=
+TAILSCALE_AUTH_KEY=
+TAILNET_DNS_NAME=
+TAILSCALE_API_KEY=
+
+# ── Agent: Juno (pm) ──────────────────────
+PM_SLACK_BOT_TOKEN=
+PM_SLACK_APP_TOKEN=
+PM_NOTION_API_KEY=
+```
+
+## Using `--env-file`
+
+By default, `clawup init` looks for `.env` in the project root. Override with:
+
+```bash
+clawup init --env-file /path/to/my/.env
+```
+
+## Validation
+
+Clawup validates well-known secret formats during init:
+
+| Secret | Validation |
+|--------|-----------|
+| `anthropicApiKey` | Must start with `sk-ant-` |
+| `tailscaleAuthKey` | Must start with `tskey-auth-` |
+| `tailnetDnsName` | Must end with `.ts.net` |
+| `slackBotToken` | Must start with `xoxb-` |
+| `slackAppToken` | Must start with `xapp-` |
+| `linearApiKey` | Must start with `lin_api_` |
+| `githubToken` | Must start with `ghp_` or `github_pat_` |
+
+If a value from `.env` fails validation, a warning is shown but the value is still used.
+
+## Managing Secrets Post-Setup
+
+After initial setup, manage secrets without re-running init:
+
+```bash
+# Set or rotate a secret
+clawup secrets set braveApiKey BSA_xxx
+clawup secrets set slackBotToken xoxb-xxx --agent pm
+
+# List configured secrets (values redacted)
+clawup secrets list
+```
+
+Under the hood, this updates the encrypted Pulumi config. Run `clawup redeploy` to apply changes to running agents.
