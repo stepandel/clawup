@@ -3,9 +3,12 @@
  * Runs deployments asynchronously and updates status in the database.
  */
 
+import { createHash } from "crypto";
 import { prisma } from "./prisma";
 import { decrypt } from "./crypto";
 import YAML from "yaml";
+
+const FINGERPRINT_KEY = "clawup:projectFingerprint";
 
 /**
  * Run a Pulumi deployment asynchronously.
@@ -70,6 +73,22 @@ export async function runDeployment(deploymentId: string): Promise<void> {
       stackName: `${deployment.userId}-${deployment.stackName}`,
       workDir: process.cwd(),
     });
+
+    // Verify/stamp project fingerprint to detect stack collisions
+    const fingerprintSource = `${deployment.userId}:${deployment.stackName}`;
+    const expectedFingerprint = createHash("sha256").update(fingerprintSource).digest("hex").slice(0, 16);
+    try {
+      const stored = await stack.getConfig(FINGERPRINT_KEY);
+      if (stored && stored.value !== expectedFingerprint) {
+        throw new Error(
+          "Stack name collision detected! This Pulumi stack belongs to a different deployment."
+        );
+      }
+    } catch (err) {
+      // getConfig throws if the key doesn't exist — that's fine (legacy stack)
+      if (err instanceof Error && err.message.includes("collision")) throw err;
+    }
+    await stack.setConfig(FINGERPRINT_KEY, { value: expectedFingerprint });
 
     // Set config from manifest
     await stack.setConfig("stackName", { value: manifest.stackName });

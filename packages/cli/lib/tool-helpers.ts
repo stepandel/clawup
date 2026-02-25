@@ -6,6 +6,7 @@
  */
 
 import type { ExecAdapter } from "../adapters";
+import { FINGERPRINT_KEY, projectFingerprint } from "./pulumi";
 
 /**
  * Get a Pulumi config value via ExecAdapter.
@@ -13,6 +14,16 @@ import type { ExecAdapter } from "../adapters";
 export function getConfig(exec: ExecAdapter, key: string, cwd?: string): string | null {
   const result = exec.capture("pulumi", ["config", "get", key], cwd);
   return result.exitCode === 0 ? result.stdout.trim() : null;
+}
+
+/**
+ * Set a Pulumi config value via ExecAdapter.
+ */
+export function setConfig(exec: ExecAdapter, key: string, value: string, cwd?: string, secret?: boolean): boolean {
+  const args = ["config", "set", key, value];
+  if (secret) args.push("--secret");
+  const result = exec.capture("pulumi", args, cwd);
+  return result.exitCode === 0;
 }
 
 /**
@@ -28,4 +39,32 @@ export function getStackOutputs(exec: ExecAdapter, showSecrets: boolean = false,
   } catch {
     return null;
   }
+}
+
+/**
+ * Verify the current stack belongs to the given project.
+ * Returns an error message on collision, null if OK.
+ */
+export function verifyStackOwnership(exec: ExecAdapter, projectRoot: string, cwd?: string): string | null {
+  const stored = getConfig(exec, FINGERPRINT_KEY, cwd);
+  if (!stored) {
+    // Legacy stack — backfill and allow
+    stampStackFingerprint(exec, projectRoot, cwd);
+    return null;
+  }
+  const expected = projectFingerprint(projectRoot);
+  if (stored !== expected) {
+    return (
+      'Stack name collision detected! This Pulumi stack belongs to a different clawup project.\n' +
+      'Change the "stackName" in your clawup.yaml to a unique value, then run "clawup init" again.'
+    );
+  }
+  return null;
+}
+
+/**
+ * Stamp the project fingerprint into Pulumi config for the current stack.
+ */
+export function stampStackFingerprint(exec: ExecAdapter, projectRoot: string, cwd?: string): void {
+  setConfig(exec, FINGERPRINT_KEY, projectFingerprint(projectRoot), cwd);
 }

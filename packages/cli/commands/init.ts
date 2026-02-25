@@ -783,7 +783,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // Select/create stack (use org-qualified name if organization is set)
   const pulumiStack = qualifiedStackName(basicConfig.stackName, basicConfig.organization);
   s.start("Selecting Pulumi stack...");
-  const stackResult = selectOrCreateStack(pulumiStack, cwd);
+  const stackResult = selectOrCreateStack(pulumiStack, cwd, process.cwd());
   if (!stackResult.ok) {
     s.stop("Failed to select/create stack");
     if (stackResult.error) p.log.error(stackResult.error);
@@ -1323,7 +1323,7 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
   // Select/create stack
   const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
   s.start("Selecting Pulumi stack...");
-  const stackResult = selectOrCreateStack(pulumiStack, cwd);
+  const stackResult = selectOrCreateStack(pulumiStack, cwd, projectRoot);
   if (!stackResult.ok) {
     s.stop("Failed to select/create stack");
     if (stackResult.error) p.log.error(stackResult.error);

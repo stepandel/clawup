@@ -2,8 +2,50 @@
  * Pulumi CLI wrappers
  */
 
+import { createHash } from "crypto";
 import { capture, stream } from "./exec";
 import type { VoidResult } from "@clawup/core";
+
+/** Pulumi config key used to detect stack collisions across projects. */
+export const FINGERPRINT_KEY = "clawup:projectFingerprint";
+
+/**
+ * Compute a deterministic fingerprint for a project directory.
+ * SHA-256 of the absolute path, truncated to 16 hex chars.
+ */
+export function projectFingerprint(projectRoot: string): string {
+  return createHash("sha256").update(projectRoot).digest("hex").slice(0, 16);
+}
+
+/**
+ * Stamp the project fingerprint into Pulumi config for the current stack.
+ */
+function stampFingerprint(projectRoot: string, cwd?: string): void {
+  setConfig(FINGERPRINT_KEY, projectFingerprint(projectRoot), false, cwd);
+}
+
+/**
+ * Verify the stored fingerprint matches the current project.
+ * Returns ok:true if the fingerprint matches or is absent (legacy stack, which gets backfilled).
+ */
+function verifyFingerprint(projectRoot: string, cwd?: string): VoidResult {
+  const stored = getConfig(FINGERPRINT_KEY, cwd);
+  if (!stored) {
+    // Legacy stack — backfill and allow
+    stampFingerprint(projectRoot, cwd);
+    return { ok: true };
+  }
+  const expected = projectFingerprint(projectRoot);
+  if (stored !== expected) {
+    return {
+      ok: false,
+      error:
+        'Stack name collision detected! This Pulumi stack belongs to a different clawup project.\n' +
+        'Change the "stackName" in your clawup.yaml to a unique value, then run "clawup init" again.',
+    };
+  }
+  return { ok: true };
+}
 
 /**
  * Build the fully-qualified Pulumi stack name.
@@ -24,14 +66,25 @@ export function currentStack(cwd?: string): string | null {
 
 /**
  * Select a Pulumi stack (create if it doesn't exist).
+ * When projectRoot is provided, verifies/stamps a fingerprint to detect
+ * stack name collisions across different clawup projects.
  * Returns { ok, error } so callers can display the error message.
  */
-export function selectOrCreateStack(stackName: string, cwd?: string): VoidResult {
+export function selectOrCreateStack(stackName: string, cwd?: string, projectRoot?: string): VoidResult {
   const select = capture("pulumi", ["stack", "select", stackName], cwd);
-  if (select.exitCode === 0) return { ok: true };
+  if (select.exitCode === 0) {
+    if (projectRoot) {
+      const fp = verifyFingerprint(projectRoot, cwd);
+      if (!fp.ok) return fp;
+    }
+    return { ok: true };
+  }
 
   const init = capture("pulumi", ["stack", "init", stackName], cwd);
-  if (init.exitCode === 0) return { ok: true };
+  if (init.exitCode === 0) {
+    if (projectRoot) stampFingerprint(projectRoot, cwd);
+    return { ok: true };
+  }
 
   return { ok: false, error: init.stderr || select.stderr };
 }

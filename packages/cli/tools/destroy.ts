@@ -8,9 +8,10 @@ import type { RuntimeAdapter, ToolImplementation } from "../adapters";
 import { requireManifest, syncManifestToProject } from "../lib/config";
 import { cleanupTailscaleDevices } from "../lib/tailscale";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
-import { getConfig } from "../lib/tool-helpers";
+import { getConfig, verifyStackOwnership } from "../lib/tool-helpers";
 import { formatAgentList } from "../lib/ui";
 import { qualifiedStackName } from "../lib/pulumi";
+import { getProjectRoot } from "../lib/project";
 
 export interface DestroyOptions {
   /** Skip confirmation prompts (dangerous!) */
@@ -47,11 +48,18 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
 
   // Select/create stack (use org-qualified name if organization is set)
   const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const projectRoot = getProjectRoot();
   const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   if (selectResult.exitCode !== 0) {
     const initResult = exec.capture("pulumi", ["stack", "init", pulumiStack], cwd);
     if (initResult.exitCode !== 0) {
       ui.log.error(`Could not select Pulumi stack "${pulumiStack}".`);
+      process.exit(1);
+    }
+  } else {
+    const collisionError = verifyStackOwnership(exec, projectRoot, cwd);
+    if (collisionError) {
+      ui.log.error(collisionError);
       process.exit(1);
     }
   }

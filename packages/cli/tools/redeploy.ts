@@ -9,9 +9,10 @@ import type { RuntimeAdapter, ToolImplementation } from "../adapters";
 import { requireManifest, syncManifestToProject } from "../lib/config";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
-import { getConfig } from "../lib/tool-helpers";
+import { getConfig, verifyStackOwnership, stampStackFingerprint } from "../lib/tool-helpers";
 import { formatAgentList } from "../lib/ui";
 import { qualifiedStackName } from "../lib/pulumi";
+import { getProjectRoot } from "../lib/project";
 import pc from "picocolors";
 
 export interface RedeployOptions {
@@ -49,6 +50,7 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
 
   // Try to select existing stack (use org-qualified name if organization is set)
   const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const projectRoot = getProjectRoot();
   const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   const stackExists = selectResult.exitCode === 0;
 
@@ -59,6 +61,13 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     const initResult = exec.capture("pulumi", ["stack", "init", pulumiStack], cwd);
     if (initResult.exitCode !== 0) {
       ui.log.error(initResult.stderr || `Could not create Pulumi stack "${pulumiStack}".`);
+      process.exit(1);
+    }
+    stampStackFingerprint(exec, projectRoot, cwd);
+  } else {
+    const collisionError = verifyStackOwnership(exec, projectRoot, cwd);
+    if (collisionError) {
+      ui.log.error(collisionError);
       process.exit(1);
     }
   }

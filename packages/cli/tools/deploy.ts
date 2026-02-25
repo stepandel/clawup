@@ -9,9 +9,10 @@ import { requireManifest, syncManifestToProject } from "../lib/config";
 import { COST_ESTIMATES, HETZNER_COST_ESTIMATES } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
-import { getConfig } from "../lib/tool-helpers";
+import { getConfig, verifyStackOwnership, stampStackFingerprint } from "../lib/tool-helpers";
 import { formatAgentList, formatCost } from "../lib/ui";
 import { qualifiedStackName } from "../lib/pulumi";
+import { getProjectRoot } from "../lib/project";
 import pc from "picocolors";
 
 export interface DeployOptions {
@@ -49,12 +50,20 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
 
   // Select/create stack (use org-qualified name if organization is set)
   const pulumiStack = qualifiedStackName(manifest.stackName, manifest.organization);
+  const projectRoot = getProjectRoot();
   const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   if (selectResult.exitCode !== 0) {
     const initResult = exec.capture("pulumi", ["stack", "init", pulumiStack], cwd);
     if (initResult.exitCode !== 0) {
       ui.log.error(initResult.stderr || selectResult.stderr);
       ui.log.error(`Could not select Pulumi stack "${pulumiStack}".`);
+      process.exit(1);
+    }
+    stampStackFingerprint(exec, projectRoot, cwd);
+  } else {
+    const collisionError = verifyStackOwnership(exec, projectRoot, cwd);
+    if (collisionError) {
+      ui.log.error(collisionError);
       process.exit(1);
     }
   }
