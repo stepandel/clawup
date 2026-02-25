@@ -43,10 +43,9 @@ program
 
 program
   .command("init")
-  .description("Configure infrastructure and agents, or refresh existing config from identity changes")
-  .option("-y, --yes", "Skip confirmation prompts")
-  .action(async (opts) => {
-    await initCommand(opts);
+  .description("Generate clawup.yaml scaffold, or refresh existing config from identity changes")
+  .action(async () => {
+    await initCommand();
   });
 
 program
