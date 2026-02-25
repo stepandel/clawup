@@ -1,36 +1,28 @@
 ---
 title: "init"
-description: "Interactive setup wizard for configuring your agent team"
+description: "Generate a clawup.yaml scaffold for your agent deployment"
 ---
 
-Interactive setup wizard that configures your cloud provider, instance type, owner info, and agent team. Writes `clawup.yaml` and `.env.example` — no secrets are prompted during init.
+Generates a `clawup.yaml` manifest and `.env.example` in the current directory. Completely non-interactive — edit the YAML by hand to configure your deployment.
 
 ## Usage
 
 ```bash
-clawup init [options]
+clawup init
 ```
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `-y, --yes` | Skip confirmation prompts |
 
 ## Two Modes
 
 ### Fresh Init (no `clawup.yaml`)
 
-Full interactive wizard that walks you through all configuration:
+Scaffolds a new manifest with all built-in agents and sensible defaults:
 
-1. **Stack Name** — unique deployment name (e.g., `dev`, `prod`)
-2. **Cloud Provider** — AWS or Hetzner
-3. **Region** — deployment region
-4. **Instance Type** — server size (affects cost)
-5. **Owner Configuration** — name, timezone, working hours
-6. **Agent Selection** — built-in identities, Git URL, local path, or mix
-7. **Template Variables** — custom values used by identity workspace files
-8. **Review & Confirm** — full config summary with cost estimates
+- **Provider**: AWS
+- **Region**: us-east-1
+- **Instance type**: t3.medium
+- **Agents**: Juno (PM), Titus (Engineer), Scout (QA)
+
+The generated `clawup.yaml` includes `${env:VAR}` secret references, inline plugin config from identities, and per-agent secrets. Edit the values directly in the YAML file to match your setup.
 
 ### Repair Mode (existing `clawup.yaml`)
 
@@ -39,7 +31,7 @@ When `clawup.yaml` already exists, init enters **repair mode** — a non-interac
 1. Re-fetches all agent identities (picks up upstream changes)
 2. Updates the secrets section with any new plugins, deps, or `requiredSecrets`
 3. Refreshes inline plugin config with latest `pluginDefaults` from identities
-4. Prompts only for **new** template variables not already in the manifest
+4. Warns about any missing template variables
 5. Regenerates `.env.example` to reflect current requirements
 
 Existing manifest values (stack name, provider, region, agents, etc.) are preserved. This is useful after updating an identity repo or adding new plugins to an identity.
@@ -47,7 +39,7 @@ Existing manifest values (stack name, provider, region, agents, etc.) are preser
 ## Examples
 
 ```bash
-# First-time setup
+# First-time setup — generates scaffold
 clawup init
 
 # Refresh after identity changes
@@ -66,8 +58,9 @@ The `.clawup/` directory and `.env` are added to `.gitignore` automatically.
 
 After `init` completes:
 
-1. Copy `.env.example` to `.env` and fill in your secrets
-2. Run [`clawup setup`](/cli/setup) to validate secrets and configure Pulumi
-3. Run [`clawup deploy`](/cli/deploy) to deploy your agents
+1. Edit `clawup.yaml` — set your provider, region, owner info, and agents
+2. Copy `.env.example` to `.env` and fill in your secrets
+3. Run [`clawup setup`](/cli/setup) to validate secrets and configure Pulumi
+4. Run [`clawup deploy`](/cli/deploy) to deploy your agents
 
 See [Environment Variables](/configuration/environment) for full details on the `${env:VAR}` reference system.

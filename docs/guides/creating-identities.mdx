@@ -292,7 +292,7 @@ Workspace files support `{{VARIABLE}}` substitution.
 
 1. Declare variables in `templateVars` in `identity.yaml`
 2. Use `{{VARIABLE_NAME}}` in any workspace file
-3. During `clawup init`, the wizard prompts for values not auto-filled from owner info
+3. During `clawup init`, any template variables not auto-filled from owner info must be added to `templateVars` in `clawup.yaml`
 4. Values are substituted before files are injected into the agent
 
 ### Standard Variables

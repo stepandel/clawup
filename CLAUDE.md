@@ -117,7 +117,7 @@ cd packages/cli && pnpm watch
 
 | File | Purpose |
 |------|---------|
-| `packages/cli/commands/init.ts` | Interactive setup wizard (largest command) |
+| `packages/cli/commands/init.ts` | Non-interactive scaffold generator + repair mode |
 | `packages/cli/lib/config.ts` | Load/save YAML manifests |
 | `packages/core/src/constants.ts` | Built-in identities, regions, instance types, key instructions |
 | `packages/core/src/schemas/` | Zod schemas (source of truth for all types) |

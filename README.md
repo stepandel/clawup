@@ -144,20 +144,13 @@ See the [`examples/identity/`](./examples/identity/) directory for a complete, m
 npm install -g clawup
 ```
 
-### 2. Run the Setup Wizard
+### 2. Generate Config
 
 ```bash
 clawup init
 ```
 
-The wizard walks you through:
-- **Prerequisites check** — verifies Pulumi, Node.js, cloud provider CLI, and Tailscale
-- **Cloud provider** — AWS or Hetzner Cloud
-- **Region & instance type** — with cost estimates shown inline
-- **Agent selection** — pick from built-in identities, point to a Git repo or local directory, or mix both
-- **Review & confirm** — see full config and estimated monthly cost
-
-This generates a `clawup.yaml` manifest and `.env.example` in your project directory.
+Scaffolds a `clawup.yaml` manifest and `.env.example` with sensible defaults (AWS, us-east-1, all built-in agents). Edit `clawup.yaml` by hand to customize your provider, region, instance type, owner info, and agents.
 
 ### 3. Fill in Secrets
 
@@ -200,7 +193,7 @@ Run `clawup --help` for the full list.
 
 | Command | Description |
 |---------|-------------|
-| `clawup init` | Interactive wizard — configure infrastructure and agents |
+| `clawup init` | Generate clawup.yaml scaffold (or refresh from identity changes) |
 | `clawup setup` | Validate secrets from `.env` and configure Pulumi |
 | `clawup deploy` | Deploy agents (`pulumi up` under the hood) |
 | `clawup deploy -y` | Deploy without confirmation prompt |
@@ -262,7 +255,7 @@ All agents share a single VPC/network for cost optimization.
 
 ## Dependencies
 
-You need the following installed on your **local machine** before running `clawup init`. The init wizard checks for these and will tell you what's missing.
+You need the following installed on your **local machine** before running `clawup init`.
 
 ### Required (all providers)
 
@@ -402,7 +395,7 @@ The `secrets` section uses `${env:VAR}` references — actual values are loaded 
 
 ### Pulumi Config
 
-Secrets are stored encrypted in Pulumi config, set automatically by the init wizard. You can also manage them directly:
+Secrets are stored encrypted in Pulumi config, set automatically by `clawup setup`. You can also manage them directly:
 
 ```bash
 pulumi config set --secret anthropicApiKey sk-ant-xxxxx

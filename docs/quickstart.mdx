@@ -30,19 +30,19 @@ Run `clawup validate` after deployment to verify all agents are healthy.
 clawup init
 ```
 
-The interactive wizard walks you through:
+Generates a `clawup.yaml` manifest and `.env.example` with sensible defaults (AWS, us-east-1, all built-in agents).
 
-1. **Stack name** — A unique name for your deployment (e.g., `dev`, `prod`)
-2. **Cloud provider** — AWS or Hetzner
-3. **Region** — Where to deploy your servers
-4. **Instance type** — Server size (affects cost)
-5. **Owner info** — Your name, timezone, working hours
-6. **Agent selection** — Pick from built-in identities, point to a Git repo or local directory, or mix both
-7. **Review** — Confirm config and estimated costs
+## 4. Edit Your Config
 
-This generates a `clawup.yaml` manifest and `.env.example` in your project directory.
+Open `clawup.yaml` and customize:
+- **stackName** — unique deployment name (e.g., `dev`, `prod`)
+- **provider** — `aws` or `hetzner`
+- **region** — where to deploy
+- **instanceType** — server size
+- **ownerName**, **timezone**, **workingHours** — your info
+- **agents** — add, remove, or modify agents
 
-## 4. Fill in Secrets
+## 5. Fill in Secrets
 
 ```bash
 cp .env.example .env
@@ -50,7 +50,7 @@ cp .env.example .env
 
 Open `.env` and fill in your API keys (Anthropic, Tailscale, etc.).
 
-## 5. Setup
+## 6. Setup
 
 ```bash
 clawup setup
@@ -58,7 +58,7 @@ clawup setup
 
 Validates all secrets are present, fetches Linear user UUIDs (if needed), and configures the Pulumi stack. If any secrets are missing, it prints exactly what's needed.
 
-## 6. Deploy
+## 7. Deploy
 
 ```bash
 clawup deploy
@@ -70,7 +70,7 @@ Pulumi provisions your agents: dedicated servers, persistent storage, networking
 First deployment takes 3-5 minutes. Subsequent deployments are incremental.
 </Note>
 
-## 7. Connect
+## 8. Connect
 
 ```bash
 # Check status

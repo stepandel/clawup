@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/clawup)](https://www.npmjs.com/package/clawup)
 
-Interactive command-line tool for deploying and managing your fleet of [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud**.
+Command-line tool for deploying and managing your fleet of [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud**.
 
 ## Installation
 
@@ -18,16 +18,14 @@ npx clawup init
 
 ### `clawup init`
 
-Interactive setup wizard for infrastructure and agent team configuration.
+Generates a `clawup.yaml` manifest and `.env.example` in the current directory. Non-interactive — edit the YAML by hand to configure your deployment.
 
-**Fresh init** (no `clawup.yaml`): full interactive wizard — prerequisites, cloud provider, region, instance type, owner info, agent selection, summary & confirmation.
+**Fresh init** (no `clawup.yaml`): scaffolds a new manifest with all built-in agents (Juno, Titus, Scout) and sensible defaults (AWS, us-east-1, t3.medium).
 
-**Repair mode** (existing `clawup.yaml`): re-fetches identities, updates secrets/plugins/deps from latest identity data, prompts only for new template variables, regenerates `.env.example`. Existing manifest values are preserved.
-
-Outputs a `clawup.yaml` manifest and `.env.example` in the current directory. No secrets are prompted — fill them in `.env` and run `clawup setup`.
+**Repair mode** (existing `clawup.yaml`): re-fetches identities, updates secrets/plugins/deps from latest identity data, regenerates `.env.example`. Existing manifest values are preserved.
 
 ```bash
-clawup init              # Interactive wizard (or repair if clawup.yaml exists)
+clawup init              # Generate scaffold (or refresh if clawup.yaml exists)
 ```
 
 ### `clawup setup`
