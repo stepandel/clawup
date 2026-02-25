@@ -45,6 +45,7 @@ program
   .description("Interactive setup wizard — configure stack, secrets, and agents")
   .option("--deploy", "Deploy immediately after init")
   .option("-y, --yes", "Skip confirmation prompt (for deploy)")
+  .option("--env-file <path>", "Load secrets from .env file")
   .action(async (opts) => {
     await initCommand(opts);
   });

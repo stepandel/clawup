@@ -28,6 +28,8 @@ export const AgentDefinitionSchema = z.object({
   envVars: z.record(z.string(), z.string()).optional(),
   /** Inline plugin config (non-secret values only) */
   plugins: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+  /** Per-agent secret references (e.g., `${env:PM_SLACK_BOT_TOKEN}`) */
+  secrets: z.record(z.string(), z.string()).optional(),
 });
 
 /** Schema for per-plugin configuration file */
@@ -52,5 +54,7 @@ export const ClawupManifestSchema = z.object({
   userNotes: z.string().optional(),
   /** Generic template variables (e.g., LINEAR_TEAM, GITHUB_REPO) */
   templateVars: z.record(z.string(), z.string()).optional(),
+  /** Global secret references (e.g., `${env:ANTHROPIC_API_KEY}`) */
+  secrets: z.record(z.string(), z.string()).optional(),
   agents: z.array(AgentDefinitionSchema).min(1, "At least one agent is required"),
 });

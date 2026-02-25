@@ -37,10 +37,20 @@ import { selectOrCreateStack, setConfig, qualifiedStackName } from "../lib/pulum
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, handleCancel, exitWithError, formatCost, formatAgentList } from "../lib/ui";
 import { findProjectRoot } from "../lib/project";
+import {
+  buildEnvDict,
+  buildManifestSecrets,
+  generateEnvExample,
+  loadEnvSecrets,
+  VALIDATORS,
+  WELL_KNOWN_ENV_VARS,
+  agentEnvVarName,
+} from "../lib/env";
 
 interface InitOptions {
   deploy?: boolean;
   yes?: boolean;
+  envFile?: string;
 }
 
 /** Fetched identity data stored alongside the agent definition */
@@ -180,81 +190,126 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // -------------------------------------------------------------------------
   // Step 4: Secrets (Anthropic, Tailscale, Hetzner)
   // -------------------------------------------------------------------------
-  p.log.step("Configure Anthropic API key");
 
-  p.note(
-    KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.anthropicApiKey.title
-  );
+  // Load .env file if present
+  const envFilePath = opts.envFile ?? path.join(process.cwd(), ".env");
+  const envDict = buildEnvDict(envFilePath);
 
-  const anthropicApiKey = await p.text({
-    message: "Anthropic API key",
-    placeholder: `${MODEL_PROVIDERS.anthropic.keyPrefix}...`,
-    validate: (val) => {
-      if (!val) return "API key is required";
-      if (!val.startsWith(MODEL_PROVIDERS.anthropic.keyPrefix)) {
-        return `Must start with ${MODEL_PROVIDERS.anthropic.keyPrefix}`;
+  // Helper: check well-known env var, log & validate if found
+  function fromEnv(secretKey: string): string | undefined {
+    const envVarName = WELL_KNOWN_ENV_VARS[secretKey];
+    if (!envVarName) return undefined;
+    const val = envDict[envVarName];
+    if (!val) return undefined;
+    const validator = VALIDATORS[secretKey];
+    if (validator) {
+      const warning = validator(val);
+      if (warning) {
+        p.log.warn(`${envVarName}: ${warning} (using value anyway)`);
       }
-    },
-  });
-  handleCancel(anthropicApiKey);
+    }
+    p.log.success(`${secretKey} (from ${envVarName})`);
+    return val;
+  }
+
+  const envAnthropicApiKey = fromEnv("anthropicApiKey");
+  let anthropicApiKey: string | symbol;
+  if (envAnthropicApiKey) {
+    anthropicApiKey = envAnthropicApiKey;
+  } else {
+    p.log.step("Configure Anthropic API key");
+    p.note(
+      KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
+      KEY_INSTRUCTIONS.anthropicApiKey.title
+    );
+    anthropicApiKey = await p.text({
+      message: "Anthropic API key",
+      placeholder: `${MODEL_PROVIDERS.anthropic.keyPrefix}...`,
+      validate: (val) => {
+        if (!val) return "API key is required";
+        if (!val.startsWith(MODEL_PROVIDERS.anthropic.keyPrefix)) {
+          return `Must start with ${MODEL_PROVIDERS.anthropic.keyPrefix}`;
+        }
+      },
+    });
+    handleCancel(anthropicApiKey);
+  }
 
   p.log.step("Configure infrastructure secrets");
 
-  p.note(
-    KEY_INSTRUCTIONS.tailscaleAuthKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.tailscaleAuthKey.title
-  );
+  const envTailscaleAuthKey = fromEnv("tailscaleAuthKey");
+  let tailscaleAuthKey: string | symbol;
+  if (envTailscaleAuthKey) {
+    tailscaleAuthKey = envTailscaleAuthKey;
+  } else {
+    p.note(
+      KEY_INSTRUCTIONS.tailscaleAuthKey.steps.join("\n"),
+      KEY_INSTRUCTIONS.tailscaleAuthKey.title
+    );
+    tailscaleAuthKey = await p.password({
+      message: "Tailscale auth key",
+      validate: (val) => {
+        if (!val.startsWith("tskey-auth-")) return "Must start with tskey-auth-";
+      },
+    });
+    handleCancel(tailscaleAuthKey);
+  }
 
-  const tailscaleAuthKey = await p.password({
-    message: "Tailscale auth key",
-    validate: (val) => {
-      if (!val.startsWith("tskey-auth-")) return "Must start with tskey-auth-";
-    },
-  });
-  handleCancel(tailscaleAuthKey);
+  const envTailnetDnsName = fromEnv("tailnetDnsName");
+  let tailnetDnsName: string | symbol;
+  if (envTailnetDnsName) {
+    tailnetDnsName = envTailnetDnsName;
+  } else {
+    p.note(
+      KEY_INSTRUCTIONS.tailnetDnsName.steps.join("\n"),
+      KEY_INSTRUCTIONS.tailnetDnsName.title
+    );
+    tailnetDnsName = await p.text({
+      message: "Tailnet DNS name",
+      placeholder: "my-tailnet.ts.net",
+      validate: (val) => {
+        if (!val.endsWith(".ts.net")) return "Must end with .ts.net";
+      },
+    });
+    handleCancel(tailnetDnsName);
+  }
 
-  p.note(
-    KEY_INSTRUCTIONS.tailnetDnsName.steps.join("\n"),
-    KEY_INSTRUCTIONS.tailnetDnsName.title
-  );
-
-  const tailnetDnsName = await p.text({
-    message: "Tailnet DNS name",
-    placeholder: "my-tailnet.ts.net",
-    validate: (val) => {
-      if (!val.endsWith(".ts.net")) return "Must end with .ts.net";
-    },
-  });
-  handleCancel(tailnetDnsName);
-
-  p.note(
-    KEY_INSTRUCTIONS.tailscaleApiKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.tailscaleApiKey.title
-  );
-
-  const tailscaleApiKey = await p.text({
-    message: "Tailscale API key (press Enter to skip)",
-    placeholder: "tskey-api-... (optional)",
-    defaultValue: "",
-  });
-  handleCancel(tailscaleApiKey);
+  const envTailscaleApiKey = fromEnv("tailscaleApiKey");
+  let tailscaleApiKey: string | symbol;
+  if (envTailscaleApiKey) {
+    tailscaleApiKey = envTailscaleApiKey;
+  } else {
+    p.note(
+      KEY_INSTRUCTIONS.tailscaleApiKey.steps.join("\n"),
+      KEY_INSTRUCTIONS.tailscaleApiKey.title
+    );
+    tailscaleApiKey = await p.text({
+      message: "Tailscale API key (press Enter to skip)",
+      placeholder: "tskey-api-... (optional)",
+      defaultValue: "",
+    });
+    handleCancel(tailscaleApiKey);
+  }
 
   let hcloudToken: string | undefined;
   if (provider === "hetzner") {
-    p.note(
-      KEY_INSTRUCTIONS.hcloudToken.steps.join("\n"),
-      KEY_INSTRUCTIONS.hcloudToken.title
-    );
-
-    const token = await p.password({
-      message: "Hetzner Cloud API token",
-      validate: (val) => {
-        if (!val) return "API token is required for Hetzner deployments";
-      },
-    });
-    handleCancel(token);
-    hcloudToken = token as string;
+    const envHcloudToken = fromEnv("hcloudToken");
+    if (envHcloudToken) {
+      hcloudToken = envHcloudToken;
+    } else {
+      p.note(
+        KEY_INSTRUCTIONS.hcloudToken.steps.join("\n"),
+        KEY_INSTRUCTIONS.hcloudToken.title
+      );
+      const token = await p.password({
+        message: "Hetzner Cloud API token",
+        validate: (val) => {
+          if (!val) return "API token is required for Hetzner deployments";
+        },
+      });
+      handleCancel(token);
+      hcloudToken = token as string;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -453,16 +508,47 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     integrationCredentials[agent.role] = {};
   }
 
+  // Helper: check per-agent env var from well-known name
+  function fromAgentEnv(role: string, suffix: string, validatorKey?: string): string | undefined {
+    const envVarName = agentEnvVarName(role, suffix);
+    const val = envDict[envVarName];
+    if (!val) return undefined;
+    if (validatorKey) {
+      const validator = VALIDATORS[validatorKey];
+      if (validator) {
+        const warning = validator(val);
+        if (warning) {
+          p.log.warn(`${envVarName}: ${warning} (using value anyway)`);
+        }
+      }
+    }
+    p.log.success(`${validatorKey ?? suffix} for ${role} (from ${envVarName})`);
+    return val;
+  }
+
   // Slack credentials — only if any identity has the slack plugin
   const slackCredentials: Record<string, { botToken: string; appToken: string }> = {};
   if (allPluginNames.has("slack")) {
-    p.note(
-      KEY_INSTRUCTIONS.slackCredentials.steps.join("\n"),
-      KEY_INSTRUCTIONS.slackCredentials.title
-    );
+    let slackInstructionsShown = false;
 
     for (const fi of fetchedIdentities) {
       if (!agentPlugins.get(fi.agent.name)?.has("slack")) continue;
+
+      const envBotToken = fromAgentEnv(fi.agent.role, "SLACK_BOT_TOKEN", "slackBotToken");
+      const envAppToken = fromAgentEnv(fi.agent.role, "SLACK_APP_TOKEN", "slackAppToken");
+
+      if (envBotToken && envAppToken) {
+        slackCredentials[fi.agent.role] = { botToken: envBotToken, appToken: envAppToken };
+        continue;
+      }
+
+      if (!slackInstructionsShown) {
+        p.note(
+          KEY_INSTRUCTIONS.slackCredentials.steps.join("\n"),
+          KEY_INSTRUCTIONS.slackCredentials.title
+        );
+        slackInstructionsShown = true;
+      }
 
       const slackManifest = slackAppManifest(fi.agent.displayName);
       try {
@@ -476,50 +562,71 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
         console.log(slackManifest);
       }
 
-      const botToken = await p.password({
-        message: `Slack Bot Token for ${fi.agent.displayName} (${fi.agent.role})`,
-        validate: (val) => {
-          if (!val.startsWith("xoxb-")) return "Must start with xoxb-";
-        },
-      });
-      handleCancel(botToken);
+      let botToken: string;
+      if (envBotToken) {
+        botToken = envBotToken;
+      } else {
+        const input = await p.password({
+          message: `Slack Bot Token for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val.startsWith("xoxb-")) return "Must start with xoxb-";
+          },
+        });
+        handleCancel(input);
+        botToken = input as string;
+      }
 
-      const appToken = await p.password({
-        message: `Slack App Token for ${fi.agent.displayName} (${fi.agent.role})`,
-        validate: (val) => {
-          if (!val.startsWith("xapp-")) return "Must start with xapp-";
-        },
-      });
-      handleCancel(appToken);
+      let appToken: string;
+      if (envAppToken) {
+        appToken = envAppToken;
+      } else {
+        const input = await p.password({
+          message: `Slack App Token for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val.startsWith("xapp-")) return "Must start with xapp-";
+          },
+        });
+        handleCancel(input);
+        appToken = input as string;
+      }
 
-      slackCredentials[fi.agent.role] = {
-        botToken: botToken as string,
-        appToken: appToken as string,
-      };
+      slackCredentials[fi.agent.role] = { botToken, appToken };
     }
   }
 
   // Linear credentials — only if any identity has the openclaw-linear plugin
   if (allPluginNames.has("openclaw-linear")) {
-    p.note(
-      KEY_INSTRUCTIONS.linearApiKey.steps.join("\n"),
-      KEY_INSTRUCTIONS.linearApiKey.title
-    );
-
     const linearAgents = fetchedIdentities.filter(
       (fi) => agentPlugins.get(fi.agent.name)?.has("openclaw-linear")
     );
 
-    for (const fi of linearAgents) {
-      const linearKey = await p.password({
-        message: `Linear API key for ${fi.agent.displayName} (${fi.agent.role})`,
-        validate: (val) => {
-          if (!val.startsWith("lin_api_")) return "Must start with lin_api_";
-        },
-      });
-      handleCancel(linearKey);
+    let linearInstructionsShown = false;
 
-      integrationCredentials[fi.agent.role].linearApiKey = linearKey as string;
+    for (const fi of linearAgents) {
+      const envLinearKey = fromAgentEnv(fi.agent.role, "LINEAR_API_KEY", "linearApiKey");
+
+      let linearKeyValue: string;
+      if (envLinearKey) {
+        linearKeyValue = envLinearKey;
+      } else {
+        if (!linearInstructionsShown) {
+          p.note(
+            KEY_INSTRUCTIONS.linearApiKey.steps.join("\n"),
+            KEY_INSTRUCTIONS.linearApiKey.title
+          );
+          linearInstructionsShown = true;
+        }
+        const linearKey = await p.password({
+          message: `Linear API key for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val.startsWith("lin_api_")) return "Must start with lin_api_";
+          },
+        });
+        handleCancel(linearKey);
+        linearKeyValue = linearKey as string;
+      }
+
+      integrationCredentials[fi.agent.role].linearApiKey = linearKeyValue;
 
       // Auto-fetch user UUID from Linear API
       const s = p.spinner();
@@ -529,7 +636,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: linearKey as string,
+            Authorization: linearKeyValue,
           },
           body: JSON.stringify({ query: "{ viewer { id } }" }),
         });
@@ -557,18 +664,30 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     }
 
     // Linear webhook signing secrets
-    p.note(
-      [
-        "Create a webhook in Linear for each agent:",
-        "1. Go to Settings → API → Webhooks → \"New webhook\"",
-        "2. Paste the webhook URL shown below for each agent",
-        "3. Select events to receive (e.g., Issues, Comments)",
-        "4. Copy the \"Signing secret\" shown after creating the webhook",
-      ].join("\n"),
-      "Linear Webhook Setup"
-    );
+    let webhookInstructionsShown = false;
 
     for (const fi of linearAgents) {
+      const envWebhookSecret = fromAgentEnv(fi.agent.role, "LINEAR_WEBHOOK_SECRET");
+
+      if (envWebhookSecret) {
+        integrationCredentials[fi.agent.role].linearWebhookSecret = envWebhookSecret;
+        continue;
+      }
+
+      if (!webhookInstructionsShown) {
+        p.note(
+          [
+            "Create a webhook in Linear for each agent:",
+            "1. Go to Settings → API → Webhooks → \"New webhook\"",
+            "2. Paste the webhook URL shown below for each agent",
+            "3. Select events to receive (e.g., Issues, Comments)",
+            "4. Copy the \"Signing secret\" shown after creating the webhook",
+          ].join("\n"),
+          "Linear Webhook Setup"
+        );
+        webhookInstructionsShown = true;
+      }
+
       const webhookUrl = `https://${tailscaleHostname(basicConfig.stackName, fi.agent.name)}.${tailnetDnsName as string}/hooks/linear`;
 
       p.log.info(`${fi.agent.displayName} (${fi.agent.role}): ${webhookUrl}`);
@@ -587,13 +706,24 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
 
   // GitHub token — only if any identity has the gh dep
   if (allDepNames.has("gh")) {
-    p.note(
-      KEY_INSTRUCTIONS.githubToken.steps.join("\n"),
-      KEY_INSTRUCTIONS.githubToken.title
-    );
+    let ghInstructionsShown = false;
 
     for (const fi of fetchedIdentities) {
       if (!agentDeps.get(fi.agent.name)?.has("gh")) continue;
+
+      const envGithubToken = fromAgentEnv(fi.agent.role, "GITHUB_TOKEN", "githubToken");
+      if (envGithubToken) {
+        integrationCredentials[fi.agent.role].githubToken = envGithubToken;
+        continue;
+      }
+
+      if (!ghInstructionsShown) {
+        p.note(
+          KEY_INSTRUCTIONS.githubToken.steps.join("\n"),
+          KEY_INSTRUCTIONS.githubToken.title
+        );
+        ghInstructionsShown = true;
+      }
 
       const githubKey = await p.password({
         message: `GitHub token for ${fi.agent.displayName} (${fi.agent.role})`,
@@ -612,19 +742,24 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // Brave Search API key — only if any identity has the brave-search dep (global, once)
   let braveApiKey: string | undefined;
   if (allDepNames.has("brave-search")) {
-    p.note(
-      KEY_INSTRUCTIONS.braveApiKey.steps.join("\n"),
-      KEY_INSTRUCTIONS.braveApiKey.title
-    );
+    const envBraveKey = fromEnv("braveApiKey");
+    if (envBraveKey) {
+      braveApiKey = envBraveKey;
+    } else {
+      p.note(
+        KEY_INSTRUCTIONS.braveApiKey.steps.join("\n"),
+        KEY_INSTRUCTIONS.braveApiKey.title
+      );
 
-    const braveKey = await p.password({
-      message: "Brave Search API key",
-      validate: (val) => {
-        if (!val) return "API key is required";
-      },
-    });
-    handleCancel(braveKey);
-    braveApiKey = braveKey as string;
+      const braveKey = await p.password({
+        message: "Brave Search API key",
+        validate: (val) => {
+          if (!val) return "API key is required";
+        },
+      });
+      handleCancel(braveKey);
+      braveApiKey = braveKey as string;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -708,6 +843,24 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     }
   }
 
+  // Build secrets section for the manifest
+  const manifestSecrets = buildManifestSecrets({
+    provider: basicConfig.provider,
+    agents: agents.map((a) => ({ name: a.name, role: a.role, displayName: a.displayName })),
+    allPluginNames,
+    allDepNames,
+    agentPlugins,
+    agentDeps,
+  });
+
+  // Apply per-agent secrets to agent definitions
+  for (const agent of agents) {
+    const perAgentSec = manifestSecrets.perAgent[agent.name];
+    if (perAgentSec && Object.keys(perAgentSec).length > 0) {
+      agent.secrets = perAgentSec;
+    }
+  }
+
   const manifest: ClawupManifest = {
     stackName: configName,
     organization: basicConfig.organization,
@@ -719,6 +872,7 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     workingHours: basicConfig.workingHours,
     userNotes: basicConfig.userNotes,
     templateVars: Object.keys(manifestTemplateVars).length > 0 ? manifestTemplateVars : undefined,
+    secrets: manifestSecrets.global,
     agents,
   };
 
@@ -756,6 +910,14 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // Write manifest to CWD (project root)
   const manifestPath = path.join(process.cwd(), MANIFEST_FILE);
   fs.writeFileSync(manifestPath, YAML.stringify(manifest), "utf-8");
+
+  // Generate .env.example alongside the manifest
+  const envExampleContent = generateEnvExample({
+    globalSecrets: manifestSecrets.global,
+    agents: agents.map((a) => ({ name: a.name, displayName: a.displayName, role: a.role })),
+    perAgentSecrets: manifestSecrets.perAgent,
+  });
+  fs.writeFileSync(path.join(process.cwd(), ".env.example"), envExampleContent, "utf-8");
   s.stop("Config saved");
 
   // Now ensureWorkspace() will find clawup.yaml → use .clawup/ as workspace
@@ -768,16 +930,17 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   s.stop("Workspace ready");
   const cwd = getWorkspaceDir();
 
-  // Ensure .clawup/ is in .gitignore
+  // Ensure .clawup/ and .env are in .gitignore
   const gitignorePath = path.join(process.cwd(), ".gitignore");
-  const clawupIgnoreEntry = ".clawup/";
+  const ignoreEntries = [".clawup/", ".env"];
   if (fs.existsSync(gitignorePath)) {
     const existing = fs.readFileSync(gitignorePath, "utf-8");
-    if (!existing.includes(clawupIgnoreEntry)) {
-      fs.appendFileSync(gitignorePath, `\n# clawup local state\n${clawupIgnoreEntry}\n`);
+    const toAdd = ignoreEntries.filter((entry) => !existing.includes(entry));
+    if (toAdd.length > 0) {
+      fs.appendFileSync(gitignorePath, `\n# clawup local state\n${toAdd.join("\n")}\n`);
     }
   } else {
-    fs.writeFileSync(gitignorePath, `# clawup local state\n${clawupIgnoreEntry}\n`, "utf-8");
+    fs.writeFileSync(gitignorePath, `# clawup local state\n${ignoreEntries.join("\n")}\n`, "utf-8");
   }
 
   // Select/create stack (use org-qualified name if organization is set)
@@ -969,86 +1132,150 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
   }
 
   // ---------------------------------------------------------------------------
+  // Load .env file and resolve manifest secrets
+  // ---------------------------------------------------------------------------
+  const envFilePath = opts.envFile ?? path.join(projectRoot, ".env");
+  const envDict = buildEnvDict(envFilePath);
+
+  // Resolve secrets from manifest's secrets section (if present)
+  const resolvedSecrets = loadEnvSecrets(manifest.secrets, agents, envDict);
+
+  // Helper: get a resolved global secret or fall back to well-known env var
+  function resolvedGlobal(key: string): string | undefined {
+    if (resolvedSecrets.global[key]) return resolvedSecrets.global[key];
+    // Fall back to well-known env var names for manifests without secrets section
+    const envVarName = WELL_KNOWN_ENV_VARS[key];
+    return envVarName ? envDict[envVarName] : undefined;
+  }
+
+  // Helper: get a resolved per-agent secret or fall back to well-known env var
+  function resolvedAgent(agentName: string, role: string, key: string, suffix: string): string | undefined {
+    const perAgent = resolvedSecrets.perAgent[agentName];
+    if (perAgent?.[key]) return perAgent[key];
+    // Fall back to well-known env var: <ROLE>_<SUFFIX>
+    return envDict[agentEnvVarName(role, suffix)];
+  }
+
+  // Helper: validate and log an env-resolved value
+  function validateAndLog(key: string, val: string, label: string): void {
+    const validator = VALIDATORS[key];
+    if (validator) {
+      const warning = validator(val);
+      if (warning) {
+        p.log.warn(`${label}: ${warning} (using value anyway)`);
+      }
+    }
+    p.log.success(`${key} (from env: ${label})`);
+  }
+
+  // ---------------------------------------------------------------------------
   // Secrets: Anthropic API key
   // ---------------------------------------------------------------------------
-  p.log.step("Configure Anthropic API key");
-
-  p.note(
-    KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.anthropicApiKey.title
-  );
-
-  const anthropicApiKey = await p.text({
-    message: "Anthropic API key",
-    placeholder: `${MODEL_PROVIDERS.anthropic.keyPrefix}...`,
-    validate: (val) => {
-      if (!val) return "API key is required";
-      if (!val.startsWith(MODEL_PROVIDERS.anthropic.keyPrefix)) {
-        return `Must start with ${MODEL_PROVIDERS.anthropic.keyPrefix}`;
-      }
-    },
-  });
-  handleCancel(anthropicApiKey);
+  const envAnthropicApiKey = resolvedGlobal("anthropicApiKey");
+  let anthropicApiKey: string | symbol;
+  if (envAnthropicApiKey) {
+    validateAndLog("anthropicApiKey", envAnthropicApiKey, "ANTHROPIC_API_KEY");
+    anthropicApiKey = envAnthropicApiKey;
+  } else {
+    p.log.step("Configure Anthropic API key");
+    p.note(
+      KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
+      KEY_INSTRUCTIONS.anthropicApiKey.title
+    );
+    anthropicApiKey = await p.text({
+      message: "Anthropic API key",
+      placeholder: `${MODEL_PROVIDERS.anthropic.keyPrefix}...`,
+      validate: (val) => {
+        if (!val) return "API key is required";
+        if (!val.startsWith(MODEL_PROVIDERS.anthropic.keyPrefix)) {
+          return `Must start with ${MODEL_PROVIDERS.anthropic.keyPrefix}`;
+        }
+      },
+    });
+    handleCancel(anthropicApiKey);
+  }
 
   // ---------------------------------------------------------------------------
   // Secrets: Tailscale
   // ---------------------------------------------------------------------------
-  p.log.step("Configure infrastructure secrets");
+  const envTailscaleAuthKey = resolvedGlobal("tailscaleAuthKey");
+  let tailscaleAuthKey: string | symbol;
+  if (envTailscaleAuthKey) {
+    validateAndLog("tailscaleAuthKey", envTailscaleAuthKey, "TAILSCALE_AUTH_KEY");
+    tailscaleAuthKey = envTailscaleAuthKey;
+  } else {
+    p.log.step("Configure infrastructure secrets");
+    p.note(
+      KEY_INSTRUCTIONS.tailscaleAuthKey.steps.join("\n"),
+      KEY_INSTRUCTIONS.tailscaleAuthKey.title
+    );
+    tailscaleAuthKey = await p.password({
+      message: "Tailscale auth key",
+      validate: (val) => {
+        if (!val.startsWith("tskey-auth-")) return "Must start with tskey-auth-";
+      },
+    });
+    handleCancel(tailscaleAuthKey);
+  }
 
-  p.note(
-    KEY_INSTRUCTIONS.tailscaleAuthKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.tailscaleAuthKey.title
-  );
+  const envTailnetDnsName = resolvedGlobal("tailnetDnsName");
+  let tailnetDnsName: string | symbol;
+  if (envTailnetDnsName) {
+    validateAndLog("tailnetDnsName", envTailnetDnsName, "TAILNET_DNS_NAME");
+    tailnetDnsName = envTailnetDnsName;
+  } else {
+    p.note(
+      KEY_INSTRUCTIONS.tailnetDnsName.steps.join("\n"),
+      KEY_INSTRUCTIONS.tailnetDnsName.title
+    );
+    tailnetDnsName = await p.text({
+      message: "Tailnet DNS name",
+      placeholder: "my-tailnet.ts.net",
+      validate: (val) => {
+        if (!val.endsWith(".ts.net")) return "Must end with .ts.net";
+      },
+    });
+    handleCancel(tailnetDnsName);
+  }
 
-  const tailscaleAuthKey = await p.password({
-    message: "Tailscale auth key",
-    validate: (val) => {
-      if (!val.startsWith("tskey-auth-")) return "Must start with tskey-auth-";
-    },
-  });
-  handleCancel(tailscaleAuthKey);
-
-  p.note(
-    KEY_INSTRUCTIONS.tailnetDnsName.steps.join("\n"),
-    KEY_INSTRUCTIONS.tailnetDnsName.title
-  );
-
-  const tailnetDnsName = await p.text({
-    message: "Tailnet DNS name",
-    placeholder: "my-tailnet.ts.net",
-    validate: (val) => {
-      if (!val.endsWith(".ts.net")) return "Must end with .ts.net";
-    },
-  });
-  handleCancel(tailnetDnsName);
-
-  p.note(
-    KEY_INSTRUCTIONS.tailscaleApiKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.tailscaleApiKey.title
-  );
-
-  const tailscaleApiKey = await p.text({
-    message: "Tailscale API key (press Enter to skip)",
-    placeholder: "tskey-api-... (optional)",
-    defaultValue: "",
-  });
-  handleCancel(tailscaleApiKey);
+  const envTailscaleApiKey = resolvedGlobal("tailscaleApiKey");
+  let tailscaleApiKey: string | symbol;
+  if (envTailscaleApiKey) {
+    validateAndLog("tailscaleApiKey", envTailscaleApiKey, "TAILSCALE_API_KEY");
+    tailscaleApiKey = envTailscaleApiKey;
+  } else {
+    p.note(
+      KEY_INSTRUCTIONS.tailscaleApiKey.steps.join("\n"),
+      KEY_INSTRUCTIONS.tailscaleApiKey.title
+    );
+    tailscaleApiKey = await p.text({
+      message: "Tailscale API key (press Enter to skip)",
+      placeholder: "tskey-api-... (optional)",
+      defaultValue: "",
+    });
+    handleCancel(tailscaleApiKey);
+  }
 
   let hcloudToken: string | undefined;
   if (manifest.provider === "hetzner") {
-    p.note(
-      KEY_INSTRUCTIONS.hcloudToken.steps.join("\n"),
-      KEY_INSTRUCTIONS.hcloudToken.title
-    );
-
-    const token = await p.password({
-      message: "Hetzner Cloud API token",
-      validate: (val) => {
-        if (!val) return "API token is required for Hetzner deployments";
-      },
-    });
-    handleCancel(token);
-    hcloudToken = token as string;
+    const envHcloudToken = resolvedGlobal("hcloudToken");
+    if (envHcloudToken) {
+      validateAndLog("hcloudToken", envHcloudToken, "HCLOUD_TOKEN");
+      hcloudToken = envHcloudToken;
+    } else {
+      p.note(
+        KEY_INSTRUCTIONS.hcloudToken.steps.join("\n"),
+        KEY_INSTRUCTIONS.hcloudToken.title
+      );
+      const token = await p.password({
+        message: "Hetzner Cloud API token",
+        validate: (val) => {
+          if (!val) return "API token is required for Hetzner deployments";
+        },
+      });
+      handleCancel(token);
+      hcloudToken = token as string;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1069,13 +1296,28 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
   // Slack credentials — only if any identity has the slack plugin
   const slackCredentials: Record<string, { botToken: string; appToken: string }> = {};
   if (allPluginNames.has("slack")) {
-    p.note(
-      KEY_INSTRUCTIONS.slackCredentials.steps.join("\n"),
-      KEY_INSTRUCTIONS.slackCredentials.title
-    );
+    let slackInstructionsShown = false;
 
     for (const fi of fetchedIdentities) {
       if (!agentPlugins.get(fi.agent.name)?.has("slack")) continue;
+
+      const envBotToken = resolvedAgent(fi.agent.name, fi.agent.role, "slackBotToken", "SLACK_BOT_TOKEN");
+      const envAppToken = resolvedAgent(fi.agent.name, fi.agent.role, "slackAppToken", "SLACK_APP_TOKEN");
+
+      if (envBotToken && envAppToken) {
+        validateAndLog("slackBotToken", envBotToken, agentEnvVarName(fi.agent.role, "SLACK_BOT_TOKEN"));
+        validateAndLog("slackAppToken", envAppToken, agentEnvVarName(fi.agent.role, "SLACK_APP_TOKEN"));
+        slackCredentials[fi.agent.role] = { botToken: envBotToken, appToken: envAppToken };
+        continue;
+      }
+
+      if (!slackInstructionsShown) {
+        p.note(
+          KEY_INSTRUCTIONS.slackCredentials.steps.join("\n"),
+          KEY_INSTRUCTIONS.slackCredentials.title
+        );
+        slackInstructionsShown = true;
+      }
 
       const slackManifest = slackAppManifest(fi.agent.displayName);
       try {
@@ -1089,50 +1331,74 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
         console.log(slackManifest);
       }
 
-      const botToken = await p.password({
-        message: `Slack Bot Token for ${fi.agent.displayName} (${fi.agent.role})`,
-        validate: (val) => {
-          if (!val.startsWith("xoxb-")) return "Must start with xoxb-";
-        },
-      });
-      handleCancel(botToken);
+      let botToken: string;
+      if (envBotToken) {
+        validateAndLog("slackBotToken", envBotToken, agentEnvVarName(fi.agent.role, "SLACK_BOT_TOKEN"));
+        botToken = envBotToken;
+      } else {
+        const input = await p.password({
+          message: `Slack Bot Token for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val.startsWith("xoxb-")) return "Must start with xoxb-";
+          },
+        });
+        handleCancel(input);
+        botToken = input as string;
+      }
 
-      const appToken = await p.password({
-        message: `Slack App Token for ${fi.agent.displayName} (${fi.agent.role})`,
-        validate: (val) => {
-          if (!val.startsWith("xapp-")) return "Must start with xapp-";
-        },
-      });
-      handleCancel(appToken);
+      let appToken: string;
+      if (envAppToken) {
+        validateAndLog("slackAppToken", envAppToken, agentEnvVarName(fi.agent.role, "SLACK_APP_TOKEN"));
+        appToken = envAppToken;
+      } else {
+        const input = await p.password({
+          message: `Slack App Token for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val.startsWith("xapp-")) return "Must start with xapp-";
+          },
+        });
+        handleCancel(input);
+        appToken = input as string;
+      }
 
-      slackCredentials[fi.agent.role] = {
-        botToken: botToken as string,
-        appToken: appToken as string,
-      };
+      slackCredentials[fi.agent.role] = { botToken, appToken };
     }
   }
 
   // Linear credentials — only if any identity has the openclaw-linear plugin
   if (allPluginNames.has("openclaw-linear")) {
-    p.note(
-      KEY_INSTRUCTIONS.linearApiKey.steps.join("\n"),
-      KEY_INSTRUCTIONS.linearApiKey.title
-    );
-
     const linearAgents = fetchedIdentities.filter(
       (fi) => agentPlugins.get(fi.agent.name)?.has("openclaw-linear")
     );
 
-    for (const fi of linearAgents) {
-      const linearKey = await p.password({
-        message: `Linear API key for ${fi.agent.displayName} (${fi.agent.role})`,
-        validate: (val) => {
-          if (!val.startsWith("lin_api_")) return "Must start with lin_api_";
-        },
-      });
-      handleCancel(linearKey);
+    let linearInstructionsShown = false;
 
-      integrationCredentials[fi.agent.role].linearApiKey = linearKey as string;
+    for (const fi of linearAgents) {
+      const envLinearKey = resolvedAgent(fi.agent.name, fi.agent.role, "linearApiKey", "LINEAR_API_KEY");
+
+      let linearKeyValue: string;
+      if (envLinearKey) {
+        validateAndLog("linearApiKey", envLinearKey, agentEnvVarName(fi.agent.role, "LINEAR_API_KEY"));
+        linearKeyValue = envLinearKey;
+      } else {
+        if (!linearInstructionsShown) {
+          p.note(
+            KEY_INSTRUCTIONS.linearApiKey.steps.join("\n"),
+            KEY_INSTRUCTIONS.linearApiKey.title
+          );
+          linearInstructionsShown = true;
+        }
+        const linearKey = await p.password({
+          message: `Linear API key for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val.startsWith("lin_api_")) return "Must start with lin_api_";
+          },
+        });
+        handleCancel(linearKey);
+        linearKeyValue = linearKey as string;
+      }
+
+      integrationCredentials[fi.agent.role].linearApiKey = linearKeyValue;
 
       // Auto-fetch user UUID from Linear API
       const s = p.spinner();
@@ -1142,7 +1408,7 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: linearKey as string,
+            Authorization: linearKeyValue,
           },
           body: JSON.stringify({ query: "{ viewer { id } }" }),
         });
@@ -1170,18 +1436,31 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
     }
 
     // Linear webhook signing secrets
-    p.note(
-      [
-        "Create a webhook in Linear for each agent:",
-        "1. Go to Settings → API → Webhooks → \"New webhook\"",
-        "2. Paste the webhook URL shown below for each agent",
-        "3. Select events to receive (e.g., Issues, Comments)",
-        "4. Copy the \"Signing secret\" shown after creating the webhook",
-      ].join("\n"),
-      "Linear Webhook Setup"
-    );
+    let webhookInstructionsShown = false;
 
     for (const fi of linearAgents) {
+      const envWebhookSecret = resolvedAgent(fi.agent.name, fi.agent.role, "linearWebhookSecret", "LINEAR_WEBHOOK_SECRET");
+
+      if (envWebhookSecret) {
+        p.log.success(`linearWebhookSecret for ${fi.agent.role} (from env)`);
+        integrationCredentials[fi.agent.role].linearWebhookSecret = envWebhookSecret;
+        continue;
+      }
+
+      if (!webhookInstructionsShown) {
+        p.note(
+          [
+            "Create a webhook in Linear for each agent:",
+            "1. Go to Settings → API → Webhooks → \"New webhook\"",
+            "2. Paste the webhook URL shown below for each agent",
+            "3. Select events to receive (e.g., Issues, Comments)",
+            "4. Copy the \"Signing secret\" shown after creating the webhook",
+          ].join("\n"),
+          "Linear Webhook Setup"
+        );
+        webhookInstructionsShown = true;
+      }
+
       const webhookUrl = `https://${tailscaleHostname(manifest.stackName, fi.agent.name)}.${tailnetDnsName as string}/hooks/linear`;
 
       p.log.info(`${fi.agent.displayName} (${fi.agent.role}): ${webhookUrl}`);
@@ -1200,13 +1479,25 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
 
   // GitHub token — only if any identity has the gh dep
   if (allDepNames.has("gh")) {
-    p.note(
-      KEY_INSTRUCTIONS.githubToken.steps.join("\n"),
-      KEY_INSTRUCTIONS.githubToken.title
-    );
+    let ghInstructionsShown = false;
 
     for (const fi of fetchedIdentities) {
       if (!agentDeps.get(fi.agent.name)?.has("gh")) continue;
+
+      const envGithubToken = resolvedAgent(fi.agent.name, fi.agent.role, "githubToken", "GITHUB_TOKEN");
+      if (envGithubToken) {
+        validateAndLog("githubToken", envGithubToken, agentEnvVarName(fi.agent.role, "GITHUB_TOKEN"));
+        integrationCredentials[fi.agent.role].githubToken = envGithubToken;
+        continue;
+      }
+
+      if (!ghInstructionsShown) {
+        p.note(
+          KEY_INSTRUCTIONS.githubToken.steps.join("\n"),
+          KEY_INSTRUCTIONS.githubToken.title
+        );
+        ghInstructionsShown = true;
+      }
 
       const githubKey = await p.password({
         message: `GitHub token for ${fi.agent.displayName} (${fi.agent.role})`,
@@ -1225,19 +1516,24 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
   // Brave Search API key — only if any identity has the brave-search dep
   let braveApiKey: string | undefined;
   if (allDepNames.has("brave-search")) {
-    p.note(
-      KEY_INSTRUCTIONS.braveApiKey.steps.join("\n"),
-      KEY_INSTRUCTIONS.braveApiKey.title
-    );
-
-    const braveKey = await p.password({
-      message: "Brave Search API key",
-      validate: (val) => {
-        if (!val) return "API key is required";
-      },
-    });
-    handleCancel(braveKey);
-    braveApiKey = braveKey as string;
+    const envBraveKey = resolvedGlobal("braveApiKey");
+    if (envBraveKey) {
+      validateAndLog("braveApiKey", envBraveKey, "BRAVE_API_KEY");
+      braveApiKey = envBraveKey;
+    } else {
+      p.note(
+        KEY_INSTRUCTIONS.braveApiKey.steps.join("\n"),
+        KEY_INSTRUCTIONS.braveApiKey.title
+      );
+      const braveKey = await p.password({
+        message: "Brave Search API key",
+        validate: (val) => {
+          if (!val) return "API key is required";
+        },
+      });
+      handleCancel(braveKey);
+      braveApiKey = braveKey as string;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1308,16 +1604,17 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
   s.stop("Workspace ready");
   const cwd = getWorkspaceDir();
 
-  // Ensure .clawup/ is in .gitignore
+  // Ensure .clawup/ and .env are in .gitignore
   const gitignorePath = path.join(projectRoot, ".gitignore");
-  const clawupIgnoreEntry = ".clawup/";
+  const ignoreEntries = [".clawup/", ".env"];
   if (fs.existsSync(gitignorePath)) {
     const existing = fs.readFileSync(gitignorePath, "utf-8");
-    if (!existing.includes(clawupIgnoreEntry)) {
-      fs.appendFileSync(gitignorePath, `\n# clawup local state\n${clawupIgnoreEntry}\n`);
+    const toAdd = ignoreEntries.filter((entry) => !existing.includes(entry));
+    if (toAdd.length > 0) {
+      fs.appendFileSync(gitignorePath, `\n# clawup local state\n${toAdd.join("\n")}\n`);
     }
   } else {
-    fs.writeFileSync(gitignorePath, `# clawup local state\n${clawupIgnoreEntry}\n`, "utf-8");
+    fs.writeFileSync(gitignorePath, `# clawup local state\n${ignoreEntries.join("\n")}\n`, "utf-8");
   }
 
   // Select/create stack
@@ -1403,6 +1700,20 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
 
   // Write to project root only — no global copy
   fs.writeFileSync(manifestPath, YAML.stringify(manifest), "utf-8");
+
+  // Generate .env.example if manifest has secrets
+  if (manifest.secrets) {
+    const perAgentSecrets: Record<string, Record<string, string>> = {};
+    for (const agent of agents) {
+      if (agent.secrets) perAgentSecrets[agent.name] = agent.secrets;
+    }
+    const envExampleContent = generateEnvExample({
+      globalSecrets: manifest.secrets,
+      agents: agents.map((a) => ({ name: a.name, displayName: a.displayName, role: a.role })),
+      perAgentSecrets,
+    });
+    fs.writeFileSync(path.join(projectRoot, ".env.example"), envExampleContent, "utf-8");
+  }
   s.stop("Config saved");
 
   if (opts.deploy) {
