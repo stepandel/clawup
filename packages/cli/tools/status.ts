@@ -170,7 +170,7 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
 
     if (isLocal) {
       // Local Docker: use docker exec
-      const container = dockerContainerName(manifest.stackName, agent.name);
+      const container = dockerContainerName(stackName, agent.name);
       claudeCodeVersion = dockerExecVersion(exec, container, `/home/${SSH_USER}/.local/bin/claude --version 2>/dev/null || echo ''`);
       ghVersion = dockerExecVersion(exec, container, `gh --version 2>/dev/null | head -n1 | awk '{print $3}' || echo ''`);
       if (ghVersion !== "—") {

@@ -69,7 +69,7 @@ export async function sshCommand(agentNameOrAlias: string, commandArgs: string[]
 
   // Local provider: use docker exec instead of SSH
   if (manifest.provider === "local") {
-    const containerName = dockerContainerName(manifest.stackName, agent.name);
+    const containerName = dockerContainerName(stackName, agent.name);
     const user = opts.user ?? SSH_USER;
     p.log.info(`Connecting to ${agent.displayName} (${containerName})...`);
 

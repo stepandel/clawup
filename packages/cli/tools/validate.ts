@@ -148,7 +148,7 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   console.log();
 
   for (const agent of manifest.agents) {
-    const containerName = isLocal ? dockerContainerName(manifest.stackName, agent.name) : "";
+    const containerName = isLocal ? dockerContainerName(stackName, agent.name) : "";
     const tsHost = isLocal ? "" : tailscaleHostname(manifest.stackName, agent.name);
     const host = isLocal ? containerName : `${tsHost}.${tailnetDnsName}`;
 
@@ -458,15 +458,20 @@ timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
 
   if (failed > 0) {
     ui.log.warn("Some agents failed validation.");
-    console.log("  1. Wait 3-5 minutes for cloud-init to complete");
     const agentHints = results
       .filter((r) => !r.passed)
       .map((r) => {
         const agent = manifest.agents.find((a) => a.displayName === r.agent);
         return agent ? agent.role : r.agent;
       });
-    console.log(`  2. Check logs: clawup ssh ${agentHints[0] ?? "<role>"} -- journalctl -u openclaw`);
-    console.log("  3. Verify Tailscale: tailscale status");
+    if (isLocal) {
+      console.log("  1. Check container logs: docker logs " + dockerContainerName(stackName, manifest.agents[0]?.name ?? "agent"));
+      console.log(`  2. Shell in: clawup ssh ${agentHints[0] ?? "<role>"} --local`);
+    } else {
+      console.log("  1. Wait 3-5 minutes for cloud-init to complete");
+      console.log(`  2. Check logs: clawup ssh ${agentHints[0] ?? "<role>"} -- journalctl -u openclaw`);
+      console.log("  3. Verify Tailscale: tailscale status");
+    }
     process.exit(1);
   } else {
     ui.log.success("All agents are healthy!");

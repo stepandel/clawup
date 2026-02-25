@@ -244,7 +244,7 @@ export const pushTool: ToolImplementation<PushOptions> = async (
   let allOk = true;
 
   for (const agent of targetAgents) {
-    const containerName = isLocal ? dockerContainerName(manifest.stackName, agent.name) : "";
+    const containerName = isLocal ? dockerContainerName(stackName, agent.name) : "";
     const tsHost = isLocal ? "" : tailscaleHostname(manifest.stackName, agent.name);
     const host = isLocal ? containerName : `${tsHost}.${tailnetDnsName}`;
 
