@@ -1,0 +1,14 @@
+{
+  "name": "clawup-infra",
+  "private": true,
+  "main": "dist/index.js",
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/aws": "^6.0.0",
+    "@pulumi/docker": "^4.0.0",
+    "@pulumi/hcloud": "^1.32.0",
+    "@pulumi/tls": "^5.0.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.0"
+  }
+}
