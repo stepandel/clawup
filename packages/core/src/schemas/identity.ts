@@ -46,4 +46,9 @@ export const IdentityManifestSchema = z.object({
   backupModel: z.string().optional(),
   /** Coding agent CLI to use (e.g., "claude-code", "codex", "amp"). Defaults to "claude-code". */
   codingAgent: z.string().optional(),
+  /** Additional secret keys this identity requires beyond what plugins/deps imply */
+  requiredSecrets: z.array(
+    z.string().min(1, "each requiredSecrets entry must be a non-empty string"),
+    { invalid_type_error: '"requiredSecrets" must be an array of strings' },
+  ).optional(),
 });

@@ -40,6 +40,7 @@ import { findProjectRoot } from "../lib/project";
 import {
   buildEnvDict,
   buildManifestSecrets,
+  camelToScreamingSnake,
   generateEnvExample,
   loadEnvSecrets,
   VALIDATORS,
@@ -762,6 +763,46 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     }
   }
 
+  // Identity requiredSecrets — prompt for any not already covered by plugins/deps
+  const identitySecretCredentials: Record<string, Record<string, string>> = {};
+  for (const fi of fetchedIdentities) {
+    if (!fi.manifest.requiredSecrets || fi.manifest.requiredSecrets.length === 0) continue;
+
+    const plugins = agentPlugins.get(fi.agent.name);
+    const deps = agentDeps.get(fi.agent.name);
+
+    for (const key of fi.manifest.requiredSecrets) {
+      // Skip if already covered by plugin/dep-derived secrets
+      const alreadyCovered =
+        (key === "slackBotToken" && plugins?.has("slack")) ||
+        (key === "slackAppToken" && plugins?.has("slack")) ||
+        (key === "linearApiKey" && plugins?.has("openclaw-linear")) ||
+        (key === "linearWebhookSecret" && plugins?.has("openclaw-linear")) ||
+        (key === "githubToken" && deps?.has("gh"));
+      if (alreadyCovered) continue;
+
+      const roleUpper = fi.agent.role.toUpperCase();
+      const envVarName = `${roleUpper}_${camelToScreamingSnake(key)}`;
+      const envValue = envDict[envVarName];
+
+      if (envValue) {
+        p.log.success(`${key} for ${fi.agent.role} (from ${envVarName})`);
+        if (!identitySecretCredentials[fi.agent.role]) identitySecretCredentials[fi.agent.role] = {};
+        identitySecretCredentials[fi.agent.role][key] = envValue;
+      } else {
+        const input = await p.password({
+          message: `${key} for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val) return `${key} is required`;
+          },
+        });
+        handleCancel(input);
+        if (!identitySecretCredentials[fi.agent.role]) identitySecretCredentials[fi.agent.role] = {};
+        identitySecretCredentials[fi.agent.role][key] = input as string;
+      }
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Step 8: Summary
   // -------------------------------------------------------------------------
@@ -846,7 +887,15 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   // Build secrets section for the manifest
   const manifestSecrets = buildManifestSecrets({
     provider: basicConfig.provider,
-    agents: agents.map((a) => ({ name: a.name, role: a.role, displayName: a.displayName })),
+    agents: agents.map((a) => {
+      const fi = fetchedIdentities.find((f) => f.agent.name === a.name);
+      return {
+        name: a.name,
+        role: a.role,
+        displayName: a.displayName,
+        requiredSecrets: fi?.manifest.requiredSecrets,
+      };
+    }),
     allPluginNames,
     allDepNames,
     agentPlugins,
@@ -990,6 +1039,12 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
     setConfig(`${role}SlackAppToken`, creds.appToken, true, cwd);
   }
   if (braveApiKey) setConfig("braveApiKey", braveApiKey, true, cwd);
+  // Set per-agent identity requiredSecrets credentials
+  for (const [role, creds] of Object.entries(identitySecretCredentials)) {
+    for (const [key, value] of Object.entries(creds)) {
+      setConfig(`${role}${key.charAt(0).toUpperCase()}${key.slice(1)}`, value, true, cwd);
+    }
+  }
   s.stop("Configuration saved");
 
   if (opts.deploy) {
@@ -1536,6 +1591,49 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
     }
   }
 
+  // Identity requiredSecrets — prompt for any not already covered by plugins/deps
+  const identitySecretCredentials: Record<string, Record<string, string>> = {};
+  for (const fi of fetchedIdentities) {
+    if (!fi.manifest.requiredSecrets || fi.manifest.requiredSecrets.length === 0) continue;
+
+    const plugins = agentPlugins.get(fi.agent.name);
+    const deps = agentDeps.get(fi.agent.name);
+
+    for (const key of fi.manifest.requiredSecrets) {
+      // Skip if already covered by plugin/dep-derived secrets
+      const alreadyCovered =
+        (key === "slackBotToken" && plugins?.has("slack")) ||
+        (key === "slackAppToken" && plugins?.has("slack")) ||
+        (key === "linearApiKey" && plugins?.has("openclaw-linear")) ||
+        (key === "linearWebhookSecret" && plugins?.has("openclaw-linear")) ||
+        (key === "githubToken" && deps?.has("gh"));
+      if (alreadyCovered) continue;
+
+      const roleUpper = fi.agent.role.toUpperCase();
+      const envVarName = `${roleUpper}_${camelToScreamingSnake(key)}`;
+
+      // Check resolved per-agent secrets first, then fall back to env dict
+      const envValue = resolvedAgent(fi.agent.name, fi.agent.role, key, camelToScreamingSnake(key))
+        ?? envDict[envVarName];
+
+      if (envValue) {
+        p.log.success(`${key} for ${fi.agent.role} (from ${envVarName})`);
+        if (!identitySecretCredentials[fi.agent.role]) identitySecretCredentials[fi.agent.role] = {};
+        identitySecretCredentials[fi.agent.role][key] = envValue;
+      } else {
+        const input = await p.password({
+          message: `${key} for ${fi.agent.displayName} (${fi.agent.role})`,
+          validate: (val) => {
+            if (!val) return `${key} is required`;
+          },
+        });
+        handleCancel(input);
+        if (!identitySecretCredentials[fi.agent.role]) identitySecretCredentials[fi.agent.role] = {};
+        identitySecretCredentials[fi.agent.role][key] = input as string;
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Summary
   // ---------------------------------------------------------------------------
@@ -1664,6 +1762,12 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
     setConfig(`${role}SlackAppToken`, creds.appToken, true, cwd);
   }
   if (braveApiKey) setConfig("braveApiKey", braveApiKey, true, cwd);
+  // Set per-agent identity requiredSecrets credentials
+  for (const [role, creds] of Object.entries(identitySecretCredentials)) {
+    for (const [key, value] of Object.entries(creds)) {
+      setConfig(`${role}${key.charAt(0).toUpperCase()}${key.slice(1)}`, value, true, cwd);
+    }
+  }
   s.stop("Configuration saved");
 
   // Write manifest (update inline plugin config from identities)
@@ -1695,6 +1799,29 @@ async function initProjectMode(projectRoot: string, opts: InitOptions): Promise<
 
     if (Object.keys(inlinePlugins).length > 0) {
       fi.agent.plugins = inlinePlugins;
+    }
+  }
+
+  // Add requiredSecrets-derived env refs to per-agent secrets in manifest
+  for (const fi of fetchedIdentities) {
+    if (!fi.manifest.requiredSecrets || fi.manifest.requiredSecrets.length === 0) continue;
+
+    const plugins = agentPlugins.get(fi.agent.name);
+    const deps = agentDeps.get(fi.agent.name);
+    const roleUpper = fi.agent.role.toUpperCase();
+
+    if (!fi.agent.secrets) fi.agent.secrets = {};
+
+    for (const key of fi.manifest.requiredSecrets) {
+      if (fi.agent.secrets[key]) continue; // already present
+      const alreadyCovered =
+        (key === "slackBotToken" && plugins?.has("slack")) ||
+        (key === "slackAppToken" && plugins?.has("slack")) ||
+        (key === "linearApiKey" && plugins?.has("openclaw-linear")) ||
+        (key === "linearWebhookSecret" && plugins?.has("openclaw-linear")) ||
+        (key === "githubToken" && deps?.has("gh"));
+      if (alreadyCovered) continue;
+      fi.agent.secrets[key] = `\${env:${roleUpper}_${camelToScreamingSnake(key)}}`;
     }
   }
 

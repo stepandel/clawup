@@ -220,6 +220,21 @@ export function agentEnvVarName(role: string, suffix: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// camelCase → SCREAMING_SNAKE_CASE converter
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a camelCase key to SCREAMING_SNAKE_CASE.
+ * e.g., "notionApiKey" → "NOTION_API_KEY", "slackBotToken" → "SLACK_BOT_TOKEN"
+ */
+export function camelToScreamingSnake(str: string): string {
+  return str
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .toUpperCase();
+}
+
+// ---------------------------------------------------------------------------
 // Secrets section builder (for generating manifest secrets after wizard)
 // ---------------------------------------------------------------------------
 
@@ -229,6 +244,7 @@ interface SecretsBuilderOpts {
     name: string;
     role: string;
     displayName: string;
+    requiredSecrets?: string[];
   }>;
   allPluginNames: Set<string>;
   allDepNames: Set<string>;
@@ -285,6 +301,15 @@ export function buildManifestSecrets(opts: SecretsBuilderOpts): ManifestSecrets 
 
     if (deps?.has("gh")) {
       agentSecrets.githubToken = `\${env:${roleUpper}_GITHUB_TOKEN}`;
+    }
+
+    // Add requiredSecrets from identity manifest (additive, skip duplicates)
+    if (agent.requiredSecrets) {
+      for (const key of agent.requiredSecrets) {
+        if (!agentSecrets[key]) {
+          agentSecrets[key] = `\${env:${roleUpper}_${camelToScreamingSnake(key)}}`;
+        }
+      }
     }
 
     if (Object.keys(agentSecrets).length > 0) {

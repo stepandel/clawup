@@ -9,6 +9,7 @@ import {
   buildManifestSecrets,
   generateEnvExample,
   agentEnvVarName,
+  camelToScreamingSnake,
   VALIDATORS,
   WELL_KNOWN_ENV_VARS,
 } from "../env";
@@ -355,6 +356,118 @@ describe("buildManifestSecrets", () => {
     expect(result.perAgent["agent-eng"]).toEqual({
       githubToken: "${env:ENG_GITHUB_TOKEN}",
     });
+  });
+});
+
+describe("camelToScreamingSnake", () => {
+  it("converts simple camelCase", () => {
+    expect(camelToScreamingSnake("notionApiKey")).toBe("NOTION_API_KEY");
+  });
+
+  it("converts camelCase with consecutive capitals", () => {
+    expect(camelToScreamingSnake("slackBotToken")).toBe("SLACK_BOT_TOKEN");
+  });
+
+  it("handles single word", () => {
+    expect(camelToScreamingSnake("token")).toBe("TOKEN");
+  });
+
+  it("converts customWebhookSecret", () => {
+    expect(camelToScreamingSnake("customWebhookSecret")).toBe("CUSTOM_WEBHOOK_SECRET");
+  });
+
+  it("handles already uppercase", () => {
+    expect(camelToScreamingSnake("API")).toBe("API");
+  });
+});
+
+describe("buildManifestSecrets with requiredSecrets", () => {
+  it("adds requiredSecrets as per-agent env refs", () => {
+    const result = buildManifestSecrets({
+      provider: "aws",
+      agents: [
+        { name: "agent-pm", role: "pm", displayName: "Juno", requiredSecrets: ["notionApiKey"] },
+      ],
+      allPluginNames: new Set(),
+      allDepNames: new Set(),
+      agentPlugins: new Map([["agent-pm", new Set()]]),
+      agentDeps: new Map([["agent-pm", new Set()]]),
+    });
+
+    expect(result.perAgent["agent-pm"]).toEqual({
+      notionApiKey: "${env:PM_NOTION_API_KEY}",
+    });
+  });
+
+  it("does not duplicate plugin-derived secrets listed in requiredSecrets", () => {
+    const result = buildManifestSecrets({
+      provider: "aws",
+      agents: [
+        { name: "agent-pm", role: "pm", displayName: "Juno", requiredSecrets: ["slackBotToken", "notionApiKey"] },
+      ],
+      allPluginNames: new Set(["slack"]),
+      allDepNames: new Set(),
+      agentPlugins: new Map([["agent-pm", new Set(["slack"])]]),
+      agentDeps: new Map([["agent-pm", new Set()]]),
+    });
+
+    // slackBotToken/slackAppToken from plugin, notionApiKey from requiredSecrets
+    expect(result.perAgent["agent-pm"]).toEqual({
+      slackBotToken: "${env:PM_SLACK_BOT_TOKEN}",
+      slackAppToken: "${env:PM_SLACK_APP_TOKEN}",
+      notionApiKey: "${env:PM_NOTION_API_KEY}",
+    });
+  });
+
+  it("adds multiple requiredSecrets for multiple agents", () => {
+    const result = buildManifestSecrets({
+      provider: "aws",
+      agents: [
+        { name: "agent-pm", role: "pm", displayName: "Juno", requiredSecrets: ["notionApiKey"] },
+        { name: "agent-eng", role: "eng", displayName: "Titus", requiredSecrets: ["customWebhookSecret"] },
+      ],
+      allPluginNames: new Set(),
+      allDepNames: new Set(),
+      agentPlugins: new Map([["agent-pm", new Set()], ["agent-eng", new Set()]]),
+      agentDeps: new Map([["agent-pm", new Set()], ["agent-eng", new Set()]]),
+    });
+
+    expect(result.perAgent["agent-pm"]).toEqual({
+      notionApiKey: "${env:PM_NOTION_API_KEY}",
+    });
+    expect(result.perAgent["agent-eng"]).toEqual({
+      customWebhookSecret: "${env:ENG_CUSTOM_WEBHOOK_SECRET}",
+    });
+  });
+
+  it("handles agents without requiredSecrets (undefined)", () => {
+    const result = buildManifestSecrets({
+      provider: "aws",
+      agents: [
+        { name: "agent-pm", role: "pm", displayName: "Juno" },
+      ],
+      allPluginNames: new Set(),
+      allDepNames: new Set(),
+      agentPlugins: new Map([["agent-pm", new Set()]]),
+      agentDeps: new Map([["agent-pm", new Set()]]),
+    });
+
+    expect(result.perAgent["agent-pm"]).toBeUndefined();
+  });
+
+  it("handles empty requiredSecrets array", () => {
+    const result = buildManifestSecrets({
+      provider: "aws",
+      agents: [
+        { name: "agent-pm", role: "pm", displayName: "Juno", requiredSecrets: [] },
+      ],
+      allPluginNames: new Set(),
+      allDepNames: new Set(),
+      agentPlugins: new Map([["agent-pm", new Set()]]),
+      agentDeps: new Map([["agent-pm", new Set()]]),
+    });
+
+    expect(result.perAgent["agent-pm"]).toBeUndefined();
   });
 });
 
