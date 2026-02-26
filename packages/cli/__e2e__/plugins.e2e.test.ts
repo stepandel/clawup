@@ -57,6 +57,13 @@ vi.mock("../lib/project", () => ({
   isProjectMode: vi.fn(() => !!tempDir),
 }));
 
+// Mock workspace to use dev mode (Pulumi runs from repo root)
+vi.mock("../lib/workspace", () => ({
+  getWorkspaceDir: vi.fn(() => undefined),
+  ensureWorkspace: vi.fn(() => ({ ok: true })),
+  isDevMode: vi.fn(() => true),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks are declared)
 // ---------------------------------------------------------------------------
@@ -102,6 +109,7 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
     // Set env vars for Pulumi
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
+    process.env.PULUMI_BACKEND_URL = "file://~";
 
     // Mock process.exit to throw instead of exiting
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
@@ -148,6 +156,7 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
         "PLUGINTESTER_SLACK_APP_TOKEN=xapp-fake-app-token-for-e2e",
         "PLUGINTESTER_LINEAR_API_KEY=lin_api_fake_key_for_e2e",
         "PLUGINTESTER_LINEAR_WEBHOOK_SECRET=fake-webhook-secret-for-e2e",
+        "PLUGINTESTER_LINEAR_USER_UUID=fake-uuid-for-e2e",
       ],
     });
 

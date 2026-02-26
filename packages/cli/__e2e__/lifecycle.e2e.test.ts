@@ -54,6 +54,13 @@ vi.mock("../lib/project", () => ({
   isProjectMode: vi.fn(() => !!tempDir),
 }));
 
+// Mock workspace to use dev mode (Pulumi runs from repo root)
+vi.mock("../lib/workspace", () => ({
+  getWorkspaceDir: vi.fn(() => undefined),
+  ensureWorkspace: vi.fn(() => ({ ok: true })),
+  isDevMode: vi.fn(() => true),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks are declared)
 // ---------------------------------------------------------------------------
@@ -88,6 +95,7 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
     // Set env vars for Pulumi
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
+    process.env.PULUMI_BACKEND_URL = "file://~";
 
     // Mock process.exit to throw instead of exiting
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
