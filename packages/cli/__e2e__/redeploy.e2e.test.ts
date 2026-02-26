@@ -114,6 +114,7 @@ describe("Redeploy existing stack (in-place update)", () => {
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
     process.env.PULUMI_BACKEND_URL = "file://~";
+    process.env.CLAWUP_LOCAL_BASE_PORT = "28789";
 
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
       throw new ProcessExitError(typeof code === "number" ? code : 1);
@@ -250,6 +251,7 @@ describe("Redeploy with no existing stack (fresh deploy fallback)", () => {
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
     process.env.PULUMI_BACKEND_URL = "file://~";
+    process.env.CLAWUP_LOCAL_BASE_PORT = "28789";
 
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
       throw new ProcessExitError(typeof code === "number" ? code : 1);
