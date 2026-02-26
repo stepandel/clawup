@@ -39,7 +39,7 @@ jobs:
     env:
       PULUMI_CONFIG_PASSPHRASE: test
       PULUMI_SKIP_UPDATE_CHECK: "true"
-      PULUMI_BACKEND_URL: "file://~"
+      PULUMI_BACKEND_URL: "file://${{ github.workspace }}/.pulumi-state"
     steps:
       - uses: actions/checkout@v4
 
@@ -61,12 +61,13 @@ jobs:
           pulumi-version: latest
 
       - name: Login to local Pulumi backend
-        run: pulumi login --local
+        run: pulumi login "$PULUMI_BACKEND_URL"
 
       - name: Run E2E tests
         run: pnpm exec vitest run --config packages/cli/__e2e__/vitest.e2e.config.ts
         env:
           CLAWUP_LOCAL_BASE_PORT: "28789"
+          AGENT_LINEAR_USER_UUID: "test-linear-user"
 
   lint:
     name: Lint & Typecheck

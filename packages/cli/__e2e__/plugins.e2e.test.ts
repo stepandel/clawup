@@ -57,7 +57,7 @@ vi.mock("../lib/project", () => ({
   isProjectMode: vi.fn(() => !!tempDir),
 }));
 
-// Mock workspace to use dev mode (Pulumi runs from repo root)
+// Mock workspace for project mode (Pulumi runs from workspace dir)
 vi.mock("../lib/workspace", () => ({
   getWorkspaceDir: vi.fn(() => path.join(tempDir, ".clawup")),
   ensureWorkspace: vi.fn(() => ({ ok: true })),
@@ -160,6 +160,9 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
 
     // Clean up env vars
     delete process.env.PULUMI_CONFIG_PASSPHRASE;
+    delete process.env.PULUMI_SKIP_UPDATE_CHECK;
+    delete process.env.PULUMI_BACKEND_URL;
+    delete process.env.CLAWUP_LOCAL_BASE_PORT;
   });
 
   // -------------------------------------------------------------------------
