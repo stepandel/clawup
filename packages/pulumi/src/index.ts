@@ -443,7 +443,8 @@ for (const agent of manifest.agents) {
       sshPrivateKey: agentResource.sshPrivateKey,
     };
   } else if (provider === "local") {
-    const hostPort = 18789 + localPortOffset++;
+    const basePort = parseInt(process.env.CLAWUP_LOCAL_BASE_PORT || "18789", 10);
+    const hostPort = basePort + localPortOffset++;
     const agentResource = new LocalDockerOpenClawAgent(agent.name, {
       ...baseArgs,
       gatewayPort: hostPort,
