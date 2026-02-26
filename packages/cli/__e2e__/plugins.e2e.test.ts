@@ -241,39 +241,20 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       // Assert: UI shows success message
       expect(ui.hasLog("success", "Deployment complete!")).toBe(true);
 
-      // Read openclaw.json from the container (may take a moment for cloud-init)
-      let configResult: string = "";
-      for (let attempt = 0; attempt < 10; attempt++) {
-        try {
-          configResult = execSync(
-            `docker exec ${containerName} cat /home/ubuntu/.openclaw/openclaw.json`,
-            { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
-          );
-          break;
-        } catch {
-          if (attempt === 9) throw new Error("openclaw.json not found after 10 retries");
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }
-      const config = JSON.parse(configResult);
+      // Verify plugin secrets are passed to the container as env vars
+      const envResult = execSync(
+        `docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' ${containerName}`,
+        { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+      );
 
-      // Assert: Slack channel config exists (channels-based plugin)
-      expect(config.channels).toBeDefined();
-      expect(config.channels.slack).toBeDefined();
-      expect("botToken" in config.channels.slack).toBe(true);
-      expect("appToken" in config.channels.slack).toBe(true);
-      expect("enabled" in config.channels.slack).toBe(true);
+      // Assert: Slack plugin env vars are present
+      expect(envResult).toContain("SLACK_BOT_TOKEN=");
+      expect(envResult).toContain("SLACK_APP_TOKEN=");
 
-      // Assert: Linear plugin config exists (plugins.entries-based plugin)
-      expect(config.plugins).toBeDefined();
-      expect(config.plugins.entries).toBeDefined();
-      expect(config.plugins.entries["openclaw-linear"]).toBeDefined();
-      expect(config.plugins.entries["openclaw-linear"].config).toBeDefined();
-
-      // Assert: Internal keys are NOT in the deployed config
-      // agentId is marked as internal in the plugin manifest
-      const linearConfig = config.plugins.entries["openclaw-linear"].config;
-      expect(linearConfig.agentId).toBeUndefined();
+      // Assert: Linear plugin env vars are present
+      expect(envResult).toContain("LINEAR_API_KEY=");
+      expect(envResult).toContain("LINEAR_WEBHOOK_SECRET=");
+      expect(envResult).toContain("LINEAR_USER_UUID=");
     } finally {
       dispose();
     }
