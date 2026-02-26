@@ -55,6 +55,17 @@ export {
   isSecretCoveredByPlugin,
 } from "./plugin-loader";
 
+// Manifest hooks
+export {
+  runResolveHook,
+  runLifecycleHook,
+  resolvePluginSecrets,
+  type ResolveHookResult,
+  type HookResult,
+  type HookSuccess,
+  type HookError,
+} from "./manifest-hooks";
+
 // Coding agent registry
 export type { CodingAgentEntry, CodingAgentSecret } from "./coding-agent-registry";
 export { CODING_AGENT_REGISTRY } from "./coding-agent-registry";
@@ -82,6 +93,7 @@ export {
   IdentityManifestSchema,
   PluginManifestSchema,
   PluginSecretSchema,
+  PluginHooksSchema,
   WebhookSetupSchema,
   ConfigTransformSchema,
 } from "./schemas";
