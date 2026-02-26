@@ -94,7 +94,7 @@ export const PLUGIN_MANIFEST_REGISTRY: Record<string, PluginManifest> = {
         "3. Select events to receive (e.g., Issues, Comments)",
         "4. Create the webhook and copy the \"Signing secret\"",
       ],
-      configJsonPath: "plugins.entries.linear.config.webhookSecret",
+      configJsonPath: "plugins.entries.openclaw-linear.config.webhookSecret",
     },
   },
   slack: {

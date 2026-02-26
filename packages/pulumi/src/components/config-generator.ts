@@ -273,14 +273,15 @@ function generateChannelPluginPython(plugin: PluginEntry): string {
           channelEntries.push(`    "${targetKey}": ${toPythonLiteral(nested[nestedKey])}`);
         }
       }
-      continue;
+      // Only skip the source key if removeSource is true
+      if (transform.removeSource) continue;
     }
 
     channelEntries.push(`    "${key}": ${toPythonLiteral(value)}`);
   }
 
-  // Add enabled: True
-  channelEntries.push(`    "enabled": True`);
+  // Add enabled flag from plugin config
+  channelEntries.push(`    "enabled": ${plugin.enabled ? "True" : "False"}`);
 
   const channelBlock = channelEntries.length > 0
     ? `{

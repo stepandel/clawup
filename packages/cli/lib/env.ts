@@ -341,6 +341,8 @@ interface EnvExampleOpts {
   globalSecrets: Record<string, string>;
   agents: Array<{ name: string; displayName: string; role: string }>;
   perAgentSecrets: Record<string, Record<string, string>>;
+  /** Optional map of agent name → plugin names, to scope auto-resolvable checks */
+  agentPluginNames?: Map<string, Set<string>>;
 }
 
 /**
@@ -379,8 +381,13 @@ export function generateEnvExample(opts: EnvExampleOpts): string {
       if (!varName) continue;
 
       // Check if this secret is auto-resolvable via plugin manifest
+      // Scope to agent's actual plugins if available, otherwise check all
       let isAutoResolvable = false;
-      for (const pm of Object.values(PLUGIN_MANIFEST_REGISTRY)) {
+      const pluginNames = opts.agentPluginNames?.get(agent.name);
+      const manifestsToCheck = pluginNames
+        ? [...pluginNames].map((n) => PLUGIN_MANIFEST_REGISTRY[n]).filter(Boolean)
+        : Object.values(PLUGIN_MANIFEST_REGISTRY);
+      for (const pm of manifestsToCheck) {
         if (pm.secrets[key]?.autoResolvable) {
           isAutoResolvable = true;
           break;

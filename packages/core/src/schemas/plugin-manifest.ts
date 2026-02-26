@@ -81,4 +81,13 @@ export const PluginManifestSchema = z.object({
   configTransforms: z.array(ConfigTransformSchema).default([]),
   /** Webhook setup configuration (for plugins that need incoming webhooks) */
   webhookSetup: WebhookSetupSchema.optional(),
+}).superRefine((data, ctx) => {
+  // Validate that webhookSetup.secretKey references an existing secret
+  if (data.webhookSetup && !(data.webhookSetup.secretKey in data.secrets)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["webhookSetup", "secretKey"],
+      message: `webhookSetup.secretKey "${data.webhookSetup.secretKey}" does not exist in secrets`,
+    });
+  }
 });

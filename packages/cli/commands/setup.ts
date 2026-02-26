@@ -229,8 +229,12 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   // -------------------------------------------------------------------------
   const missingSecrets = [...resolvedSecrets.missing];
 
-  // Build merged validators: infrastructure + plugin-derived
-  const pluginValidators = buildValidators(Object.values(PLUGIN_MANIFEST_REGISTRY));
+  // Build merged validators: infrastructure + plugin-derived (from full resolved manifests)
+  const allResolvedManifests = [...allPluginNames].map((name) => {
+    const fi = fetchedIdentities.find((f) => agentPlugins.get(f.agent.name)?.has(name));
+    return resolvePlugin(name, fi?.identityResult);
+  });
+  const pluginValidators = buildValidators(allResolvedManifests);
   const allValidators = { ...VALIDATORS, ...pluginValidators };
 
   // Run validators on resolved values (warn, don't block)
@@ -257,8 +261,15 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   }
 
   // Filter out auto-resolvable secrets (e.g., linearUserUuid) — don't require them in .env
+  // Use agent-specific resolved manifests for context-aware lookup
   const requiredMissing = missingSecrets.filter((m) => {
-    for (const pm of Object.values(PLUGIN_MANIFEST_REGISTRY)) {
+    const agentManifests = m.agent
+      ? (() => {
+          const fi = fetchedIdentities.find((f) => f.agent.name === m.agent);
+          return fi ? resolvePlugins([...(agentPlugins.get(m.agent) ?? [])], fi.identityResult) : allResolvedManifests;
+        })()
+      : allResolvedManifests;
+    for (const pm of agentManifests) {
       if (pm.secrets[m.key]?.autoResolvable) return false;
     }
     return true;
@@ -347,6 +358,8 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
       const s = p.spinner();
       s.start(`Fetching Linear user ID for ${fi.agent.displayName}...`);
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15_000);
         const res = await fetch("https://api.linear.app/graphql", {
           method: "POST",
           headers: {
@@ -354,8 +367,16 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
             Authorization: linearApiKey,
           },
           body: JSON.stringify({ query: "{ viewer { id } }" }),
+          signal: controller.signal,
         });
-        const data = (await res.json()) as { data?: { viewer?: { id?: string } } };
+        clearTimeout(timeout);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        const data = (await res.json()) as { data?: { viewer?: { id?: string } }; errors?: Array<{ message: string }> };
+        if (data.errors && data.errors.length > 0) {
+          throw new Error(`GraphQL error: ${data.errors[0].message}`);
+        }
         const uuid = data?.data?.viewer?.id;
         if (!uuid) throw new Error("No user ID in response");
         s.stop(`${fi.agent.displayName}: ${uuid}`);
@@ -450,6 +471,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     globalSecrets: manifest.secrets,
     agents: agents.map((a) => ({ name: a.name, displayName: a.displayName, role: a.role })),
     perAgentSecrets,
+    agentPluginNames: agentPlugins,
   });
   fs.writeFileSync(path.join(projectRoot, ".env.example"), envExampleContent, "utf-8");
   s.stop("Manifest updated");
@@ -521,33 +543,30 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     const agent = agents.find((a) => a.name === agentName);
     if (!agent) continue;
     const role = agent.role;
+    const fi = fetchedIdentities.find((f) => f.agent.name === agentName);
+    const agentManifests = fi
+      ? resolvePlugins([...(agentPlugins.get(agentName) ?? [])], fi.identityResult)
+      : [];
 
     for (const [key, value] of Object.entries(agentSecrets)) {
       const configKey = `${role}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-      // Determine isSecret from plugin manifest metadata
-      let isSecret = true;
-      for (const pm of Object.values(PLUGIN_MANIFEST_REGISTRY)) {
-        if (pm.secrets[key] !== undefined) {
-          isSecret = pm.secrets[key].isSecret;
-          break;
-        }
-      }
+      // Determine isSecret from the agent's resolved plugin manifests
+      const isSecret = resolveIsSecret(key, agentManifests);
       setConfig(configKey, value, isSecret, cwd);
     }
   }
 
   // Set auto-resolved secrets (e.g., Linear user UUIDs)
   for (const [role, resolved] of Object.entries(autoResolvedSecrets)) {
+    const fi = fetchedIdentities.find((f) => f.agent.role === role);
+    const agentManifests = fi
+      ? resolvePlugins([...(agentPlugins.get(fi.agent.name) ?? [])], fi.identityResult)
+      : [];
+
     for (const [key, value] of Object.entries(resolved)) {
-      // Auto-resolved secrets are typically non-secret config values
-      let isSecret = true;
-      for (const pm of Object.values(PLUGIN_MANIFEST_REGISTRY)) {
-        if (pm.secrets[key] !== undefined) {
-          isSecret = pm.secrets[key].isSecret;
-          break;
-        }
-      }
       const configKey = `${role}${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+      // Determine isSecret from the agent's resolved plugin manifests
+      const isSecret = resolveIsSecret(key, agentManifests);
       setConfig(configKey, value, isSecret, cwd);
     }
   }
@@ -569,6 +588,30 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   }
 }
 
+/**
+ * Determine if a secret key should be stored as a Pulumi secret.
+ * Resolves by checking the agent's plugin manifests for matching secret metadata.
+ * Falls back to true (encrypted) if no metadata found.
+ */
+function resolveIsSecret(key: string, agentManifests: Array<{ secrets: Record<string, { envVar: string; isSecret: boolean }> }>): boolean {
+  for (const pm of agentManifests) {
+    // Check by raw key first (e.g., "linearUserUuid")
+    if (pm.secrets[key] !== undefined) {
+      return pm.secrets[key].isSecret;
+    }
+    // Check by envVar-derived camelCase key (e.g., "linearApiKey" matches LINEAR_API_KEY)
+    for (const secret of Object.values(pm.secrets)) {
+      const envDerivedKey = secret.envVar
+        .toLowerCase()
+        .split("_")
+        .map((part: string, i: number) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
+        .join("");
+      if (envDerivedKey === key) return secret.isSecret;
+    }
+  }
+  return true; // default to encrypted
+}
+
 /** Get a human-readable hint for a validator */
 function getValidatorHint(key: string): string {
   // Infrastructure hints
@@ -580,10 +623,20 @@ function getValidatorHint(key: string): string {
   };
   if (infraHints[key]) return infraHints[key];
 
-  // Plugin-derived hints (from validator prefix)
+  // Plugin-derived hints (from validator prefix) — check both raw key and envVar-derived key
   for (const pm of Object.values(PLUGIN_MANIFEST_REGISTRY)) {
     if (pm.secrets[key]?.validator) {
       return `must start with ${pm.secrets[key].validator}`;
+    }
+    for (const secret of Object.values(pm.secrets)) {
+      const envDerivedKey = secret.envVar
+        .toLowerCase()
+        .split("_")
+        .map((part: string, i: number) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
+        .join("");
+      if (envDerivedKey === key && secret.validator) {
+        return `must start with ${secret.validator}`;
+      }
     }
   }
 

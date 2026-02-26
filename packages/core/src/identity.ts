@@ -259,9 +259,14 @@ function _fetchIdentity(source: string, cacheDir: string): IdentityResult {
         if (parsed.success) {
           if (!pluginManifests) pluginManifests = {};
           pluginManifests[parsed.data.name] = parsed.data;
+        } else {
+          const issues = parsed.error.issues.map((i) => i.message).join(", ");
+          console.warn(`Warning: invalid plugin manifest ${entry}: ${issues}`);
         }
-      } catch {
-        // Skip invalid plugin manifest files
+      } catch (err) {
+        console.warn(
+          `Warning: failed to parse plugin manifest ${entry}: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
     }
 

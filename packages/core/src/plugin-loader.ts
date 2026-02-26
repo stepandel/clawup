@@ -64,6 +64,9 @@ export function collectPluginSecrets(
 /**
  * Build a dynamic KNOWN_SECRETS map from resolved plugin manifests.
  * Returns entries in the format expected by the secrets command.
+ *
+ * Keys are namespaced by plugin (using envVar-derived camelCase names)
+ * to avoid collisions when plugins share raw key names (e.g., "apiKey").
  */
 export function buildKnownSecrets(
   plugins: PluginManifest[]
@@ -71,7 +74,8 @@ export function buildKnownSecrets(
   const result: Record<string, { label: string; perAgent: boolean; isSecret: boolean }> = {};
   for (const plugin of plugins) {
     for (const [key, secret] of Object.entries(plugin.secrets)) {
-      result[key] = {
+      const namespacedKey = envVarToCamelCase(secret.envVar);
+      result[namespacedKey] = {
         label: `${plugin.displayName} ${formatSecretLabel(key)}`,
         perAgent: secret.scope === "agent",
         isSecret: secret.isSecret,
@@ -84,6 +88,9 @@ export function buildKnownSecrets(
 /**
  * Build a dynamic VALIDATORS map from resolved plugin manifests.
  * Returns entries in the format expected by env.ts validation.
+ *
+ * Keys are namespaced by plugin (using envVar-derived camelCase names)
+ * to avoid collisions when plugins share raw key names.
  */
 export function buildValidators(
   plugins: PluginManifest[]
@@ -93,7 +100,8 @@ export function buildValidators(
     for (const [key, secret] of Object.entries(plugin.secrets)) {
       if (secret.validator) {
         const prefix = secret.validator;
-        result[key] = (val: string) => {
+        const namespacedKey = envVarToCamelCase(secret.envVar);
+        result[namespacedKey] = (val: string) => {
           if (!val.startsWith(prefix)) return `Must start with ${prefix}`;
         };
       }
@@ -114,6 +122,18 @@ export function isSecretCoveredByPlugin(
     if (key in plugin.secrets) return true;
   }
   return false;
+}
+
+/**
+ * Convert a SCREAMING_SNAKE_CASE env var to camelCase.
+ * e.g., "SLACK_BOT_TOKEN" → "slackBotToken", "LINEAR_API_KEY" → "linearApiKey"
+ */
+function envVarToCamelCase(envVar: string): string {
+  return envVar
+    .toLowerCase()
+    .split("_")
+    .map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
 }
 
 /**

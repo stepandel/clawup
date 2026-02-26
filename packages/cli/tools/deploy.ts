@@ -237,12 +237,15 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
 
       ui.note(lines.join("\n"), "Agent Details");
 
-      // Show webhook URLs if available
+      // Show webhook URLs if available (keys are ${role}${PluginSlug}WebhookUrl)
       const webhookLines: string[] = [];
       for (const agent of manifest.agents) {
-        const webhookUrl = outputs[`${agent.role}WebhookUrl`] as string | undefined;
-        if (webhookUrl) {
-          webhookLines.push(`  ${agent.displayName} (${agent.role}): ${webhookUrl}`);
+        const prefix = `${agent.role}`;
+        const suffix = "WebhookUrl";
+        for (const [key, value] of Object.entries(outputs)) {
+          if (key.startsWith(prefix) && key.endsWith(suffix) && key !== `${prefix}${suffix}`) {
+            webhookLines.push(`  ${agent.displayName} (${agent.role}): ${value}`);
+          }
         }
       }
       if (webhookLines.length > 0) {
@@ -284,8 +287,10 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
             webhookPluginNames.add(pluginManifest.displayName);
           }
         }
-      } catch {
-        // Identity not available — skip
+      } catch (err) {
+        ui.log.warn(
+          `Could not evaluate webhook-capable plugins for agent "${agent.role}": ${err instanceof Error ? err.message : String(err)}`
+        );
       }
     }
     if (webhookPluginNames.size > 0) {

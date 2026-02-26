@@ -95,9 +95,11 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
     process.exit(1);
   }
 
-  // Check if any webhook URLs exist
+  // Check if any webhook URLs exist (keys are ${role}${PluginSlug}WebhookUrl)
   const agentsWithUrls = manifest.agents.filter(
-    (agent) => outputs[`${agent.role}WebhookUrl`]
+    (agent) => Object.keys(outputs).some(
+      (k) => k.startsWith(agent.role) && k.endsWith("WebhookUrl")
+    )
   );
 
   if (agentsWithUrls.length === 0) {
@@ -147,7 +149,8 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
   const secrets: { role: string; name: string; agentName: string; secret: string; plugin: PluginManifest }[] = [];
 
   for (const { agent, plugin } of webhookPlugins) {
-    const webhookUrl = outputs[`${agent.role}WebhookUrl`] as string | undefined;
+    const pluginSlug = plugin.name.replace(/[^a-zA-Z0-9]+(.)/g, (_, c: string) => c.toUpperCase()).replace(/^[a-z]/, (c) => c.toUpperCase());
+    const webhookUrl = outputs[`${agent.role}${pluginSlug}WebhookUrl`] as string | undefined;
     if (!webhookUrl) {
       ui.log.warn(`No webhook URL found for ${agent.displayName} (${agent.role}) — skipping.`);
       continue;
@@ -191,9 +194,12 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
   const configSpinner = ui.spinner("Saving webhook secrets to Pulumi config...");
   for (const { role, secret, plugin } of secrets) {
     const secretKey = plugin.webhookSetup!.secretKey;
-    // Derive Pulumi config key: e.g., <role>LinearWebhookSecret
-    const configKeySuffix = secretKey.charAt(0).toUpperCase() + secretKey.slice(1);
-    const pulumiKey = `${role}${plugin.displayName}${configKeySuffix}`;
+    // Derive Pulumi config key from the secret's envVar: e.g., <role>LinearWebhookSecret
+    const secretDef = plugin.secrets[secretKey];
+    const envVarSuffix = secretDef
+      ? secretDef.envVar.toLowerCase().split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("")
+      : secretKey.charAt(0).toUpperCase() + secretKey.slice(1);
+    const pulumiKey = `${role}${envVarSuffix}`;
     exec.capture(
       "pulumi",
       ["config", "set", pulumiKey, secret, "--secret"],
@@ -213,7 +219,7 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
 
     // Use configJsonPath from plugin manifest to build the jq path
     const jsonPath = plugin.webhookSetup!.configJsonPath;
-    const jqPath = "." + jsonPath.replace(/\./g, ".");
+    const jqPath = "." + jsonPath.replace(/^\./, "");
 
     // Escape the secret for use inside jq
     const escapedSecret = secret.replace(/'/g, "'\\''");

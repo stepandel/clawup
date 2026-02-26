@@ -494,7 +494,8 @@ for (const [role, outputs] of Object.entries(agentOutputs)) {
       const pluginManifest = resolvePlugin(pluginName, identityResult);
       if (pluginManifest.webhookSetup) {
         const urlPath = pluginManifest.webhookSetup.urlPath;
-        module.exports[`${role}WebhookUrl`] = outputs.tailscaleUrl.apply((url) => {
+        const pluginSlug = pluginName.replace(/[^a-zA-Z0-9]+(.)/g, (_, c: string) => c.toUpperCase()).replace(/^[a-z]/, (c) => c.toUpperCase());
+        module.exports[`${role}${pluginSlug}WebhookUrl`] = outputs.tailscaleUrl.apply((url) => {
           const baseUrl = url.split("?")[0].replace(/\/$/, "");
           return `${baseUrl}${urlPath}`;
         });
