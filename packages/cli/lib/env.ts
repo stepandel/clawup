@@ -382,13 +382,18 @@ export function generateEnvExample(opts: EnvExampleOpts): string {
 
       // Check if this secret is auto-resolvable via plugin manifest
       // Scope to agent's actual plugins if available, otherwise check all
+      // Note: `key` is envVar-derived camelCase (e.g., "linearApiKey") but manifest
+      // secrets are keyed by raw name (e.g., "apiKey"). Match via envVar instead.
       let isAutoResolvable = false;
       const pluginNames = opts.agentPluginNames?.get(agent.name);
       const manifestsToCheck = pluginNames
         ? [...pluginNames].map((n) => PLUGIN_MANIFEST_REGISTRY[n]).filter(Boolean)
         : Object.values(PLUGIN_MANIFEST_REGISTRY);
       for (const pm of manifestsToCheck) {
-        if (pm.secrets[key]?.autoResolvable) {
+        const matchingSecret = Object.values(pm.secrets).find(
+          (s) => envVarToCamelCase(s.envVar) === key
+        );
+        if (matchingSecret?.autoResolvable) {
           isAutoResolvable = true;
           break;
         }
