@@ -11,3 +11,10 @@ export {
 export {
   IdentityManifestSchema,
 } from "./identity";
+
+export {
+  PluginManifestSchema,
+  PluginSecretSchema,
+  WebhookSetupSchema,
+  ConfigTransformSchema,
+} from "./plugin-manifest";

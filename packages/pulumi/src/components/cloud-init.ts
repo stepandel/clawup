@@ -22,6 +22,16 @@ export interface PluginInstallConfig {
   secretEnvVars?: Record<string, string>;
   /** false for built-in plugins like Slack that don't need `openclaw plugins install` */
   installable?: boolean;
+  /** Where this plugin's config lives in openclaw.json: "plugins.entries" or "channels" */
+  configPath?: "plugins.entries" | "channels";
+  /** Keys that are clawup-internal metadata and should NOT be written to OpenClaw config */
+  internalKeys?: string[];
+  /** Config transforms to apply before writing (e.g., dm flattening for Slack) */
+  configTransforms?: Array<{
+    sourceKey: string;
+    targetKeys: Record<string, string>;
+    removeSource: boolean;
+  }>;
 }
 
 export interface CloudInitConfig {
@@ -95,6 +105,9 @@ export function generateCloudInit(config: CloudInitConfig): string {
     enabled: true,
     config: p.config ?? {},
     secretEnvVars: p.secretEnvVars,
+    configPath: p.configPath,
+    internalKeys: p.internalKeys,
+    configTransforms: p.configTransforms,
   }));
 
   // Extract braveApiKey from depSecrets for config-generator (special case)

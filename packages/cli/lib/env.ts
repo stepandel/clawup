@@ -7,11 +7,13 @@
  */
 
 import * as fs from "fs";
+import { resolvePlugin, PLUGIN_MANIFEST_REGISTRY } from "@clawup/core";
 
 // ---------------------------------------------------------------------------
 // Validators — shared prefix/suffix checks for well-known secret types
 // ---------------------------------------------------------------------------
 
+/** Infrastructure validators — always present regardless of plugins */
 export const VALIDATORS: Record<string, (val: string) => string | undefined> = {
   anthropicApiKey: (val) => {
     if (!val.startsWith("sk-ant-")) return "Must start with sk-ant-";
@@ -21,15 +23,6 @@ export const VALIDATORS: Record<string, (val: string) => string | undefined> = {
   },
   tailnetDnsName: (val) => {
     if (!val.endsWith(".ts.net")) return "Must end with .ts.net";
-  },
-  slackBotToken: (val) => {
-    if (!val.startsWith("xoxb-")) return "Must start with xoxb-";
-  },
-  slackAppToken: (val) => {
-    if (!val.startsWith("xapp-")) return "Must start with xapp-";
-  },
-  linearApiKey: (val) => {
-    if (!val.startsWith("lin_api_")) return "Must start with lin_api_";
   },
   githubToken: (val) => {
     if (!val.startsWith("ghp_") && !val.startsWith("github_pat_")) {
@@ -224,6 +217,18 @@ export function agentEnvVarName(role: string, suffix: string): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Convert a SCREAMING_SNAKE_CASE env var to camelCase.
+ * e.g., "SLACK_BOT_TOKEN" → "slackBotToken", "LINEAR_API_KEY" → "linearApiKey"
+ */
+export function envVarToCamelCase(envVar: string): string {
+  return envVar
+    .toLowerCase()
+    .split("_")
+    .map((part, i) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+/**
  * Convert a camelCase key to SCREAMING_SNAKE_CASE.
  * e.g., "notionApiKey" → "NOTION_API_KEY", "slackBotToken" → "SLACK_BOT_TOKEN"
  */
@@ -284,7 +289,7 @@ export function buildManifestSecrets(opts: SecretsBuilderOpts): ManifestSecrets 
     global.braveApiKey = "${env:BRAVE_API_KEY}";
   }
 
-  // Per-agent secrets
+  // Per-agent secrets — generic loop over resolved plugin manifests
   for (const agent of opts.agents) {
     const roleUpper = agent.role.toUpperCase();
     const agentSecrets: Record<string, string> = {};
@@ -292,17 +297,21 @@ export function buildManifestSecrets(opts: SecretsBuilderOpts): ManifestSecrets 
     const plugins = opts.agentPlugins.get(agent.name);
     const deps = opts.agentDeps.get(agent.name);
 
-    if (plugins?.has("slack")) {
-      agentSecrets.slackBotToken = `\${env:${roleUpper}_SLACK_BOT_TOKEN}`;
-      agentSecrets.slackAppToken = `\${env:${roleUpper}_SLACK_APP_TOKEN}`;
+    // Plugin secrets (driven by manifest metadata)
+    if (plugins) {
+      for (const pluginName of plugins) {
+        const manifest = resolvePlugin(pluginName);
+        for (const [key, secret] of Object.entries(manifest.secrets)) {
+          if (secret.scope === "agent") {
+            // Use the envVar to derive the manifest key (e.g., SLACK_BOT_TOKEN → slackBotToken)
+            const manifestKey = envVarToCamelCase(secret.envVar);
+            agentSecrets[manifestKey] = `\${env:${roleUpper}_${secret.envVar}}`;
+          }
+        }
+      }
     }
 
-    if (plugins?.has("openclaw-linear")) {
-      agentSecrets.linearApiKey = `\${env:${roleUpper}_LINEAR_API_KEY}`;
-      agentSecrets.linearWebhookSecret = `\${env:${roleUpper}_LINEAR_WEBHOOK_SECRET}`;
-      agentSecrets.linearUserUuid = `\${env:${roleUpper}_LINEAR_USER_UUID}`;
-    }
-
+    // Dep secrets
     if (deps?.has("gh")) {
       agentSecrets.githubToken = `\${env:${roleUpper}_GITHUB_TOKEN}`;
     }
@@ -368,9 +377,18 @@ export function generateEnvExample(opts: EnvExampleOpts): string {
     for (const [key, ref] of Object.entries(agentSecrets)) {
       const varName = extractEnvVarName(ref);
       if (!varName) continue;
-      if (key === "linearUserUuid") {
-        // Optional — auto-fetched by `clawup setup` if Linear API key is set
-        lines.push(`# ${varName}=  # auto-fetched if ${agent.role.toUpperCase()}_LINEAR_API_KEY is set`);
+
+      // Check if this secret is auto-resolvable via plugin manifest
+      let isAutoResolvable = false;
+      for (const pm of Object.values(PLUGIN_MANIFEST_REGISTRY)) {
+        if (pm.secrets[key]?.autoResolvable) {
+          isAutoResolvable = true;
+          break;
+        }
+      }
+
+      if (isAutoResolvable) {
+        lines.push(`# ${varName}=  # auto-resolved by \`clawup setup\``);
       } else {
         lines.push(`${varName}=`);
       }

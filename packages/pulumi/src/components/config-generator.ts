@@ -21,10 +21,17 @@ export interface PluginEntry {
    * e.g., { "apiKey": "LINEAR_API_KEY", "webhookSecret": "LINEAR_WEBHOOK_SECRET" }
    */
   secretEnvVars?: Record<string, string>;
+  /** Where this plugin's config lives in openclaw.json: "plugins.entries" or "channels" */
+  configPath?: "plugins.entries" | "channels";
+  /** Keys that are clawup-internal metadata and should NOT be written to OpenClaw config */
+  internalKeys?: string[];
+  /** Config transforms to apply before writing (e.g., dm flattening for Slack) */
+  configTransforms?: Array<{
+    sourceKey: string;
+    targetKeys: Record<string, string>;
+    removeSource: boolean;
+  }>;
 }
-
-/** Keys that are clawup-internal metadata and should NOT be written to OpenClaw config */
-const INTERNAL_PLUGIN_KEYS = new Set(["agentId", "linearUserUuid"]);
 
 /** Matches a string that is entirely an env var reference: $VAR_NAME */
 const ENV_VAR_PATTERN = /^\$([A-Z][A-Z0-9_]*)$/;
@@ -185,13 +192,17 @@ export function generateOpenClawConfigJson(options: OpenClawConfigOptions): stri
  * Generates Python code to configure a single plugin in openclaw.json.
  * Secrets are injected from environment variables.
  *
- * Slack is special-cased: it writes to config["channels"]["slack"] (channel config)
- * AND config["plugins"]["entries"]["slack"] (plugin entry).
+ * The configPath field drives which code path is used:
+ * - "channels": writes to config["channels"]["<name>"] (channel config)
+ * - "plugins.entries": writes to config["plugins"]["entries"]["<name>"] (plugin entry)
  */
 function generatePluginPython(plugin: PluginEntry): string {
-  if (plugin.name === "slack") {
-    return generateSlackPluginPython(plugin);
+  if (plugin.configPath === "channels") {
+    return generateChannelPluginPython(plugin);
   }
+
+  const internalKeys = new Set(plugin.internalKeys ?? []);
+
   // Build the config dict, injecting secrets from env vars
   const configEntries: string[] = [];
 
@@ -202,9 +213,9 @@ function generatePluginPython(plugin: PluginEntry): string {
     }
   }
 
-  // Non-secret config values (filter out clawup-internal metadata)
+  // Non-secret config values (filter out internal metadata)
   for (const [key, value] of Object.entries(plugin.config)) {
-    if (INTERNAL_PLUGIN_KEYS.has(key)) continue;
+    if (internalKeys.has(key)) continue;
     configEntries.push(`        "${key}": ${toPythonLiteral(value)}`);
   }
 
@@ -227,31 +238,44 @@ print("Configured ${plugin.name} plugin")
 }
 
 /**
- * Generates Python code for Slack channel + plugin configuration.
- * Slack writes to config["channels"]["slack"] with secrets from env vars
+ * Generates Python code for channel-based plugin configuration.
+ * Writes to config["channels"]["<name>"] with secrets from env vars
  * and non-secret config from plugin defaults, plus enables the plugin entry.
+ *
+ * Config transforms (e.g., dm → dmPolicy/allowFrom flattening) are applied
+ * generically based on the plugin's configTransforms definition.
  */
-function generateSlackPluginPython(plugin: PluginEntry): string {
+function generateChannelPluginPython(plugin: PluginEntry): string {
+  const internalKeys = new Set(plugin.internalKeys ?? []);
+  const transforms = plugin.configTransforms ?? [];
+  const transformSourceKeys = new Set(transforms.map((t) => t.sourceKey));
+
   // Build channel config entries from non-secret plugin config
   const channelEntries: string[] = [];
 
-  // Secret env var values (botToken, appToken)
+  // Secret env var values
   if (plugin.secretEnvVars) {
     for (const [configKey, envVar] of Object.entries(plugin.secretEnvVars)) {
       channelEntries.push(`    "${configKey}": os.environ.get("${envVar}", "")`);
     }
   }
 
-  // Non-secret config values (mode, userTokenReadOnly, groupPolicy, dm, etc.)
+  // Non-secret config values with generic transform support
   for (const [key, value] of Object.entries(plugin.config)) {
-    if (INTERNAL_PLUGIN_KEYS.has(key)) continue;
-    // Flatten dm nested object → top-level dmPolicy/allowFrom (OpenClaw schema)
-    if (key === "dm" && typeof value === "object" && value !== null) {
-      const dm = value as Record<string, unknown>;
-      if (dm.policy) channelEntries.push(`    "dmPolicy": ${toPythonLiteral(dm.policy)}`);
-      if (dm.allowFrom) channelEntries.push(`    "allowFrom": ${toPythonLiteral(dm.allowFrom)}`);
+    if (internalKeys.has(key)) continue;
+
+    // Apply config transforms
+    if (transformSourceKeys.has(key) && typeof value === "object" && value !== null) {
+      const transform = transforms.find((t) => t.sourceKey === key)!;
+      const nested = value as Record<string, unknown>;
+      for (const [nestedKey, targetKey] of Object.entries(transform.targetKeys)) {
+        if (nested[nestedKey] !== undefined) {
+          channelEntries.push(`    "${targetKey}": ${toPythonLiteral(nested[nestedKey])}`);
+        }
+      }
       continue;
     }
+
     channelEntries.push(`    "${key}": ${toPythonLiteral(value)}`);
   }
 
@@ -265,13 +289,13 @@ ${channelEntries.join(",\n")}
     : "{}";
 
   return `
-# Configure Slack channel (Socket Mode) and plugin
+# Configure ${plugin.name} channel and plugin
 config.setdefault("channels", {})
-config["channels"]["slack"] = ${channelBlock}
+config["channels"]["${plugin.name}"] = ${channelBlock}
 config.setdefault("plugins", {})
 config["plugins"].setdefault("entries", {})
-config["plugins"]["entries"]["slack"] = {"enabled": ${plugin.enabled ? "True" : "False"}}
-print("Configured Slack channel with Socket Mode")
+config["plugins"]["entries"]["${plugin.name}"] = {"enabled": ${plugin.enabled ? "True" : "False"}}
+print("Configured ${plugin.name} channel")
 `;
 }
 

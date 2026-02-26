@@ -42,8 +42,18 @@ export {
 } from "./constants";
 
 // Plugin registry
-export type { PluginRegistryEntry } from "./plugin-registry";
-export { PLUGIN_REGISTRY } from "./plugin-registry";
+export type { PluginRegistryEntry, PluginManifest, PluginSecret } from "./plugin-registry";
+export { PLUGIN_REGISTRY, PLUGIN_MANIFEST_REGISTRY, getSecretEnvVars } from "./plugin-registry";
+
+// Plugin loader
+export {
+  resolvePlugin,
+  resolvePlugins,
+  collectPluginSecrets,
+  buildKnownSecrets,
+  buildValidators,
+  isSecretCoveredByPlugin,
+} from "./plugin-loader";
 
 // Coding agent registry
 export type { CodingAgentEntry, CodingAgentSecret } from "./coding-agent-registry";
@@ -70,4 +80,8 @@ export {
   ClawupManifestSchema,
   PluginConfigFileSchema,
   IdentityManifestSchema,
+  PluginManifestSchema,
+  PluginSecretSchema,
+  WebhookSetupSchema,
+  ConfigTransformSchema,
 } from "./schemas";

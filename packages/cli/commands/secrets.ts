@@ -10,6 +10,7 @@ import * as process from "process";
 import { requireManifest } from "../lib/config";
 import { selectOrCreateStack, setConfig, getConfig } from "../lib/pulumi";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
+import { PLUGIN_MANIFEST_REGISTRY, buildKnownSecrets, DEP_REGISTRY } from "@clawup/core";
 import pc from "picocolors";
 
 // ---------------------------------------------------------------------------
@@ -25,19 +26,37 @@ interface SecretMeta {
   isSecret: boolean;
 }
 
-const KNOWN_SECRETS: Record<string, SecretMeta> = {
-  anthropicApiKey: { label: "Anthropic API Key", perAgent: false, isSecret: true },
-  tailscaleAuthKey: { label: "Tailscale Auth Key", perAgent: false, isSecret: true },
-  tailscaleApiKey: { label: "Tailscale API Key", perAgent: false, isSecret: true },
-  tailnetDnsName: { label: "Tailnet DNS Name", perAgent: false, isSecret: false },
-  braveApiKey: { label: "Brave Search API Key", perAgent: false, isSecret: true },
-  slackBotToken: { label: "Slack Bot Token", perAgent: true, isSecret: true },
-  slackAppToken: { label: "Slack App Token", perAgent: true, isSecret: true },
-  linearApiKey: { label: "Linear API Key", perAgent: true, isSecret: true },
-  linearWebhookSecret: { label: "Linear Webhook Secret", perAgent: true, isSecret: true },
-  linearUserUuid: { label: "Linear User UUID", perAgent: true, isSecret: false },
-  githubToken: { label: "GitHub Token", perAgent: true, isSecret: true },
-};
+/** Build the full KNOWN_SECRETS map: infrastructure + plugins + deps */
+function buildAllKnownSecrets(): Record<string, SecretMeta> {
+  // Infrastructure secrets (always present)
+  const infra: Record<string, SecretMeta> = {
+    anthropicApiKey: { label: "Anthropic API Key", perAgent: false, isSecret: true },
+    tailscaleAuthKey: { label: "Tailscale Auth Key", perAgent: false, isSecret: true },
+    tailscaleApiKey: { label: "Tailscale API Key", perAgent: false, isSecret: true },
+    tailnetDnsName: { label: "Tailnet DNS Name", perAgent: false, isSecret: false },
+  };
+
+  // Plugin secrets (dynamic from registry)
+  const pluginSecrets = buildKnownSecrets(Object.values(PLUGIN_MANIFEST_REGISTRY));
+
+  // Dep secrets (dynamic from dep registry)
+  const depSecrets: Record<string, SecretMeta> = {};
+  for (const dep of Object.values(DEP_REGISTRY)) {
+    for (const [key, secret] of Object.entries(dep.secrets)) {
+      // Convert PascalCase key to camelCase for consistency
+      const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+      depSecrets[camelKey] = {
+        label: `${dep.displayName} ${key.replace(/([A-Z])/g, " $1").trim()}`,
+        perAgent: secret.scope === "agent",
+        isSecret: true,
+      };
+    }
+  }
+
+  return { ...infra, ...pluginSecrets, ...depSecrets };
+}
+
+const KNOWN_SECRETS: Record<string, SecretMeta> = buildAllKnownSecrets();
 
 // ---------------------------------------------------------------------------
 // Helpers

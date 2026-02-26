@@ -197,28 +197,9 @@ export const KEY_INSTRUCTIONS = {
       "3. It looks like \"tailXXXXX.ts.net\" or a custom domain",
     ],
   },
-  slackCredentials: {
-    title: "Slack App Setup",
-    steps: [
-      "Create a Slack app for each agent using the manifest shown below:",
-      "1. Go to https://api.slack.com/apps → \"Create New App\" → \"From a manifest\"",
-      "2. Select your workspace, paste the JSON manifest, and create the app",
-      "3. Go to \"OAuth & Permissions\" — copy the Bot Token (xoxb-...)",
-      "4. Under \"Basic Information\" → \"App-Level Tokens\", generate a token",
-      "   with the connections:write scope — copy it (xapp-...)",
-    ],
-  },
-  linearApiKey: {
-    title: "Linear API Key",
-    steps: [
-      "Create a separate Linear account for each agent (used by openclaw-linear plugin):",
-      "1. Invite you+agentname@domain.com to your Linear workspace",
-      "   (plus-addressing forwards to your inbox — no new email needed)",
-      "   Follow the link in the invite email to create the account and join the org",
-      "2. Go to Settings → Security & Access → Personal API keys → \"New API key\"",
-      "3. Copy the key (starts with lin_api_)",
-    ],
-  },
+  // Plugin-specific instructions (slackCredentials, linearApiKey) have been
+  // moved to the enriched plugin registry in plugin-registry.ts.
+  // Access them via: PLUGIN_MANIFEST_REGISTRY["slack"].secrets.botToken.instructions
   githubToken: {
     title: "GitHub Token",
     steps: [

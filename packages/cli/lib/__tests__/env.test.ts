@@ -229,19 +229,12 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.tailnetDnsName("bad")).toBe("Must end with .ts.net");
   });
 
-  it("validates slackBotToken prefix", () => {
-    expect(VALIDATORS.slackBotToken("xoxb-test")).toBeUndefined();
-    expect(VALIDATORS.slackBotToken("bad")).toBe("Must start with xoxb-");
-  });
-
-  it("validates slackAppToken prefix", () => {
-    expect(VALIDATORS.slackAppToken("xapp-test")).toBeUndefined();
-    expect(VALIDATORS.slackAppToken("bad")).toBe("Must start with xapp-");
-  });
-
-  it("validates linearApiKey prefix", () => {
-    expect(VALIDATORS.linearApiKey("lin_api_test")).toBeUndefined();
-    expect(VALIDATORS.linearApiKey("bad")).toBe("Must start with lin_api_");
+  it("does not include plugin validators (moved to plugin registry)", () => {
+    // Plugin validators are now generated dynamically via buildValidators()
+    // from the plugin registry, not hardcoded in VALIDATORS
+    expect(VALIDATORS.slackBotToken).toBeUndefined();
+    expect(VALIDATORS.slackAppToken).toBeUndefined();
+    expect(VALIDATORS.linearApiKey).toBeUndefined();
   });
 
   it("validates githubToken prefix", () => {
@@ -510,9 +503,9 @@ describe("generateEnvExample", () => {
     });
 
     expect(result).toContain("ENG_LINEAR_API_KEY=");
-    // linearUserUuid should be commented out (optional, auto-fetched)
+    // linearUserUuid should be commented out (optional, auto-resolved)
     expect(result).toMatch(/# ENG_LINEAR_USER_UUID=/);
-    expect(result).toContain("auto-fetched");
+    expect(result).toContain("auto-resolved");
   });
 
   it("skips agents with no secrets", () => {

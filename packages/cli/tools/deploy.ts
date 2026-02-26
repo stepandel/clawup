@@ -6,8 +6,11 @@
 
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
 import { requireManifest, syncManifestToProject } from "../lib/config";
-import { COST_ESTIMATES, HETZNER_COST_ESTIMATES, LOCAL_COST_ESTIMATES } from "@clawup/core";
+import { COST_ESTIMATES, HETZNER_COST_ESTIMATES, LOCAL_COST_ESTIMATES, resolvePlugin } from "@clawup/core";
 import type { ClawupManifest } from "@clawup/core";
+import { fetchIdentitySync } from "@clawup/core/identity";
+import * as path from "path";
+import * as os from "os";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
 import { getConfig, setConfig, verifyStackOwnership, stampStackFingerprint } from "../lib/tool-helpers";
@@ -269,9 +272,28 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
       );
     }
 
-    ui.log.info(
-      `Run ${pc.cyan("clawup webhooks setup")} to configure Linear webhooks for your agents.`
-    );
+    // Check if any agent has plugins with webhookSetup — show generic message
+    const identityCacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
+    const webhookPluginNames = new Set<string>();
+    for (const agent of manifest.agents) {
+      try {
+        const identity = fetchIdentitySync(agent.identity, identityCacheDir);
+        for (const pluginName of identity.manifest.plugins ?? []) {
+          const pluginManifest = resolvePlugin(pluginName);
+          if (pluginManifest.webhookSetup) {
+            webhookPluginNames.add(pluginManifest.displayName);
+          }
+        }
+      } catch {
+        // Identity not available — skip
+      }
+    }
+    if (webhookPluginNames.size > 0) {
+      const pluginList = [...webhookPluginNames].join(", ");
+      ui.log.info(
+        `Run ${pc.cyan("clawup webhooks setup")} to configure ${pluginList} webhooks for your agents.`
+      );
+    }
 
     ui.outro("Agents will be ready in 3-5 minutes. Run `clawup validate` to check.");
   }

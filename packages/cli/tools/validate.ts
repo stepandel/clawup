@@ -8,7 +8,7 @@ import path from "path";
 import os from "os";
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { requireManifest } from "../lib/config";
-import { SSH_USER, tailscaleHostname, dockerContainerName, CODING_AGENT_REGISTRY, DEP_REGISTRY, PLUGIN_REGISTRY } from "@clawup/core";
+import { SSH_USER, tailscaleHostname, dockerContainerName, CODING_AGENT_REGISTRY, DEP_REGISTRY, resolvePlugin } from "@clawup/core";
 import type { IdentityManifest } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
@@ -303,24 +303,21 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
 
         // Plugin secret checks
         for (const plugin of identityManifest.plugins ?? []) {
-          const pluginEntry = PLUGIN_REGISTRY[plugin];
-          if (!pluginEntry) {
-            ui.log.warn(`Unknown plugin "${plugin}" — skipping checks`);
-            continue;
-          }
+          const pluginManifest = resolvePlugin(plugin);
+          if (Object.keys(pluginManifest.secrets).length === 0) continue;
 
-          for (const [key, envVar] of Object.entries(pluginEntry.secretEnvVars)) {
-            // Slack secrets live at .channels.slack.<key>; other plugins at .plugins.entries["<name>"].config.<key>
-            const pyPath = plugin === "slack"
-              ? `c.get('channels',{}).get('slack',{}).get('${key}')`
+          for (const [key, secret] of Object.entries(pluginManifest.secrets)) {
+            // Use configPath to determine where secrets live in openclaw.json
+            const pyPath = pluginManifest.configPath === "channels"
+              ? `c.get('channels',{}).get('${plugin}',{}).get('${key}')`
               : `c.get('plugins',{}).get('entries',{}).get('${plugin}',{}).get('config',{}).get('${key}')`;
             const secretCheck = runCheck(
               `python3 -c "import json,sys;c=json.load(open('/home/${SSH_USER}/.openclaw/openclaw.json'));sys.exit(0 if ${pyPath} else 1)"`
             );
             checks.push({
-              name: `${plugin} secret (${envVar})`,
+              name: `${plugin} secret (${secret.envVar})`,
               passed: secretCheck.ok,
-              detail: secretCheck.ok ? "configured" : `${envVar} not configured`,
+              detail: secretCheck.ok ? "configured" : `${secret.envVar} not configured`,
             });
           }
         }
@@ -422,11 +419,9 @@ timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
           }
         }
         for (const plugin of identityManifest.plugins ?? []) {
-          const pluginEntry = PLUGIN_REGISTRY[plugin];
-          if (pluginEntry) {
-            for (const [_key, envVar] of Object.entries(pluginEntry.secretEnvVars)) {
-              checks.push({ name: `${plugin} secret (${envVar})`, passed: false, detail: skipReason });
-            }
+          const pluginManifest = resolvePlugin(plugin);
+          for (const [_key, secret] of Object.entries(pluginManifest.secrets)) {
+            checks.push({ name: `${plugin} secret (${secret.envVar})`, passed: false, detail: skipReason });
           }
         }
       } else {

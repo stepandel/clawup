@@ -21,7 +21,8 @@ import type { BaseOpenClawAgentArgs, DepInstallConfig } from "./components";
 import { SharedVpc } from "./shared-vpc";
 import {
   classifySkills,
-  PLUGIN_REGISTRY,
+  resolvePlugin,
+  getSecretEnvVars,
   resolveDeps,
   collectDepSecrets,
 } from "@clawup/core";
@@ -236,24 +237,32 @@ function buildPluginsForAgent(
       agentSection = { ...identityConfig, ...userConfig };
     }
 
-    const registryEntry = PLUGIN_REGISTRY[pluginName];
-    const secretMapping = registryEntry?.secretEnvVars ?? {};
+    const manifest = resolvePlugin(pluginName);
+    const secretMapping = getSecretEnvVars(manifest);
 
     // Merge registry defaultConfig as lowest-priority defaults
-    let mergedConfig = registryEntry?.defaultConfig
-      ? { ...registryEntry.defaultConfig, ...agentSection }
+    let mergedConfig = manifest.defaultConfig
+      ? { ...manifest.defaultConfig, ...agentSection }
       : agentSection;
 
-    // Apply registry transform (e.g., build agentMapping from linearUserUuid)
-    if (registryEntry?.transformConfig) {
-      mergedConfig = registryEntry.transformConfig(mergedConfig);
+    // Apply Linear-specific transform (build agentMapping from linearUserUuid)
+    // This is the one piece of runtime logic that can't be purely declarative
+    if (pluginName === "openclaw-linear") {
+      const uuid = mergedConfig.linearUserUuid as string | undefined;
+      const mapping: Record<string, string> = {};
+      if (uuid) mapping[uuid] = "default";
+      mapping["$AGENT_NAME"] = "default";
+      mergedConfig.agentMapping = mapping;
     }
 
     plugins.push({
       name: pluginName,
       config: mergedConfig,
       secretEnvVars: Object.keys(secretMapping).length > 0 ? secretMapping : undefined,
-      installable: registryEntry?.installable ?? true,
+      installable: manifest.installable,
+      configPath: manifest.configPath,
+      internalKeys: manifest.internalKeys.length > 0 ? manifest.internalKeys : undefined,
+      configTransforms: manifest.configTransforms.length > 0 ? manifest.configTransforms : undefined,
     });
 
     // Collect secret outputs from Pulumi config
@@ -269,7 +278,7 @@ function buildPluginsForAgent(
     }
 
     // Enable funnel if the plugin needs webhooks
-    if (registryEntry?.needsFunnel) {
+    if (manifest.needsFunnel) {
       enableFunnel = true;
     }
   }
@@ -474,10 +483,21 @@ for (const [role, outputs] of Object.entries(agentOutputs)) {
   module.exports[`${role}PublicIp`] = outputs.publicIp;
   module.exports[`${role}SshPrivateKey`] = pulumi.secret(outputs.sshPrivateKey);
 
-  // Webhook URL for plugins that need it (derived from Tailscale Funnel public URL)
-  module.exports[`${role}WebhookUrl`] = outputs.tailscaleUrl.apply((url) => {
-    // Extract base URL (remove query params like ?token=...) and append webhook path
-    const baseUrl = url.split("?")[0].replace(/\/$/, "");
-    return `${baseUrl}/hooks/linear`;
-  });
+  // Webhook URLs for plugins that need them (derived from Tailscale Funnel public URL)
+  // Generic: loop over all agents' plugins and emit webhook URLs for those with webhookSetup
+  const agentDef = manifest.agents.find((a) => a.role === role);
+  if (agentDef) {
+    const identityResult = fetchIdentitySync(agentDef.identity, identityCacheDir);
+    const agentPluginNames = identityResult.manifest.plugins ?? [];
+    for (const pluginName of agentPluginNames) {
+      const pluginManifest = resolvePlugin(pluginName);
+      if (pluginManifest.webhookSetup) {
+        const urlPath = pluginManifest.webhookSetup.urlPath;
+        module.exports[`${role}WebhookUrl`] = outputs.tailscaleUrl.apply((url) => {
+          const baseUrl = url.split("?")[0].replace(/\/$/, "");
+          return `${baseUrl}${urlPath}`;
+        });
+      }
+    }
+  }
 }
