@@ -205,42 +205,54 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
 
     const { adapter, ui, dispose } = createTestAdapter();
 
-    // Validate — some checks may fail (dummy API key) but container check should pass.
+    // Validate — some checks may fail (dummy API key) but infrastructure checks should pass.
     // The validate tool calls process.exit(1) if any agent fails.
     try {
       await validateTool(adapter, { local: true, timeout: "60" });
     } catch (err) {
-      // Expected — validation may fail on auth checks with dummy key
+      // Expected — validation exits 1 when auth checks fail with dummy key
       if (!(err instanceof ProcessExitError)) throw err;
     } finally {
       dispose();
     }
 
-    // Assert: validation summary note was generated
-    expect(ui.hasNote("Validation Summary")).toBe(true);
-
-    // Assert: summary has correct agent count
+    // Assert: validation summary note was generated with correct agent count
     const summary = ui.getValidationSummary();
     expect(summary).not.toBeNull();
     expect(summary!.total).toBe(1);
 
-    // Assert: agent name was logged (ui.log.info with agent display name)
+    // Assert: agent header was logged
     expect(ui.hasLog("info", "TestBot")).toBe(true);
 
-    // Assert: "Container running" check passed (printed via console.log)
-    expect(ui.hasConsoleOutput("Container running")).toBe(true);
-    // The PASS line includes "running" detail
-    const containerLines = ui.getConsoleLines("Container running");
-    expect(containerLines.length).toBeGreaterThan(0);
-    expect(containerLines[0]).toContain("running");
+    // Parse individual check results from console output
+    const checks = ui.getCheckResults();
+    expect(checks.length).toBeGreaterThan(0);
 
-    // Assert: "Workspace files" check ran (SOUL.md + HEARTBEAT.md)
-    expect(ui.hasConsoleOutput("Workspace files")).toBe(true);
+    // Assert: "Container running" check PASSED — the core infrastructure check
+    const containerCheck = ui.getCheckResult("Container running");
+    expect(containerCheck).not.toBeNull();
+    expect(containerCheck!.passed).toBe(true);
+    expect(containerCheck!.detail).toBe("running");
 
-    // Assert: "Claude Code CLI" or coding agent check ran
-    expect(
-      ui.hasConsoleOutput("Claude Code") || ui.hasConsoleOutput("coding agent"),
-    ).toBe(true);
+    // Assert: "Workspace files" check ran
+    // May fail in local Docker since cloud-init workspace injection may not complete
+    // immediately. The important thing is that the check was executed.
+    const workspaceCheck = ui.getCheckResult("Workspace files");
+    expect(workspaceCheck).not.toBeNull();
+
+    // Assert: Claude Code CLI check ran
+    const claudeCheck = ui.getCheckResult("Claude Code CLI");
+    expect(claudeCheck).not.toBeNull();
+
+    // Assert: Claude Code auth check ran — expected to FAIL with dummy API key
+    const authCheck = ui.getCheckResult("Claude Code auth");
+    if (authCheck && !process.env.ANTHROPIC_API_KEY?.startsWith("sk-ant-api")) {
+      expect(authCheck.passed).toBe(false);
+    }
+
+    // Assert: overall validation correctly reports the agent as failed
+    // (auth checks fail with dummy key, so the agent fails)
+    expect(summary!.failed).toBe(1);
   }, 120_000);
 
   // -------------------------------------------------------------------------

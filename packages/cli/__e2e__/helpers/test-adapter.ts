@@ -302,6 +302,37 @@ export class TestUIAdapter implements UIAdapter {
     );
   }
 
+  /**
+   * Parse validate tool check result lines from console output.
+   * Each line looks like: "    PASS  Container running: running"
+   * (with ANSI color codes around PASS/FAIL).
+   * Returns an array of { name, passed, detail } objects.
+   */
+  getCheckResults(): Array<{ name: string; passed: boolean; detail: string }> {
+    const results: Array<{ name: string; passed: boolean; detail: string }> = [];
+    for (const line of this.consoleOutput) {
+      // Strip ANSI codes for matching
+      const stripped = line.replace(/\x1b\[[0-9;]*m/g, "").trim();
+      const match = stripped.match(/^(PASS|FAIL)\s+(.+?):\s*(.*)$/);
+      if (match) {
+        results.push({
+          passed: match[1] === "PASS",
+          name: match[2],
+          detail: match[3],
+        });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Get a specific check result by name from validate output.
+   * Returns null if not found.
+   */
+  getCheckResult(name: string): { passed: boolean; detail: string } | null {
+    return this.getCheckResults().find((c) => c.name === name) ?? null;
+  }
+
   reset(): void {
     this.logs = [];
     this.notes = [];

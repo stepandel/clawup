@@ -155,14 +155,22 @@ describe("Redeploy existing stack (in-place update)", () => {
       dispose();
     }
 
-    // Assert: validation ran with correct structure
-    expect(ui.hasNote("Validation Summary")).toBe(true);
+    // Assert: validation ran with correct agent count
     const summary = ui.getValidationSummary();
     expect(summary).not.toBeNull();
     expect(summary!.total).toBe(1);
 
-    // Assert: container running check was performed
-    expect(ui.hasConsoleOutput("Container running")).toBe(true);
+    // Assert: "Container running" check PASSED
+    const containerCheck = ui.getCheckResult("Container running");
+    expect(containerCheck).not.toBeNull();
+    expect(containerCheck!.passed).toBe(true);
+
+    // Assert: all expected checks ran
+    const workspaceCheck = ui.getCheckResult("Workspace files");
+    expect(workspaceCheck).not.toBeNull();
+
+    const claudeCheck = ui.getCheckResult("Claude Code CLI");
+    expect(claudeCheck).not.toBeNull();
   }, 120_000);
 
   it("cleanup: destroy removes containers", async () => {
