@@ -94,12 +94,22 @@ describe("Redeploy existing stack (in-place update)", () => {
     fs.mkdirSync(workspaceDir, { recursive: true });
     
     // Copy Pulumi.yaml to workspace
-    const repoRoot = path.resolve(__dirname, "../..");
+    const repoRoot = path.resolve(__dirname, "../../..");
     fs.copyFileSync(path.join(repoRoot, "Pulumi.yaml"), path.join(workspaceDir, "Pulumi.yaml"));
     
-    // Copy Pulumi dist
-    const distSrc = path.join(repoRoot, "packages/pulumi/dist");
-    fs.cpSync(distSrc, path.join(workspaceDir, "dist"), { recursive: true });
+    // Create packages/pulumi/dist structure to match Pulumi.yaml main path
+    const workspaceDistDir = path.join(workspaceDir, "packages/pulumi/dist");
+    fs.mkdirSync(workspaceDistDir, { recursive: true });
+    
+    const repoDistDir = path.join(repoRoot, "packages/pulumi/dist");
+    fs.cpSync(repoDistDir, workspaceDistDir, { recursive: true });
+    
+    // Symlink node_modules for @pulumi/pulumi and other dependencies
+    fs.symlinkSync(
+      path.join(repoRoot, "node_modules"),
+      path.join(workspaceDir, "node_modules"),
+      "dir"
+    );
 
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
@@ -220,12 +230,22 @@ describe("Redeploy with no existing stack (fresh deploy fallback)", () => {
     fs.mkdirSync(workspaceDir, { recursive: true });
     
     // Copy Pulumi.yaml to workspace
-    const repoRoot = path.resolve(__dirname, "../..");
+    const repoRoot = path.resolve(__dirname, "../../..");
     fs.copyFileSync(path.join(repoRoot, "Pulumi.yaml"), path.join(workspaceDir, "Pulumi.yaml"));
     
-    // Copy Pulumi dist
-    const distSrc = path.join(repoRoot, "packages/pulumi/dist");
-    fs.cpSync(distSrc, path.join(workspaceDir, "dist"), { recursive: true });
+    // Create packages/pulumi/dist structure to match Pulumi.yaml main path
+    const workspaceDistDir = path.join(workspaceDir, "packages/pulumi/dist");
+    fs.mkdirSync(workspaceDistDir, { recursive: true });
+    
+    const repoDistDir = path.join(repoRoot, "packages/pulumi/dist");
+    fs.cpSync(repoDistDir, workspaceDistDir, { recursive: true });
+    
+    // Symlink node_modules for @pulumi/pulumi and other dependencies
+    fs.symlinkSync(
+      path.join(repoRoot, "node_modules"),
+      path.join(workspaceDir, "node_modules"),
+      "dir"
+    );
 
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";

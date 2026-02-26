@@ -88,7 +88,7 @@ function processTemplates(
 // In project mode: <projectRoot>/.clawup (clawup.yaml is in parent dir)
 let manifestPath = path.join(process.cwd(), "clawup.yaml");
 if (!fs.existsSync(manifestPath)) {
-  manifestPath = path.join(process.cwd(), "../clawup.yaml");
+  manifestPath = path.join(process.cwd(), "..", "clawup.yaml");
   if (!fs.existsSync(manifestPath)) {
     throw new Error(
       "clawup.yaml not found. Run `clawup init` to create it."
