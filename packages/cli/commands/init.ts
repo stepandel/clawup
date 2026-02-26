@@ -24,6 +24,7 @@ import {
   tailscaleHostname,
   PLUGIN_REGISTRY,
   DEP_REGISTRY,
+  getProviderForModel,
 } from "@clawup/core";
 import { fetchIdentity } from "@clawup/core/identity";
 import * as os from "os";
@@ -166,26 +167,73 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
   };
 
   // -------------------------------------------------------------------------
-  // Step 4: Secrets (Anthropic, Tailscale, Hetzner)
+  // Step 4: Model provider + API key (dynamic)
   // -------------------------------------------------------------------------
-  p.log.step("Configure Anthropic API key");
+  p.log.step("Configure model provider");
 
-  p.note(
-    KEY_INSTRUCTIONS.anthropicApiKey.steps.join("\n"),
-    KEY_INSTRUCTIONS.anthropicApiKey.title
-  );
+  const providerOptions = Object.entries(MODEL_PROVIDERS).map(([key, prov]) => ({
+    value: key,
+    label: prov.name,
+    hint: prov.models.length > 0
+      ? prov.models.map((m) => m.label).join(", ")
+      : "Any model (free-form input)",
+  }));
 
-  const anthropicApiKey = await p.text({
-    message: "Anthropic API key",
-    placeholder: `${MODEL_PROVIDERS.anthropic.keyPrefix}...`,
+  const modelProvider = await p.select({
+    message: "Model provider",
+    options: providerOptions,
+    initialValue: "anthropic",
+  });
+  handleCancel(modelProvider);
+
+  const selectedProvider = MODEL_PROVIDERS[modelProvider as keyof typeof MODEL_PROVIDERS];
+
+  // Model selection
+  let selectedModel: string;
+  if (selectedProvider.models.length > 0) {
+    const modelChoice = await p.select({
+      message: "Default model",
+      options: [...selectedProvider.models],
+      initialValue: selectedProvider.models[0].value,
+    });
+    handleCancel(modelChoice);
+    selectedModel = modelChoice as string;
+  } else {
+    // Free-form model input (e.g., OpenRouter)
+    const modelInput = await p.text({
+      message: "Model identifier (e.g., openai/gpt-4o)",
+      placeholder: `${modelProvider as string}/model-name`,
+      validate: (val) => {
+        if (!val.trim()) return "Model identifier is required";
+      },
+    });
+    handleCancel(modelInput);
+    selectedModel = modelInput as string;
+  }
+
+  // API key collection — provider-aware
+  const providerKeyMap: Record<string, keyof typeof KEY_INSTRUCTIONS> = {
+    anthropic: "anthropicApiKey",
+    openai: "openaiApiKey",
+    google: "googleApiKey",
+    openrouter: "openrouterApiKey",
+  };
+  const keyInstructionKey = providerKeyMap[modelProvider as string] ?? "anthropicApiKey";
+  const keyInstruction = KEY_INSTRUCTIONS[keyInstructionKey];
+
+  p.note(keyInstruction.steps.join("\n"), keyInstruction.title);
+
+  const modelApiKey = await p.text({
+    message: `${selectedProvider.name} API key`,
+    placeholder: selectedProvider.keyPrefix ? `${selectedProvider.keyPrefix}...` : "API key",
     validate: (val) => {
       if (!val) return "API key is required";
-      if (!val.startsWith(MODEL_PROVIDERS.anthropic.keyPrefix)) {
-        return `Must start with ${MODEL_PROVIDERS.anthropic.keyPrefix}`;
+      if (selectedProvider.keyPrefix && !val.startsWith(selectedProvider.keyPrefix)) {
+        return `Must start with ${selectedProvider.keyPrefix}`;
       }
     },
   });
-  handleCancel(anthropicApiKey);
+  handleCancel(modelApiKey);
 
   p.log.step("Configure infrastructure secrets");
 
@@ -715,7 +763,9 @@ export async function initCommand(opts: InitOptions = {}): Promise<void> {
       setConfig("hcloud:token", hcloudToken, true, cwd);
     }
   }
-  setConfig("anthropicApiKey", anthropicApiKey as string, true, cwd);
+  setConfig("modelProvider", modelProvider as string, false, cwd);
+  setConfig("defaultModel", selectedModel, false, cwd);
+  setConfig(`${selectedProvider.envVar}`, modelApiKey as string, true, cwd);
   setConfig("tailscaleAuthKey", tailscaleAuthKey as string, true, cwd);
   setConfig("tailnetDnsName", tailnetDnsName as string, false, cwd);
   if (tailscaleApiKey) {
