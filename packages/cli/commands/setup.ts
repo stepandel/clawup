@@ -10,7 +10,7 @@ import * as path from "path";
 import * as os from "os";
 import * as p from "@clack/prompts";
 import YAML from "yaml";
-import type { AgentDefinition, ClawupManifest, IdentityManifest } from "@clawup/core";
+import type { AgentDefinition, ClawupManifest, IdentityManifest, IdentityResult } from "@clawup/core";
 import {
   MANIFEST_FILE,
   ClawupManifestSchema,
@@ -46,6 +46,7 @@ interface SetupOptions {
 interface FetchedIdentity {
   agent: AgentDefinition;
   manifest: IdentityManifest;
+  identityResult: IdentityResult;
 }
 
 export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
@@ -99,7 +100,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   for (const agent of agents) {
     try {
       const identity = await fetchIdentity(agent.identity, identityCacheDir);
-      fetchedIdentities.push({ agent, manifest: identity.manifest });
+      fetchedIdentities.push({ agent, manifest: identity.manifest, identityResult: identity });
     } catch (err) {
       identitySpinner.stop(`Failed to resolve identity for ${agent.name}`);
       exitWithError(
@@ -290,7 +291,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     if (!plugins) continue;
 
     for (const pluginName of plugins) {
-      const manifest = resolvePlugin(pluginName);
+      const manifest = resolvePlugin(pluginName, fi.identityResult);
       for (const [key, secret] of Object.entries(manifest.secrets)) {
         if (!secret.autoResolvable) continue;
 
@@ -398,7 +399,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
       // Inject auto-resolved secrets for this plugin
       const roleAutoResolved = autoResolvedSecrets[fi.agent.role];
       if (roleAutoResolved) {
-        const manifest = resolvePlugin(pluginName);
+        const manifest = resolvePlugin(pluginName, fi.identityResult);
         for (const [key, secret] of Object.entries(manifest.secrets)) {
           if (secret.autoResolvable && roleAutoResolved[key]) {
             agentConfig[key] = roleAutoResolved[key];
@@ -425,7 +426,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     if (!fi.agent.secrets) fi.agent.secrets = {};
 
     // Resolve plugins for this agent to check coverage generically
-    const agentResolvedPlugins = resolvePlugins([...(plugins ?? [])]);
+    const agentResolvedPlugins = resolvePlugins([...(plugins ?? [])], fi.identityResult);
 
     for (const key of fi.manifest.requiredSecrets) {
       if (fi.agent.secrets[key]) continue;

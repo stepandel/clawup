@@ -9,7 +9,7 @@ import os from "os";
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
 import { requireManifest } from "../lib/config";
 import { SSH_USER, tailscaleHostname, dockerContainerName, CODING_AGENT_REGISTRY, DEP_REGISTRY, resolvePlugin } from "@clawup/core";
-import type { IdentityManifest } from "@clawup/core";
+import type { IdentityManifest, IdentityResult } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { requireTailscale } from "../lib/tailscale";
@@ -136,10 +136,12 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   // Load identity manifests for each agent
   const identityCacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
   const identityMap: Record<string, IdentityManifest> = {};
+  const identityResultMap: Record<string, IdentityResult> = {};
   for (const agent of manifest.agents) {
     try {
       const identity = fetchIdentitySync(agent.identity, identityCacheDir);
       identityMap[agent.name] = identity.manifest;
+      identityResultMap[agent.name] = identity;
     } catch (err) {
       ui.log.warn(`Could not load identity for ${agent.displayName}: ${(err as Error).message}`);
     }
@@ -303,7 +305,7 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
 
         // Plugin secret checks
         for (const plugin of identityManifest.plugins ?? []) {
-          const pluginManifest = resolvePlugin(plugin);
+          const pluginManifest = resolvePlugin(plugin, identityResultMap[agent.name]);
           if (Object.keys(pluginManifest.secrets).length === 0) continue;
 
           for (const [key, secret] of Object.entries(pluginManifest.secrets)) {
@@ -419,7 +421,7 @@ timeout 15 /home/${SSH_USER}/.local/bin/claude -p 'hi' 2>&1 | head -5
           }
         }
         for (const plugin of identityManifest.plugins ?? []) {
-          const pluginManifest = resolvePlugin(plugin);
+          const pluginManifest = resolvePlugin(plugin, identityResultMap[agent.name]);
           for (const [_key, secret] of Object.entries(pluginManifest.secrets)) {
             checks.push({ name: `${plugin} secret (${secret.envVar})`, passed: false, detail: skipReason });
           }

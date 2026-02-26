@@ -27,7 +27,7 @@ import {
   collectDepSecrets,
 } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
-import type { AgentDefinition, ClawupManifest, PluginConfigFile } from "@clawup/core";
+import type { AgentDefinition, ClawupManifest, PluginConfigFile, IdentityResult } from "@clawup/core";
 import * as os from "os";
 
 // -----------------------------------------------------------------------------
@@ -215,7 +215,8 @@ if (provider === "aws") {
 function buildPluginsForAgent(
   agent: AgentDefinition,
   identityDefaults?: Record<string, Record<string, unknown>>,
-  identityPlugins?: string[]
+  identityPlugins?: string[],
+  identityResult?: IdentityResult
 ): { plugins: PluginInstallConfig[]; pluginSecrets: Record<string, pulumi.Output<string>>; enableFunnel: boolean } {
   const plugins: PluginInstallConfig[] = [];
   const pluginSecrets: Record<string, pulumi.Output<string>> = {};
@@ -237,7 +238,7 @@ function buildPluginsForAgent(
       agentSection = { ...identityConfig, ...userConfig };
     }
 
-    const manifest = resolvePlugin(pluginName);
+    const manifest = resolvePlugin(pluginName, identityResult);
     const secretMapping = getSecretEnvVars(manifest);
 
     // Merge registry defaultConfig as lowest-priority defaults
@@ -345,7 +346,7 @@ function buildBaseAgentArgs(agent: AgentDefinition): {
   const clawhubSkillSlugs = publicSkills.map((s) => s.slug);
 
   // Build plugin configs for this agent (always from identity)
-  const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identity.manifest.pluginDefaults, identity.manifest.plugins);
+  const { plugins, pluginSecrets, enableFunnel } = buildPluginsForAgent(agent, identity.manifest.pluginDefaults, identity.manifest.plugins, identity);
 
   // Resolve model/codingAgent from identity
   const agentModel = identity.manifest.model ?? "anthropic/claude-opus-4-6";
@@ -490,7 +491,7 @@ for (const [role, outputs] of Object.entries(agentOutputs)) {
     const identityResult = fetchIdentitySync(agentDef.identity, identityCacheDir);
     const agentPluginNames = identityResult.manifest.plugins ?? [];
     for (const pluginName of agentPluginNames) {
-      const pluginManifest = resolvePlugin(pluginName);
+      const pluginManifest = resolvePlugin(pluginName, identityResult);
       if (pluginManifest.webhookSetup) {
         const urlPath = pluginManifest.webhookSetup.urlPath;
         module.exports[`${role}WebhookUrl`] = outputs.tailscaleUrl.apply((url) => {

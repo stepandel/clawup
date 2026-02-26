@@ -12,7 +12,8 @@ import { join, relative, resolve } from "path";
 import { createHash } from "crypto";
 import YAML from "yaml";
 import type { IdentityManifest, IdentityResult } from "./types";
-import { IdentityManifestSchema } from "./schemas";
+import { IdentityManifestSchema, PluginManifestSchema } from "./schemas";
+import type { z } from "zod";
 
 /** Result of a captured command execution */
 interface ExecResult {
@@ -240,5 +241,37 @@ function _fetchIdentity(source: string, cacheDir: string): IdentityResult {
   const allFiles = readFilesRecursive(identityDir);
   delete allFiles[manifestFilename];
 
-  return { manifest, files: allFiles };
+  // Scan for identity-bundled plugin manifests in plugins/ directory
+  const pluginsDir = join(identityDir, "plugins");
+  let pluginManifests: Record<string, z.infer<typeof PluginManifestSchema>> | undefined;
+
+  if (existsSync(pluginsDir) && statSync(pluginsDir).isDirectory()) {
+    for (const entry of readdirSync(pluginsDir)) {
+      if (!entry.endsWith(".yaml") && !entry.endsWith(".yml")) continue;
+
+      const pluginPath = join(pluginsDir, entry);
+      if (!statSync(pluginPath).isFile()) continue;
+
+      try {
+        const content = readFileSync(pluginPath, "utf-8");
+        const raw = YAML.parse(content);
+        const parsed = PluginManifestSchema.safeParse(raw);
+        if (parsed.success) {
+          if (!pluginManifests) pluginManifests = {};
+          pluginManifests[parsed.data.name] = parsed.data;
+        }
+      } catch {
+        // Skip invalid plugin manifest files
+      }
+    }
+
+    // Exclude plugin manifest files from workspace files
+    for (const key of Object.keys(allFiles)) {
+      if (key.startsWith("plugins/") && (key.endsWith(".yaml") || key.endsWith(".yml"))) {
+        delete allFiles[key];
+      }
+    }
+  }
+
+  return { manifest, files: allFiles, pluginManifests };
 }

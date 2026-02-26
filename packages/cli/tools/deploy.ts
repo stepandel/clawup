@@ -279,7 +279,7 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
       try {
         const identity = fetchIdentitySync(agent.identity, identityCacheDir);
         for (const pluginName of identity.manifest.plugins ?? []) {
-          const pluginManifest = resolvePlugin(pluginName);
+          const pluginManifest = resolvePlugin(pluginName, identity);
           if (pluginManifest.webhookSetup) {
             webhookPluginNames.add(pluginManifest.displayName);
           }

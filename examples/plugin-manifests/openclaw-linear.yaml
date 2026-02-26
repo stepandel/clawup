@@ -1,0 +1,57 @@
+# Plugin manifest for openclaw-linear
+#
+# This is a standalone YAML serialization of the PluginManifest schema.
+# Identity repos can ship plugin metadata by placing files like this
+# in a plugins/ directory alongside identity.yaml.
+
+name: openclaw-linear
+displayName: Linear
+installable: true
+needsFunnel: true
+configPath: plugins.entries
+
+secrets:
+  apiKey:
+    envVar: LINEAR_API_KEY
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "lin_api_"
+    instructions:
+      title: Linear API Key
+      steps:
+        - "Create a separate Linear account for each agent (used by openclaw-linear plugin):"
+        - "1. Invite you+agentname@domain.com to your Linear workspace"
+        - "   (plus-addressing forwards to your inbox — no new email needed)"
+        - "   Follow the link in the invite email to create the account and join the org"
+        - "2. Go to Settings → Security & Access → Personal API keys → \"New API key\""
+        - "3. Copy the key (starts with lin_api_)"
+  webhookSecret:
+    envVar: LINEAR_WEBHOOK_SECRET
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+  linearUserUuid:
+    envVar: LINEAR_USER_UUID
+    scope: agent
+    isSecret: false
+    required: false
+    autoResolvable: true
+
+internalKeys:
+  - agentId
+  - linearUserUuid
+
+configTransforms: []
+
+webhookSetup:
+  urlPath: /hooks/linear
+  secretKey: webhookSecret
+  instructions:
+    - "1. Go to Linear Settings → API → Webhooks → \"New webhook\""
+    - "2. Paste the URL above"
+    - "3. Select events to receive (e.g., Issues, Comments)"
+    - "4. Create the webhook and copy the \"Signing secret\""
+  configJsonPath: plugins.entries.linear.config.webhookSecret

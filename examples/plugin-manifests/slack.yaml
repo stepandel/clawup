@@ -1,0 +1,45 @@
+# Plugin manifest for slack
+#
+# This is a standalone YAML serialization of the PluginManifest schema.
+# Identity repos can ship plugin metadata by placing files like this
+# in a plugins/ directory alongside identity.yaml.
+
+name: slack
+displayName: Slack
+installable: false
+needsFunnel: false
+configPath: channels
+
+secrets:
+  botToken:
+    envVar: SLACK_BOT_TOKEN
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "xoxb-"
+    instructions:
+      title: Slack App Setup
+      steps:
+        - "Create a Slack app for each agent using the manifest shown below:"
+        - "1. Go to https://api.slack.com/apps → \"Create New App\" → \"From a manifest\""
+        - "2. Select your workspace, paste the JSON manifest, and create the app"
+        - "3. Go to \"OAuth & Permissions\" — copy the Bot Token (xoxb-...)"
+        - "4. Under \"Basic Information\" → \"App-Level Tokens\", generate a token"
+        - "   with the connections:write scope — copy it (xapp-...)"
+  appToken:
+    envVar: SLACK_APP_TOKEN
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "xapp-"
+
+internalKeys: []
+
+configTransforms:
+  - sourceKey: dm
+    targetKeys:
+      policy: dmPolicy
+      allowFrom: allowFrom
+    removeSource: true

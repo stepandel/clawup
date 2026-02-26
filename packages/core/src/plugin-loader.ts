@@ -6,18 +6,26 @@
  */
 
 import { PLUGIN_MANIFEST_REGISTRY, type PluginManifest, type PluginSecret } from "./plugin-registry";
+import type { IdentityResult } from "./types";
 
 /**
  * Resolve a single plugin by name.
- * Returns the enriched manifest from the built-in registry, or a generic fallback
- * for unknown plugins.
+ *
+ * Three-tier resolution chain:
+ *   1. Built-in PLUGIN_MANIFEST_REGISTRY (maintained, tested)
+ *   2. Identity-bundled manifests (from identity repo plugins/ directory)
+ *   3. Generic fallback stub (unknown plugins still work)
  */
-export function resolvePlugin(name: string): PluginManifest {
-  // Check built-in registry
+export function resolvePlugin(name: string, identityResult?: IdentityResult): PluginManifest {
+  // 1. Check built-in registry
   const builtin = PLUGIN_MANIFEST_REGISTRY[name];
   if (builtin) return builtin;
 
-  // Generic fallback — unknown plugins work with manual config
+  // 2. Check identity-bundled manifests
+  const identityBundled = identityResult?.pluginManifests?.[name];
+  if (identityBundled) return identityBundled;
+
+  // 3. Generic fallback — unknown plugins work with manual config
   return {
     name,
     displayName: name,
@@ -33,8 +41,8 @@ export function resolvePlugin(name: string): PluginManifest {
 /**
  * Batch-resolve multiple plugins.
  */
-export function resolvePlugins(names: string[]): PluginManifest[] {
-  return names.map((name) => resolvePlugin(name));
+export function resolvePlugins(names: string[], identityResult?: IdentityResult): PluginManifest[] {
+  return names.map((name) => resolvePlugin(name, identityResult));
 }
 
 /**

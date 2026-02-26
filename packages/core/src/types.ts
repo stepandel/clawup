@@ -9,6 +9,7 @@ import type {
   ClawupManifestSchema,
   PluginConfigFileSchema,
   IdentityManifestSchema,
+  PluginManifestSchema,
 } from "./schemas";
 
 /** Definition of a single agent in the manifest */
@@ -32,6 +33,8 @@ export interface IdentityResult {
   manifest: IdentityManifest;
   /** Files keyed by relative path (e.g., "SOUL.md", "skills/pm-queue-handler/SKILL.md") */
   files: Record<string, string>;
+  /** Plugin manifests bundled with the identity (from plugins/<name>.yaml), keyed by plugin name */
+  pluginManifests?: Record<string, z.infer<typeof PluginManifestSchema>>;
 }
 
 /**
