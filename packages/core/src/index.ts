@@ -55,16 +55,8 @@ export {
   isSecretCoveredByPlugin,
 } from "./plugin-loader";
 
-// Manifest hooks
-export {
-  runResolveHook,
-  runLifecycleHook,
-  resolvePluginSecrets,
-  type ResolveHookResult,
-  type HookResult,
-  type HookSuccess,
-  type HookError,
-} from "./manifest-hooks";
+// Manifest hooks — re-exported from "@clawup/core/manifest-hooks" subpath
+// to avoid pulling child_process into browser bundles.
 
 // Coding agent registry
 export type { CodingAgentEntry, CodingAgentSecret } from "./coding-agent-registry";
