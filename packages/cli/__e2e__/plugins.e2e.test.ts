@@ -241,20 +241,25 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       // Assert: UI shows success message
       expect(ui.hasLog("success", "Deployment complete!")).toBe(true);
 
-      // Verify plugin secrets are passed to the container as env vars
+      // Verify plugin secrets are embedded in the cloud-init script
       const envResult = execSync(
         `docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' ${containerName}`,
         { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
       );
 
-      // Assert: Slack plugin env vars are present
-      expect(envResult).toContain("SLACK_BOT_TOKEN=");
-      expect(envResult).toContain("SLACK_APP_TOKEN=");
+      // Cloud-init script is base64-encoded in CLOUDINIT_SCRIPT env var
+      const cloudinitMatch = envResult.match(/CLOUDINIT_SCRIPT=(.+)/);
+      expect(cloudinitMatch).not.toBeNull();
+      const cloudinitScript = Buffer.from(cloudinitMatch![1], "base64").toString("utf-8");
 
-      // Assert: Linear plugin env vars are present
-      expect(envResult).toContain("LINEAR_API_KEY=");
-      expect(envResult).toContain("LINEAR_WEBHOOK_SECRET=");
-      expect(envResult).toContain("LINEAR_USER_UUID=");
+      // Assert: Slack plugin secrets are in the cloud-init script
+      expect(cloudinitScript).toContain("SLACK_BOT_TOKEN=");
+      expect(cloudinitScript).toContain("SLACK_APP_TOKEN=");
+
+      // Assert: Linear plugin secrets are in the cloud-init script
+      expect(cloudinitScript).toContain("LINEAR_API_KEY=");
+      expect(cloudinitScript).toContain("LINEAR_WEBHOOK_SECRET=");
+      expect(cloudinitScript).toContain("LINEAR_USER_UUID=");
     } finally {
       dispose();
     }
