@@ -28,6 +28,7 @@ import { findProjectRoot } from "../lib/project";
 import { selectOrCreateStack, setConfig, qualifiedStackName } from "../lib/pulumi";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { showBanner, exitWithError } from "../lib/ui";
+import { redactSecretsFromString } from "../lib/redact";
 import {
   buildEnvDict,
   buildManifestSecrets,
@@ -398,8 +399,9 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
         // runOnce: skip if all required secrets are already present
         if (onboard.runOnce) {
           const roleUpper = fi.agent.role.toUpperCase();
-          const allSecretsPresent = Object.entries(pluginManifest.secrets)
-            .filter(([, s]) => s.required)
+          const requiredSecrets = Object.entries(pluginManifest.secrets)
+            .filter(([, s]) => s.required);
+          const allSecretsPresent = requiredSecrets.length > 0 && requiredSecrets
             .every(([key, secret]) => {
               // Check auto-resolved secrets (stored by raw plugin key)
               if (autoResolvedSecrets[fi.agent.role]?.[key]) return true;
@@ -464,9 +466,10 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
         const result = await runOnboardHook({ script: onboard.script, env: hookEnv });
         if (result.ok) {
           if (result.instructions) {
+            const redacted = redactSecretsFromString(result.instructions);
             console.log();
             p.log.info(`Follow-up instructions for ${pluginName}:`);
-            console.log(result.instructions);
+            console.log(redacted);
             console.log();
           }
         } else {
