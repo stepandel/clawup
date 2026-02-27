@@ -106,7 +106,7 @@ export interface OpenClawConfigOptions {
 export interface OpenClawConfig {
   gateway: {
     port: number;
-    bind: string;
+    mode?: string;
     trustedProxies: string[];
     controlUi: {
       enabled: boolean;
@@ -119,9 +119,6 @@ export interface OpenClawConfig {
   };
   browser?: {
     port: number;
-  };
-  sandbox?: {
-    enabled: boolean;
   };
   model?: string;
   tools?: {
@@ -142,7 +139,7 @@ export function generateOpenClawConfig(options: OpenClawConfigOptions): OpenClaw
   const config: OpenClawConfig = {
     gateway: {
       port: options.gatewayPort ?? 18789,
-      bind: "127.0.0.1",  // Bind to loopback for Tailscale Serve
+      mode: "local",
       trustedProxies: options.trustedProxies ?? ["127.0.0.1"],
       controlUi: {
         enabled: options.enableControlUi ?? true,
@@ -158,12 +155,6 @@ export function generateOpenClawConfig(options: OpenClawConfigOptions): OpenClaw
   if (options.browserPort) {
     config.browser = {
       port: options.browserPort,
-    };
-  }
-
-  if (options.enableSandbox !== undefined) {
-    config.sandbox = {
-      enabled: options.enableSandbox,
     };
   }
 
@@ -330,10 +321,13 @@ export function generateConfigPatchScript(options: OpenClawConfigOptions): strin
     : undefined;
 
   // Build cliBackends config from coding agent registry
+  // Filter out empty-string fields — OpenClaw rejects them for backends that don't support those features
   const codingAgentName = options.codingAgent ?? "claude-code";
   const codingAgentEntry = CODING_AGENT_REGISTRY[codingAgentName];
   const cliBackendsJson = codingAgentEntry
-    ? JSON.stringify({ "claude-cli": codingAgentEntry.cliBackend })
+    ? JSON.stringify({ "claude-cli": Object.fromEntries(
+        Object.entries(codingAgentEntry.cliBackend).filter(([, v]) => v !== "" && v !== "never")
+      ) })
     : "{}";
 
   // Build dynamic plugin config sections

@@ -137,7 +137,7 @@ export const PLUGIN_MANIFEST_REGISTRY: Record<string, PluginManifest> = {
         validator: "xapp-",
       },
     },
-    internalKeys: [],
+    internalKeys: ["agentId"],
     configTransforms: [
       {
         sourceKey: "dm",

@@ -425,12 +425,11 @@ cat > /home/ubuntu/.openclaw/openclaw.json << SKELETON_CONFIG
 {
   "gateway": {
     "port": '"$GATEWAY_PORT"',
-    "bind": "127.0.0.1",
+    "mode": "local",
     "trustedProxies": ["127.0.0.1"],
     "controlUi": { "enabled": true, "allowInsecureAuth": true },
     "auth": { "mode": "token", "token": "" }
   },
-  "sandbox": { "enabled": false },
   "agents": { "defaults": {} },
   "env": {}
 }
