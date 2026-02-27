@@ -51,7 +51,7 @@ describe("runResolveHook", () => {
 
   it("returns error on empty stdout", async () => {
     const result = await runResolveHook({
-      script: "echo -n ''",
+      script: "printf ''",
       env: {},
     });
     expect(result.ok).toBe(false);
