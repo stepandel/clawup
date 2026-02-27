@@ -155,32 +155,34 @@ function expectValidPythonBlock(script: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// 1. Provider-conditional onboarding (targets the production bug)
+// 1. Unified skeleton onboarding (all providers use the same path)
 // ---------------------------------------------------------------------------
 
-describe("cloud-init pipeline — provider-conditional onboarding", () => {
-  it("Anthropic provider runs openclaw onboard with ANTHROPIC_API_KEY", () => {
-    const script = runPipeline(ANTHROPIC_CLOUD);
-    expect(script).toContain("openclaw onboard --non-interactive");
-    expect(script).toContain("ANTHROPIC_API_KEY=");
-    expect(script).not.toContain("Skipping OpenClaw onboarding");
+describe("cloud-init pipeline — unified skeleton onboarding", () => {
+  it("all providers create skeleton openclaw.json (no openclaw onboard)", () => {
+    for (const config of [ANTHROPIC_CLOUD, OPENAI_LOCAL_DOCKER, GOOGLE_CLOUD, MIXED_PROVIDER]) {
+      const script = runPipeline(config);
+      expect(script).toContain("Creating openclaw.json skeleton");
+      expect(script).toContain("Created minimal openclaw.json skeleton");
+      expect(script).not.toContain("openclaw onboard");
+    }
   });
 
-  it("OpenAI provider skips onboard and creates skeleton openclaw.json", () => {
-    const script = runPipeline(OPENAI_LOCAL_DOCKER);
-    expect(script).toContain("Skipping OpenClaw onboarding (non-Anthropic provider: openai)");
-    expect(script).toContain("openclaw.json");
-    expect(script).not.toContain("openclaw onboard --non-interactive");
+  it("all providers run openclaw doctor --fix", () => {
+    for (const config of [ANTHROPIC_CLOUD, OPENAI_LOCAL_DOCKER, GOOGLE_CLOUD]) {
+      const script = runPipeline(config);
+      expect(script).toContain("openclaw doctor --fix");
+    }
   });
 
-  it("Google provider skips onboard and creates skeleton openclaw.json", () => {
-    const script = runPipeline(GOOGLE_CLOUD);
-    expect(script).toContain("Skipping OpenClaw onboarding (non-Anthropic provider: google)");
-    expect(script).toContain("openclaw.json");
-    expect(script).not.toContain("openclaw onboard --non-interactive");
+  it("all providers run devices approve --latest", () => {
+    for (const config of [ANTHROPIC_CLOUD, OPENAI_LOCAL_DOCKER, GOOGLE_CLOUD]) {
+      const script = runPipeline(config);
+      expect(script).toContain("devices approve --latest");
+    }
   });
 
-  it("Python config-patch has os.path.exists() fallback for missing openclaw.json", () => {
+  it("Python config-patch has os.path.exists() fallback as safety net", () => {
     const script = runPipeline(OPENAI_LOCAL_DOCKER);
     expectValidPythonBlock(script);
     const pythonMatch = script.match(
@@ -188,7 +190,6 @@ describe("cloud-init pipeline — provider-conditional onboarding", () => {
     );
     const python = pythonMatch![1];
     expect(python).toContain("os.path.exists(config_path)");
-    // Non-Anthropic should have the skeleton fallback branch
     expect(python).toContain("Create default skeleton if onboarding was skipped");
   });
 });
