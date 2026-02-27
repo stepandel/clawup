@@ -397,11 +397,15 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
 
         // runOnce: skip if all required secrets are already present
         if (onboard.runOnce) {
+          const roleUpper = fi.agent.role.toUpperCase();
           const allSecretsPresent = Object.entries(pluginManifest.secrets)
             .filter(([, s]) => s.required)
-            .every(([key]) => {
-              const agentSecrets = resolvedSecrets.perAgent[fi.agent.name] ?? {};
-              return agentSecrets[key] || autoResolvedSecrets[fi.agent.role]?.[key];
+            .every(([key, secret]) => {
+              // Check auto-resolved secrets (stored by raw plugin key)
+              if (autoResolvedSecrets[fi.agent.role]?.[key]) return true;
+              // Check env dict using the plugin secret's envVar (prefixed with role)
+              const envKey = `${roleUpper}_${secret.envVar}`;
+              return !!envDict[envKey];
             });
           if (allSecretsPresent) {
             p.log.info(`Onboard hook for ${pluginName} (${fi.agent.displayName}): skipped (already configured)`);
