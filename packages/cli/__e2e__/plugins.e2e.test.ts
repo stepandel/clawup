@@ -226,7 +226,7 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
 
   it("setup validates plugin secrets and creates Pulumi stack", async () => {
     // Run setup with the .env file
-    await setupCommand({ envFile: path.join(tempDir, ".env") });
+    await setupCommand({ envFile: path.join(tempDir, ".env"), skipHooks: true });
 
     // Verify Pulumi stack exists
     const result = execSync("pulumi stack ls --json", {
