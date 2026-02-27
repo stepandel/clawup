@@ -11,7 +11,7 @@
     "scripts"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/sync-infra.mjs",
     "build:bundle": "node scripts/bundle.mjs && node scripts/sync-infra.mjs",
     "prepublishOnly": "node scripts/bundle.mjs && node scripts/sync-infra.mjs",
     "watch": "tsc --watch",
