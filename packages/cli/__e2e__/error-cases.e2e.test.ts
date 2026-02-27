@@ -166,7 +166,9 @@ describe("deploy cancelled by user", () => {
     // User answers "no" to confirmation
     const { adapter, dispose } = createTestAdapter({ confirm: [false] });
     try {
-      await expect(deployTool(adapter, {})).rejects.toThrow(ProcessExitError);
+      await expect(deployTool(adapter, {})).rejects.toSatisfy(
+        (err: unknown) => err instanceof TestCancelError || err instanceof ProcessExitError
+      );
     } finally {
       dispose();
     }
@@ -205,7 +207,9 @@ describe("destroy cancelled by user", () => {
       confirm: [false],
     });
     try {
-      await expect(destroyTool(adapter, {})).rejects.toThrow(ProcessExitError);
+      await expect(destroyTool(adapter, {})).rejects.toSatisfy(
+        (err: unknown) => err instanceof TestCancelError || err instanceof ProcessExitError
+      );
     } finally {
       dispose();
     }

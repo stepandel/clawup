@@ -61,7 +61,9 @@ jobs:
           pulumi-version: latest
 
       - name: Login to local Pulumi backend
-        run: pulumi login "$PULUMI_BACKEND_URL"
+        run: |
+          mkdir -p "${{ github.workspace }}/.pulumi-state"
+          pulumi login "$PULUMI_BACKEND_URL"
 
       - name: Run E2E tests
         run: pnpm exec vitest run --config packages/cli/__e2e__/vitest.e2e.config.ts
