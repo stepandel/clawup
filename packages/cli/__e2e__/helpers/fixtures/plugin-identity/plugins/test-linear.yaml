@@ -37,3 +37,16 @@ webhookSetup:
 hooks:
   resolve:
     linearUserUuid: 'echo "test-resolved-uuid-$(echo $LINEAR_API_KEY | cut -c1-8)"'
+  onboard:
+    description: "Set up test Linear webhook integration"
+    inputs:
+      configToken:
+        envVar: TEST_LINEAR_CONFIG_TOKEN
+        prompt: "Test Linear config token"
+        instructions: "Generate a test config token from the test panel"
+        validator: "tlct-"
+    script: |
+      echo "Onboard hook received config token: $TEST_LINEAR_CONFIG_TOKEN"
+      echo "Onboard hook received API key present: $(test -n "$LINEAR_API_KEY" && echo yes || echo no)"
+      echo "Webhook configured successfully for test-linear plugin"
+    runOnce: false
