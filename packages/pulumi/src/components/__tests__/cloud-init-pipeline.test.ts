@@ -218,19 +218,21 @@ describe("cloud-init pipeline — local Docker deploy shape", () => {
     expect(script).not.toContain("-G docker ubuntu");
   });
 
-  it("foregroundMode runs exec openclaw gateway instead of systemd", () => {
+  it("foregroundMode runs openclaw gateway instead of systemd, with device auto-pairing", () => {
     const script = runPipeline(OPENAI_LOCAL_DOCKER);
-    expect(script).toContain("exec openclaw gateway");
+    expect(script).toContain("openclaw gateway");
+    expect(script).toContain("devices approve --latest");
     expect(script).not.toContain("openclaw daemon install");
     expect(script).not.toContain("systemctl start user@1000");
     expect(script).not.toContain("loginctl enable-linger");
   });
 
-  it("cloud deploy uses systemd daemon (inverse of foreground)", () => {
+  it("cloud deploy uses systemd daemon with device auto-pairing", () => {
     const script = runPipeline(ANTHROPIC_CLOUD);
     expect(script).toContain("openclaw daemon install");
     expect(script).toContain("loginctl enable-linger");
-    expect(script).not.toContain("exec openclaw gateway");
+    expect(script).toContain("devices approve --latest");
+    expect(script).not.toContain("openclaw gateway &");
   });
 });
 

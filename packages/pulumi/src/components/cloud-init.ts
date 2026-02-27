@@ -474,12 +474,27 @@ echo "============================================"
 # Start OpenClaw gateway in foreground (keeps container alive)
 # Use "openclaw gateway" instead of "openclaw daemon start" because
 # daemon start requires systemctl which is unavailable in Docker.
+#
+# Start in background first, auto-approve the pending device pairing
+# request (created on first gateway boot), then wait. Without this,
+# the ACP harness (coding agent backend) gets rejected with "pairing required".
 echo "Starting OpenClaw gateway in foreground..."
-exec su - ubuntu -c '
+su - ubuntu -c '
 export HOME=/home/ubuntu
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-exec openclaw gateway
+openclaw gateway &
+GW_PID=$!
+
+# Wait for gateway to create the pending pairing request, then approve it
+sleep 3
+if openclaw devices approve --latest --token "\${GATEWAY_TOKEN}" 2>/dev/null; then
+  echo "Auto-approved gateway device pairing"
+else
+  echo "WARNING: Device pairing approval failed (may already be paired)"
+fi
+
+wait $GW_PID
 '` : `# Install daemon service AFTER config patch so gateway token matches
 echo "Installing OpenClaw daemon..."
 sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
@@ -497,6 +512,14 @@ export HOME=/home/ubuntu
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 openclaw doctor --fix --non-interactive || echo "WARNING: openclaw doctor failed"
+
+# Auto-approve pending device pairing (gateway creates a request on first boot)
+sleep 2
+if openclaw devices approve --latest --token "\${GATEWAY_TOKEN}" 2>/dev/null; then
+  echo "Auto-approved gateway device pairing"
+else
+  echo "WARNING: Device pairing approval failed (may already be paired)"
+fi
 '
 
 ${postSetupScript}
