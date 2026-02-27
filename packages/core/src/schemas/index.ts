@@ -18,4 +18,6 @@ export {
   WebhookSetupSchema,
   ConfigTransformSchema,
   PluginHooksSchema,
+  OnboardHookSchema,
+  OnboardHookInputSchema,
 } from "./plugin-manifest";

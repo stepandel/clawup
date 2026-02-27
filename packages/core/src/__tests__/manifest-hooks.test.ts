@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { runResolveHook, runLifecycleHook, resolvePluginSecrets } from "../manifest-hooks";
+import { runResolveHook, runLifecycleHook, resolvePluginSecrets, runOnboardHook } from "../manifest-hooks";
 import type { PluginManifest } from "../plugin-registry";
 
 describe("runResolveHook", () => {
@@ -168,6 +168,23 @@ describe("resolvePluginSecrets", () => {
     }
   });
 
+  it("returns empty values when resolve hooks have no entries", async () => {
+    const emptyResolveManifest: PluginManifest = {
+      ...baseManifest,
+      hooks: {
+        resolve: {},
+      },
+    };
+    const result = await resolvePluginSecrets({
+      manifest: emptyResolveManifest,
+      env: {},
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.values).toEqual({});
+    }
+  });
+
   it("fails fast on first resolve hook error", async () => {
     const failManifest: PluginManifest = {
       ...baseManifest,
@@ -185,6 +202,66 @@ describe("resolvePluginSecrets", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain("myToken");
+    }
+  });
+});
+
+describe("runOnboardHook", () => {
+  it("captures stdout as follow-up instructions", async () => {
+    const result = await runOnboardHook({
+      script: 'echo "Step 1: Do this\nStep 2: Do that"',
+      env: {},
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.instructions).toContain("Step 1: Do this");
+      expect(result.instructions).toContain("Step 2: Do that");
+    }
+  });
+
+  it("passes input env vars to the script", async () => {
+    const result = await runOnboardHook({
+      script: 'echo "Token: $CONFIG_TOKEN"',
+      env: { CONFIG_TOKEN: "xoxe-test-123" },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.instructions).toBe("Token: xoxe-test-123");
+    }
+  });
+
+  it("returns empty instructions for no stdout", async () => {
+    const result = await runOnboardHook({
+      script: "true",
+      env: {},
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.instructions).toBe("");
+    }
+  });
+
+  it("returns error on timeout", async () => {
+    const result = await runOnboardHook({
+      script: "sleep 60",
+      env: {},
+      timeoutMs: 500,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("timed out");
+    }
+  });
+
+  it("returns error on non-zero exit", async () => {
+    const result = await runOnboardHook({
+      script: 'echo "error details" >&2; exit 1',
+      env: {},
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain("exited with code 1");
+      expect(result.error).toContain("error details");
     }
   });
 });

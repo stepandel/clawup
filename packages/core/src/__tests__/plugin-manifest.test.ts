@@ -410,4 +410,91 @@ describe("PluginManifestSchema hooks field", () => {
     expect(linearManifest.hooks?.resolve?.linearUserUuid).toContain("LINEAR_API_KEY");
     expect(linearManifest.hooks?.resolve?.linearUserUuid).toContain("viewer");
   });
+
+  it("accepts manifest with valid onboard hook", () => {
+    const result = PluginManifestSchema.safeParse({
+      name: "test-onboard",
+      displayName: "Test Onboard",
+      installable: true,
+      configPath: "plugins.entries",
+      secrets: {},
+      hooks: {
+        onboard: {
+          description: "Create external app",
+          inputs: {
+            configToken: {
+              envVar: "CONFIG_TOKEN",
+              prompt: "Enter your config token:",
+              instructions: "Generate at https://example.com/tokens",
+              validator: "xoxe-",
+            },
+          },
+          script: 'echo "Follow these steps..."',
+          runOnce: true,
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.hooks?.onboard?.description).toBe("Create external app");
+      expect(result.data.hooks?.onboard?.runOnce).toBe(true);
+      expect(result.data.hooks?.onboard?.inputs.configToken.envVar).toBe("CONFIG_TOKEN");
+    }
+  });
+
+  it("rejects onboard hook without script", () => {
+    const result = PluginManifestSchema.safeParse({
+      name: "test-no-script",
+      displayName: "Test No Script",
+      installable: true,
+      configPath: "plugins.entries",
+      secrets: {},
+      hooks: {
+        onboard: {
+          description: "Missing script",
+          inputs: {},
+        },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects onboard hook with empty script", () => {
+    const result = PluginManifestSchema.safeParse({
+      name: "test-empty-script",
+      displayName: "Test Empty",
+      installable: true,
+      configPath: "plugins.entries",
+      secrets: {},
+      hooks: {
+        onboard: {
+          description: "Empty script",
+          inputs: {},
+          script: "",
+        },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts onboard hook with empty inputs", () => {
+    const result = PluginManifestSchema.safeParse({
+      name: "test-no-inputs",
+      displayName: "Test No Inputs",
+      installable: true,
+      configPath: "plugins.entries",
+      secrets: {},
+      hooks: {
+        onboard: {
+          description: "No inputs needed",
+          script: 'echo "done"',
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.hooks?.onboard?.inputs).toEqual({});
+      expect(result.data.hooks?.onboard?.runOnce).toBe(false);
+    }
+  });
 });
