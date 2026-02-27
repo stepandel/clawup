@@ -48,6 +48,7 @@ describe("E2E: Linear plugin", () => {
       allDepNames: new Set(),
       agentPlugins: new Map([["agent-eng", new Set(["openclaw-linear"])]]),
       agentDeps: new Map([["agent-eng", new Set()]]),
+      allModels: ["anthropic/claude-opus-4-6"],
     });
 
     // Secrets use envVar-derived camelCase keys
@@ -132,6 +133,7 @@ describe("E2E: Slack plugin", () => {
       allDepNames: new Set(),
       agentPlugins: new Map([["agent-pm", new Set(["slack"])]]),
       agentDeps: new Map([["agent-pm", new Set()]]),
+      allModels: ["anthropic/claude-opus-4-6"],
     });
 
     expect(result.perAgent["agent-pm"].slackBotToken).toBe("${env:PM_SLACK_BOT_TOKEN}");
@@ -242,6 +244,7 @@ describe("E2E: Multi-plugin integration", () => {
       allDepNames: new Set(["gh"]),
       agentPlugins: new Map([["agent-pm", new Set(["openclaw-linear", "slack"])]]),
       agentDeps: new Map([["agent-pm", new Set(["gh"])]]),
+      allModels: ["anthropic/claude-opus-4-6", "openai/gpt-5.3"],
     });
 
     const pmSecrets = result.perAgent["agent-pm"];
@@ -258,6 +261,10 @@ describe("E2E: Multi-plugin integration", () => {
 
     // Dep secrets
     expect(pmSecrets.githubToken).toBe("${env:PM_GITHUB_TOKEN}");
+
+    // Both provider API keys should be in global secrets
+    expect(result.global.anthropicApiKey).toBe("${env:ANTHROPIC_API_KEY}");
+    expect(result.global.openaiApiKey).toBe("${env:OPENAI_API_KEY}");
   });
 
   it("generateEnvExample marks auto-resolvable secrets as commented", () => {
@@ -281,6 +288,42 @@ describe("E2E: Multi-plugin integration", () => {
     expect(result).toMatch(/# ENG_LINEAR_USER_UUID=/);
     // slackBotToken should be required (uncommented)
     expect(result).toContain("ENG_SLACK_BOT_TOKEN=");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E2E: Cross-provider model scenarios
+// ---------------------------------------------------------------------------
+
+describe("E2E: Cross-provider model support", () => {
+  it("OpenAI-only agent (gpt-5.3) requires only openaiApiKey", () => {
+    const result = buildManifestSecrets({
+      provider: "aws",
+      agents: [{ name: "agent-eng", role: "eng", displayName: "Titus" }],
+      allPluginNames: new Set(["openclaw-linear"]),
+      allDepNames: new Set(),
+      agentPlugins: new Map([["agent-eng", new Set(["openclaw-linear"])]]),
+      agentDeps: new Map([["agent-eng", new Set()]]),
+      allModels: ["openai/gpt-5.3"],
+    });
+
+    expect(result.global.openaiApiKey).toBe("${env:OPENAI_API_KEY}");
+    expect(result.global.anthropicApiKey).toBeUndefined();
+  });
+
+  it("mixed providers (gpt-5.3 primary + claude backup) require both keys", () => {
+    const result = buildManifestSecrets({
+      provider: "aws",
+      agents: [{ name: "agent-eng", role: "eng", displayName: "Titus" }],
+      allPluginNames: new Set(["slack"]),
+      allDepNames: new Set(),
+      agentPlugins: new Map([["agent-eng", new Set(["slack"])]]),
+      agentDeps: new Map([["agent-eng", new Set()]]),
+      allModels: ["openai/gpt-5.3", "anthropic/claude-sonnet-4-5"],
+    });
+
+    expect(result.global.openaiApiKey).toBe("${env:OPENAI_API_KEY}");
+    expect(result.global.anthropicApiKey).toBe("${env:ANTHROPIC_API_KEY}");
   });
 });
 

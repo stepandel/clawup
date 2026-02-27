@@ -327,7 +327,7 @@ describe("buildManifestSecrets", () => {
     expect(result.global.anthropicApiKey).toBe("${env:ANTHROPIC_API_KEY}");
   });
 
-  it("falls back to anthropic when allModels is not provided", () => {
+  it("includes no provider keys when allModels is empty", () => {
     const result = buildManifestSecrets({
       provider: "aws",
       agents: [{ name: "agent-pm", role: "pm", displayName: "Juno" }],
@@ -335,9 +335,11 @@ describe("buildManifestSecrets", () => {
       allDepNames: new Set(),
       agentPlugins: new Map([["agent-pm", new Set()]]),
       agentDeps: new Map([["agent-pm", new Set()]]),
+      allModels: [],
     });
 
-    expect(result.global.anthropicApiKey).toBe("${env:ANTHROPIC_API_KEY}");
+    expect(result.global.anthropicApiKey).toBeUndefined();
+    expect(result.global.openaiApiKey).toBeUndefined();
   });
 
   it("includes hcloudToken for Hetzner provider", () => {

@@ -264,7 +264,7 @@ interface SecretsBuilderOpts {
   agentPlugins: Map<string, Set<string>>;
   agentDeps: Map<string, Set<string>>;
   /** All model strings across all agents (primary + backup). Used to determine required provider API keys. */
-  allModels?: string[];
+  allModels: string[];
 }
 
 export interface ManifestSecrets {
@@ -281,16 +281,11 @@ export function buildManifestSecrets(opts: SecretsBuilderOpts): ManifestSecrets 
   const perAgent: Record<string, Record<string, string>> = {};
 
   // Per-provider API keys — only require keys for providers actually used
-  if (opts.allModels && opts.allModels.length > 0) {
-    const requiredProviders = getRequiredProviders(opts.allModels);
-    for (const providerKey of requiredProviders) {
-      const configKey = getProviderConfigKey(providerKey);
-      const envVar = getProviderEnvVar(providerKey);
-      global[configKey] = `\${env:${envVar}}`;
-    }
-  } else {
-    // Fallback: default to anthropic if no models specified
-    global.anthropicApiKey = "${env:ANTHROPIC_API_KEY}";
+  const requiredProviders = getRequiredProviders(opts.allModels);
+  for (const providerKey of requiredProviders) {
+    const configKey = getProviderConfigKey(providerKey);
+    const envVar = getProviderEnvVar(providerKey);
+    global[configKey] = `\${env:${envVar}}`;
   }
 
   if (opts.provider !== "local") {

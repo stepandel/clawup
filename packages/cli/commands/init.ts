@@ -100,7 +100,7 @@ export async function initCommand(): Promise<void> {
   const agents = fetchedIdentities.map((fi) => fi.agent);
 
   // Build plugin/dep maps
-  const { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults } =
+  const { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, allModels } =
     buildPluginDepMaps(fetchedIdentities);
 
   // Collect all template vars declared by identities
@@ -145,7 +145,7 @@ export async function initCommand(): Promise<void> {
   };
 
   // Write manifest + .env.example
-  writeManifest(manifest, fetchedIdentities, agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, process.cwd());
+  writeManifest(manifest, fetchedIdentities, agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, process.cwd(), allModels);
 
   p.log.success("Created clawup.yaml and .env.example");
   p.note(
@@ -251,11 +251,11 @@ async function repairMode(projectRoot: string): Promise<void> {
   manifest.templateVars = templateVars;
 
   // Build plugin/dep maps
-  const { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults } =
+  const { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, allModels } =
     buildPluginDepMaps(fetchedIdentities);
 
   // Write updated manifest
-  writeManifest(manifest, fetchedIdentities, agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, projectRoot);
+  writeManifest(manifest, fetchedIdentities, agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, projectRoot, allModels);
 
   p.log.success(`${MANIFEST_FILE} and .env.example updated`);
   p.outro("Run `clawup setup` to validate secrets and configure Pulumi.");
@@ -265,12 +265,13 @@ async function repairMode(projectRoot: string): Promise<void> {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-/** Build plugin/dep maps from fetched identities */
+/** Build plugin/dep maps and collect all model strings from fetched identities */
 function buildPluginDepMaps(fetchedIdentities: FetchedIdentity[]) {
   const agentPlugins = new Map<string, Set<string>>();
   const agentDeps = new Map<string, Set<string>>();
   const allPluginNames = new Set<string>();
   const allDepNames = new Set<string>();
+  const allModels: string[] = [];
 
   for (const fi of fetchedIdentities) {
     const plugins = new Set(fi.manifest.plugins ?? []);
@@ -279,6 +280,12 @@ function buildPluginDepMaps(fetchedIdentities: FetchedIdentity[]) {
     agentDeps.set(fi.agent.name, deps);
     for (const pl of plugins) allPluginNames.add(pl);
     for (const d of deps) allDepNames.add(d);
+
+    const model = fi.manifest.model ?? "anthropic/claude-opus-4-6";
+    allModels.push(model);
+    if (fi.manifest.backupModel) {
+      allModels.push(fi.manifest.backupModel);
+    }
   }
 
   const identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>> = {};
@@ -288,7 +295,7 @@ function buildPluginDepMaps(fetchedIdentities: FetchedIdentity[]) {
     }
   }
 
-  return { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults };
+  return { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, allModels };
 }
 
 /** Write/update clawup.yaml + .env.example with current identity data */
@@ -301,6 +308,7 @@ function writeManifest(
   allDepNames: Set<string>,
   identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>>,
   outputDir: string,
+  allModels: string[],
 ): void {
   const s = p.spinner();
   s.start(`Writing ${MANIFEST_FILE}...`);
@@ -323,6 +331,7 @@ function writeManifest(
     allDepNames,
     agentPlugins,
     agentDeps,
+    allModels,
   });
 
   // Apply per-agent secrets
