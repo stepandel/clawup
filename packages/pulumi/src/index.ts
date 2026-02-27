@@ -83,13 +83,24 @@ function processTemplates(
 // Load Manifest (YAML)
 // -----------------------------------------------------------------------------
 
-// Pulumi sets cwd to the project root (where Pulumi.yaml lives)
-const manifestPath = path.join(process.cwd(), "clawup.yaml");
-if (!fs.existsSync(manifestPath)) {
-  throw new Error(
-    "clawup.yaml not found. Run `clawup init` to create it."
-  );
+// Pulumi sets cwd to where Pulumi.yaml lives
+// In dev mode: repo root (clawup.yaml is also there)
+// In project mode: <projectRoot>/.clawup (clawup.yaml is in parent dir)
+// Search upward from cwd for clawup.yaml
+// In dev mode: repo root (clawup.yaml is here, cwd = repo root)
+// In project mode: Pulumi sets cwd to the program dir (packages/pulumi/dist),
+//   clawup.yaml is in the workspace root (<projectRoot>/.clawup/) or project root
+function findManifestPath(): string {
+  let dir = process.cwd();
+  const root = path.parse(dir).root;
+  while (dir !== root) {
+    const candidate = path.join(dir, "clawup.yaml");
+    if (fs.existsSync(candidate)) return candidate;
+    dir = path.dirname(dir);
+  }
+  throw new Error("clawup.yaml not found. Run `clawup init` to create it.");
 }
+const manifestPath = findManifestPath();
 
 // Cast as partial — old manifests may omit `provider` (defaults to "aws" below)
 const manifest = YAML.parse(fs.readFileSync(manifestPath, "utf-8")) as ClawupManifest & { provider?: string };
@@ -433,7 +444,8 @@ for (const agent of manifest.agents) {
       sshPrivateKey: agentResource.sshPrivateKey,
     };
   } else if (provider === "local") {
-    const hostPort = 18789 + localPortOffset++;
+    const basePort = parseInt(process.env.CLAWUP_LOCAL_BASE_PORT || "18789", 10);
+    const hostPort = basePort + localPortOffset++;
     const agentResource = new LocalDockerOpenClawAgent(agent.name, {
       ...baseArgs,
       gatewayPort: hostPort,

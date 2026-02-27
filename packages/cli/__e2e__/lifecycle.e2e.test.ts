@@ -54,6 +54,16 @@ vi.mock("../lib/project", () => ({
   isProjectMode: vi.fn(() => !!tempDir),
 }));
 
+// Mock workspace for project mode (Pulumi runs from workspace dir)
+vi.mock("../lib/workspace", () => ({
+  getWorkspaceDir: vi.fn(() => {
+    if (!tempDir) throw new Error("tempDir not set before getWorkspaceDir");
+    return path.join(tempDir, ".clawup");
+  }),
+  ensureWorkspace: vi.fn(() => ({ ok: true })),
+  isDevMode: vi.fn(() => false),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks are declared)
 // ---------------------------------------------------------------------------
@@ -76,8 +86,21 @@ import { destroyTool } from "../tools/destroy";
 // Setup & teardown
 // ---------------------------------------------------------------------------
 
+const E2E_ENV_KEYS = [
+  "PULUMI_CONFIG_PASSPHRASE",
+  "PULUMI_SKIP_UPDATE_CHECK",
+  "PULUMI_BACKEND_URL",
+  "CLAWUP_LOCAL_BASE_PORT",
+] as const;
+let savedEnv: Record<string, string | undefined> = {};
+
 describe("Lifecycle: init → setup → deploy → validate → destroy", () => {
   beforeAll(() => {
+    // Save existing env values
+    savedEnv = Object.fromEntries(
+      E2E_ENV_KEYS.map((key) => [key, process.env[key]]),
+    );
+
     // Generate unique stack name
     stackName = `e2e-${Date.now()}`;
     containerName = dockerContainerName(`${stackName}-local`, "agent-e2e-test");
@@ -85,9 +108,35 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
     // Create temp directory
     tempDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "clawup-e2e-"));
 
-    // Set env vars for Pulumi
+    // Set up workspace directory for project mode
+    const workspaceDir = path.join(tempDir, ".clawup");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    
+    // Copy Pulumi.yaml to workspace
+    const repoRoot = path.resolve(__dirname, "../../..");
+    fs.copyFileSync(path.join(repoRoot, "Pulumi.yaml"), path.join(workspaceDir, "Pulumi.yaml"));
+    
+    // Create packages/pulumi/dist structure to match Pulumi.yaml main path
+    const workspaceDistDir = path.join(workspaceDir, "packages/pulumi/dist");
+    fs.mkdirSync(workspaceDistDir, { recursive: true });
+    
+    // Copy dist contents
+    const repoDistDir = path.join(repoRoot, "packages/pulumi/dist");
+    fs.cpSync(repoDistDir, workspaceDistDir, { recursive: true });
+    
+    // Symlink node_modules for @pulumi/pulumi and other dependencies
+    fs.symlinkSync(
+      path.join(repoRoot, "node_modules"),
+      path.join(workspaceDir, "node_modules"),
+      "dir"
+    );
+
+    // Set env vars for Pulumi (isolated per suite)
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
+    process.env.PULUMI_BACKEND_URL = `file://${path.join(tempDir, ".pulumi-backend")}`;
+    fs.mkdirSync(path.join(tempDir, ".pulumi-backend"), { recursive: true });
+    process.env.CLAWUP_LOCAL_BASE_PORT = "28789";
 
     // Mock process.exit to throw instead of exiting
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
@@ -112,8 +161,12 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
       // Ignore
     }
 
-    // Clean up env vars
-    delete process.env.PULUMI_CONFIG_PASSPHRASE;
+    // Restore env vars
+    for (const key of E2E_ENV_KEYS) {
+      const value = savedEnv[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   // -------------------------------------------------------------------------

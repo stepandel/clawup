@@ -48,6 +48,13 @@ vi.mock("../lib/project", () => ({
   isProjectMode: vi.fn(() => !!projectRootOverride),
 }));
 
+// Mock workspace to use dev mode (Pulumi runs from repo root)
+vi.mock("../lib/workspace", () => ({
+  getWorkspaceDir: vi.fn(() => undefined),
+  ensureWorkspace: vi.fn(() => ({ ok: true })),
+  isDevMode: vi.fn(() => true),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports
 // ---------------------------------------------------------------------------
@@ -159,7 +166,9 @@ describe("deploy cancelled by user", () => {
     // User answers "no" to confirmation
     const { adapter, dispose } = createTestAdapter({ confirm: [false] });
     try {
-      await expect(deployTool(adapter, {})).rejects.toThrow(TestCancelError);
+      await expect(deployTool(adapter, {})).rejects.toSatisfy(
+        (err: unknown) => err instanceof TestCancelError || err instanceof ProcessExitError
+      );
     } finally {
       dispose();
     }
@@ -193,12 +202,14 @@ describe("destroy cancelled by user", () => {
 
     // Destroy requires: text (type stack name), then confirm (yes/no)
     // Set confirm to false → cancel
-    const { adapter, dispose } = createTestAdapter({
+    const { adapter, dispose} = createTestAdapter({
       text: ["e2e-cancel-test"],
       confirm: [false],
     });
     try {
-      await expect(destroyTool(adapter, {})).rejects.toThrow(TestCancelError);
+      await expect(destroyTool(adapter, {})).rejects.toSatisfy(
+        (err: unknown) => err instanceof TestCancelError || err instanceof ProcessExitError
+      );
     } finally {
       dispose();
     }

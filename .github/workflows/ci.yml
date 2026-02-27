@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run unit tests
+        run: pnpm test
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    env:
+      PULUMI_CONFIG_PASSPHRASE: test
+      PULUMI_SKIP_UPDATE_CHECK: "true"
+      PULUMI_BACKEND_URL: "file://${{ github.workspace }}/.pulumi-state"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Pulumi
+        uses: pulumi/actions@v6
+        with:
+          pulumi-version: 3.223.0  # pinned for deterministic CI
+
+      - name: Login to local Pulumi backend
+        run: |
+          mkdir -p "${{ github.workspace }}/.pulumi-state"
+          pulumi login "$PULUMI_BACKEND_URL"
+
+      - name: Run E2E tests
+        run: pnpm exec vitest run --config packages/cli/__e2e__/vitest.e2e.config.ts
+        env:
+          CLAWUP_LOCAL_BASE_PORT: "28789"
+          AGENT_LINEAR_USER_UUID: "test-linear-user"
+
+  lint:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit

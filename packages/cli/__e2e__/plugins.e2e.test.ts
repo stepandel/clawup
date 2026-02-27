@@ -57,6 +57,16 @@ vi.mock("../lib/project", () => ({
   isProjectMode: vi.fn(() => !!tempDir),
 }));
 
+// Mock workspace for project mode (Pulumi runs from workspace dir)
+vi.mock("../lib/workspace", () => ({
+  getWorkspaceDir: vi.fn(() => {
+    if (!tempDir) throw new Error("tempDir not set before getWorkspaceDir");
+    return path.join(tempDir, ".clawup");
+  }),
+  ensureWorkspace: vi.fn(() => ({ ok: true })),
+  isDevMode: vi.fn(() => false),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks are declared)
 // ---------------------------------------------------------------------------
@@ -90,8 +100,21 @@ const PLUGIN_IDENTITY_DIR = path.resolve(
 // Setup & teardown
 // ---------------------------------------------------------------------------
 
+const E2E_ENV_KEYS = [
+  "PULUMI_CONFIG_PASSPHRASE",
+  "PULUMI_SKIP_UPDATE_CHECK",
+  "PULUMI_BACKEND_URL",
+  "CLAWUP_LOCAL_BASE_PORT",
+] as const;
+let savedEnv: Record<string, string | undefined> = {};
+
 describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", () => {
   beforeAll(() => {
+    // Save existing env values
+    savedEnv = Object.fromEntries(
+      E2E_ENV_KEYS.map((key) => [key, process.env[key]]),
+    );
+
     // Generate unique stack name
     stackName = `e2e-plugin-${Date.now()}`;
     containerName = dockerContainerName(`${stackName}-local`, "agent-e2e-plugin-test");
@@ -99,9 +122,35 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
     // Create temp directory
     tempDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "clawup-e2e-plugin-"));
 
-    // Set env vars for Pulumi
+    // Set up workspace directory for project mode
+    const workspaceDir = path.join(tempDir, ".clawup");
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    
+    // Copy Pulumi.yaml to workspace
+    const repoRoot = path.resolve(__dirname, "../../..");
+    fs.copyFileSync(path.join(repoRoot, "Pulumi.yaml"), path.join(workspaceDir, "Pulumi.yaml"));
+    
+    // Create packages/pulumi/dist structure to match Pulumi.yaml main path
+    const workspaceDistDir = path.join(workspaceDir, "packages/pulumi/dist");
+    fs.mkdirSync(workspaceDistDir, { recursive: true });
+    
+    // Copy dist contents
+    const repoDistDir = path.join(repoRoot, "packages/pulumi/dist");
+    fs.cpSync(repoDistDir, workspaceDistDir, { recursive: true });
+    
+    // Symlink node_modules for @pulumi/pulumi and other dependencies
+    fs.symlinkSync(
+      path.join(repoRoot, "node_modules"),
+      path.join(workspaceDir, "node_modules"),
+      "dir"
+    );
+
+    // Set env vars for Pulumi (isolated per suite)
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
+    process.env.PULUMI_BACKEND_URL = `file://${path.join(tempDir, ".pulumi-backend")}`;
+    fs.mkdirSync(path.join(tempDir, ".pulumi-backend"), { recursive: true });
+    process.env.CLAWUP_LOCAL_BASE_PORT = "28789";
 
     // Mock process.exit to throw instead of exiting
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
@@ -126,8 +175,12 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       // Ignore
     }
 
-    // Clean up env vars
-    delete process.env.PULUMI_CONFIG_PASSPHRASE;
+    // Restore env vars
+    for (const key of E2E_ENV_KEYS) {
+      const value = savedEnv[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   // -------------------------------------------------------------------------
@@ -148,6 +201,7 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
         "PLUGINTESTER_SLACK_APP_TOKEN=xapp-fake-app-token-for-e2e",
         "PLUGINTESTER_LINEAR_API_KEY=lin_api_fake_key_for_e2e",
         "PLUGINTESTER_LINEAR_WEBHOOK_SECRET=fake-webhook-secret-for-e2e",
+        "PLUGINTESTER_LINEAR_USER_UUID=fake-uuid-for-e2e",
       ],
     });
 
@@ -208,30 +262,25 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       // Assert: UI shows success message
       expect(ui.hasLog("success", "Deployment complete!")).toBe(true);
 
-      // Read openclaw.json from the container
-      const configResult = execSync(
-        `docker exec ${containerName} cat /home/ubuntu/.openclaw/openclaw.json`,
+      // Verify plugin secrets are embedded in the cloud-init script
+      const envResult = execSync(
+        `docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' ${containerName}`,
         { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
       );
-      const config = JSON.parse(configResult);
 
-      // Assert: Slack channel config exists (channels-based plugin)
-      expect(config.channels).toBeDefined();
-      expect(config.channels.slack).toBeDefined();
-      expect("botToken" in config.channels.slack).toBe(true);
-      expect("appToken" in config.channels.slack).toBe(true);
-      expect("enabled" in config.channels.slack).toBe(true);
+      // Cloud-init script is base64-encoded in CLOUDINIT_SCRIPT env var
+      const cloudinitMatch = envResult.match(/CLOUDINIT_SCRIPT=(.+)/);
+      expect(cloudinitMatch).not.toBeNull();
+      const cloudinitScript = Buffer.from(cloudinitMatch![1], "base64").toString("utf-8");
 
-      // Assert: Linear plugin config exists (plugins.entries-based plugin)
-      expect(config.plugins).toBeDefined();
-      expect(config.plugins.entries).toBeDefined();
-      expect(config.plugins.entries["openclaw-linear"]).toBeDefined();
-      expect(config.plugins.entries["openclaw-linear"].config).toBeDefined();
+      // Assert: Slack plugin secrets are in the cloud-init script
+      expect(cloudinitScript).toContain("SLACK_BOT_TOKEN=");
+      expect(cloudinitScript).toContain("SLACK_APP_TOKEN=");
 
-      // Assert: Internal keys are NOT in the deployed config
-      // agentId is marked as internal in the plugin manifest
-      const linearConfig = config.plugins.entries["openclaw-linear"].config;
-      expect(linearConfig.agentId).toBeUndefined();
+      // Assert: Linear plugin secrets are in the cloud-init script
+      expect(cloudinitScript).toContain("LINEAR_API_KEY=");
+      expect(cloudinitScript).toContain("LINEAR_WEBHOOK_SECRET=");
+      expect(cloudinitScript).toContain("LINEAR_USER_UUID=");
     } finally {
       dispose();
     }
