@@ -394,6 +394,11 @@ ${(config.deps ?? [])
     .map(envVar => `[ -n "\${${envVar}:-}" ] && echo 'export ${envVar}="\${${envVar}:-}"' >> /home/ubuntu/.profile`)
     .join("\n")}
 ${additionalEnvVars}
+${config.envVars?.AGENT_NAME ? `
+# Configure git identity for coding agent commits
+sudo -u ubuntu git config --global user.name "${config.envVars.AGENT_NAME}"
+sudo -u ubuntu git config --global user.email "${(config.envVars.AGENT_NAME).toLowerCase().replace(/[^a-z0-9]/g, "")}@clawup.sh"
+echo "Configured git identity: ${config.envVars.AGENT_NAME}"` : ""}
 ${depPostInstallScript}
 ${codingClisInstallScript}
 
