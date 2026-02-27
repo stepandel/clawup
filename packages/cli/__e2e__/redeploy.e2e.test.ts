@@ -56,7 +56,10 @@ vi.mock("../lib/project", () => ({
 
 // Mock workspace for project mode (Pulumi runs from workspace dir)
 vi.mock("../lib/workspace", () => ({
-  getWorkspaceDir: vi.fn(() => path.join(tempDir, ".clawup")),
+  getWorkspaceDir: vi.fn(() => {
+    if (!tempDir) throw new Error("tempDir not set before getWorkspaceDir");
+    return path.join(tempDir, ".clawup");
+  }),
   ensureWorkspace: vi.fn(() => ({ ok: true })),
   isDevMode: vi.fn(() => false),
 }));
@@ -83,8 +86,20 @@ import { destroyTool } from "../tools/destroy";
 // Suite A: Redeploy existing stack
 // =========================================================================
 
+const E2E_ENV_KEYS = [
+  "PULUMI_CONFIG_PASSPHRASE",
+  "PULUMI_SKIP_UPDATE_CHECK",
+  "PULUMI_BACKEND_URL",
+  "CLAWUP_LOCAL_BASE_PORT",
+] as const;
+let savedEnv: Record<string, string | undefined> = {};
+
 describe("Redeploy existing stack (in-place update)", () => {
   beforeAll(() => {
+    savedEnv = Object.fromEntries(
+      E2E_ENV_KEYS.map((key) => [key, process.env[key]]),
+    );
+
     stackName = `e2e-rd-${Date.now()}`;
     containerName = dockerContainerName(`${stackName}-local`, "agent-e2e-test");
     tempDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "clawup-e2e-rd-"));
@@ -113,7 +128,8 @@ describe("Redeploy existing stack (in-place update)", () => {
 
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
-    process.env.PULUMI_BACKEND_URL = "file://~";
+    process.env.PULUMI_BACKEND_URL = `file://${path.join(tempDir, ".pulumi-backend")}`;
+    fs.mkdirSync(path.join(tempDir, ".pulumi-backend"), { recursive: true });
     process.env.CLAWUP_LOCAL_BASE_PORT = "28789";
 
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
@@ -130,10 +146,11 @@ describe("Redeploy existing stack (in-place update)", () => {
       if (fs.existsSync(manifestInCwd)) fs.unlinkSync(manifestInCwd);
     } catch { /* ignore */ }
 
-    delete process.env.PULUMI_CONFIG_PASSPHRASE;
-    delete process.env.PULUMI_SKIP_UPDATE_CHECK;
-    delete process.env.PULUMI_BACKEND_URL;
-    delete process.env.CLAWUP_LOCAL_BASE_PORT;
+    for (const key of E2E_ENV_KEYS) {
+      const value = savedEnv[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   it("setup + deploy creates initial stack", async () => {
@@ -225,6 +242,10 @@ describe("Redeploy existing stack (in-place update)", () => {
 
 describe("Redeploy with no existing stack (fresh deploy fallback)", () => {
   beforeAll(() => {
+    savedEnv = Object.fromEntries(
+      E2E_ENV_KEYS.map((key) => [key, process.env[key]]),
+    );
+
     stackName = `e2e-rd2-${Date.now()}`;
     containerName = dockerContainerName(`${stackName}-local`, "agent-e2e-test");
     tempDir = fs.mkdtempSync(path.join(require("os").tmpdir(), "clawup-e2e-rd2-"));
@@ -253,7 +274,8 @@ describe("Redeploy with no existing stack (fresh deploy fallback)", () => {
 
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
-    process.env.PULUMI_BACKEND_URL = "file://~";
+    process.env.PULUMI_BACKEND_URL = `file://${path.join(tempDir, ".pulumi-backend")}`;
+    fs.mkdirSync(path.join(tempDir, ".pulumi-backend"), { recursive: true });
     process.env.CLAWUP_LOCAL_BASE_PORT = "28789";
 
     vi.spyOn(process, "exit").mockImplementation((code?: string | number | null | undefined) => {
@@ -270,10 +292,11 @@ describe("Redeploy with no existing stack (fresh deploy fallback)", () => {
       if (fs.existsSync(manifestInCwd)) fs.unlinkSync(manifestInCwd);
     } catch { /* ignore */ }
 
-    delete process.env.PULUMI_CONFIG_PASSPHRASE;
-    delete process.env.PULUMI_SKIP_UPDATE_CHECK;
-    delete process.env.PULUMI_BACKEND_URL;
-    delete process.env.CLAWUP_LOCAL_BASE_PORT;
+    for (const key of E2E_ENV_KEYS) {
+      const value = savedEnv[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   it("setup creates the base stack (but no deploy)", async () => {

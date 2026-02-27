@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -58,7 +61,7 @@ jobs:
       - name: Install Pulumi
         uses: pulumi/actions@v6
         with:
-          pulumi-version: latest
+          pulumi-version: 3.223.0  # pinned for deterministic CI
 
       - name: Login to local Pulumi backend
         run: |

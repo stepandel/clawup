@@ -56,7 +56,10 @@ vi.mock("../lib/project", () => ({
 
 // Mock workspace for project mode (Pulumi runs from workspace dir)
 vi.mock("../lib/workspace", () => ({
-  getWorkspaceDir: vi.fn(() => path.join(tempDir, ".clawup")),
+  getWorkspaceDir: vi.fn(() => {
+    if (!tempDir) throw new Error("tempDir not set before getWorkspaceDir");
+    return path.join(tempDir, ".clawup");
+  }),
   ensureWorkspace: vi.fn(() => ({ ok: true })),
   isDevMode: vi.fn(() => false),
 }));
@@ -83,8 +86,21 @@ import { destroyTool } from "../tools/destroy";
 // Setup & teardown
 // ---------------------------------------------------------------------------
 
+const E2E_ENV_KEYS = [
+  "PULUMI_CONFIG_PASSPHRASE",
+  "PULUMI_SKIP_UPDATE_CHECK",
+  "PULUMI_BACKEND_URL",
+  "CLAWUP_LOCAL_BASE_PORT",
+] as const;
+let savedEnv: Record<string, string | undefined> = {};
+
 describe("Lifecycle: init → setup → deploy → validate → destroy", () => {
   beforeAll(() => {
+    // Save existing env values
+    savedEnv = Object.fromEntries(
+      E2E_ENV_KEYS.map((key) => [key, process.env[key]]),
+    );
+
     // Generate unique stack name
     stackName = `e2e-${Date.now()}`;
     containerName = dockerContainerName(`${stackName}-local`, "agent-e2e-test");
@@ -115,10 +131,11 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
       "dir"
     );
 
-    // Set env vars for Pulumi
+    // Set env vars for Pulumi (isolated per suite)
     process.env.PULUMI_CONFIG_PASSPHRASE = "test";
     process.env.PULUMI_SKIP_UPDATE_CHECK = "true";
-    process.env.PULUMI_BACKEND_URL = "file://~";
+    process.env.PULUMI_BACKEND_URL = `file://${path.join(tempDir, ".pulumi-backend")}`;
+    fs.mkdirSync(path.join(tempDir, ".pulumi-backend"), { recursive: true });
     process.env.CLAWUP_LOCAL_BASE_PORT = "28789";
 
     // Mock process.exit to throw instead of exiting
@@ -144,11 +161,12 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
       // Ignore
     }
 
-    // Clean up env vars
-    delete process.env.PULUMI_CONFIG_PASSPHRASE;
-    delete process.env.PULUMI_SKIP_UPDATE_CHECK;
-    delete process.env.PULUMI_BACKEND_URL;
-    delete process.env.CLAWUP_LOCAL_BASE_PORT;
+    // Restore env vars
+    for (const key of E2E_ENV_KEYS) {
+      const value = savedEnv[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   // -------------------------------------------------------------------------
