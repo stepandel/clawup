@@ -1,0 +1,39 @@
+name: test-linear
+displayName: Test Linear
+installable: true
+needsFunnel: true
+configPath: plugins.entries
+secrets:
+  apiKey:
+    envVar: LINEAR_API_KEY
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "lin_api_"
+  webhookSecret:
+    envVar: LINEAR_WEBHOOK_SECRET
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+  linearUserUuid:
+    envVar: LINEAR_USER_UUID
+    scope: agent
+    isSecret: false
+    required: false
+    autoResolvable: true
+internalKeys:
+  - agentId
+  - linearUserUuid
+configTransforms: []
+webhookSetup:
+  urlPath: "/hooks/linear"
+  secretKey: webhookSecret
+  instructions:
+    - "1. Create webhook"
+    - "2. Paste URL"
+  configJsonPath: "plugins.entries.test-linear.config.webhookSecret"
+hooks:
+  resolve:
+    linearUserUuid: 'echo "test-resolved-uuid-$(echo $LINEAR_API_KEY | cut -c1-8)"'

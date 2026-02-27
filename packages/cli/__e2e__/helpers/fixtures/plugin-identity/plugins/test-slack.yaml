@@ -1,0 +1,22 @@
+name: test-slack
+displayName: Test Slack
+installable: false
+needsFunnel: false
+configPath: channels
+secrets:
+  botToken:
+    envVar: SLACK_BOT_TOKEN
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "xoxb-"
+  appToken:
+    envVar: SLACK_APP_TOKEN
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "xapp-"
+internalKeys: []
+configTransforms: []
