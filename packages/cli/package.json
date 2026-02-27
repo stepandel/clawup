@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@clawup/core": "workspace:*",
+    "@clawup/pulumi": "workspace:*",
     "@types/node": "^20.0.0",
     "esbuild": "^0.27.3",
     "typescript": "^5.0.0"

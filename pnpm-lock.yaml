@@ -42,6 +42,9 @@ importers:
       '@clawup/core':
         specifier: workspace:*
         version: link:../core
+      '@clawup/pulumi':
+        specifier: workspace:*
+        version: link:../pulumi
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.33
