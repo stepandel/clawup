@@ -201,7 +201,7 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
         "PLUGINTESTER_SLACK_APP_TOKEN=xapp-fake-app-token-for-e2e",
         "PLUGINTESTER_LINEAR_API_KEY=lin_api_fake_key_for_e2e",
         "PLUGINTESTER_LINEAR_WEBHOOK_SECRET=fake-webhook-secret-for-e2e",
-        "PLUGINTESTER_LINEAR_USER_UUID=fake-uuid-for-e2e",
+        // LINEAR_USER_UUID intentionally omitted — resolved by test-linear hook
       ],
     });
 
@@ -280,7 +280,9 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       // Assert: Linear plugin secrets are in the cloud-init script
       expect(cloudinitScript).toContain("LINEAR_API_KEY=");
       expect(cloudinitScript).toContain("LINEAR_WEBHOOK_SECRET=");
+      // LINEAR_USER_UUID was resolved by the test-linear hook (echo-based stub)
       expect(cloudinitScript).toContain("LINEAR_USER_UUID=");
+      expect(cloudinitScript).toContain("test-resolved-uuid-");
     } finally {
       dispose();
     }
@@ -321,17 +323,17 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
     expect(containerCheck!.detail).toBe("running");
 
     // Assert: Plugin secret checks were executed for Slack
-    const slackBotCheck = ui.getCheckResult("slack secret (SLACK_BOT_TOKEN)");
+    const slackBotCheck = ui.getCheckResult("test-slack secret (SLACK_BOT_TOKEN)");
     expect(slackBotCheck).not.toBeNull();
 
-    const slackAppCheck = ui.getCheckResult("slack secret (SLACK_APP_TOKEN)");
+    const slackAppCheck = ui.getCheckResult("test-slack secret (SLACK_APP_TOKEN)");
     expect(slackAppCheck).not.toBeNull();
 
     // Assert: Plugin secret checks were executed for Linear
-    const linearApiCheck = ui.getCheckResult("openclaw-linear secret (LINEAR_API_KEY)");
+    const linearApiCheck = ui.getCheckResult("test-linear secret (LINEAR_API_KEY)");
     expect(linearApiCheck).not.toBeNull();
 
-    const linearWebhookCheck = ui.getCheckResult("openclaw-linear secret (LINEAR_WEBHOOK_SECRET)");
+    const linearWebhookCheck = ui.getCheckResult("test-linear secret (LINEAR_WEBHOOK_SECRET)");
     expect(linearWebhookCheck).not.toBeNull();
 
     // Assert: Overall validation reports failures (expected with dummy secrets/API key)
