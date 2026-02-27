@@ -405,6 +405,11 @@ print("Configured model: ${model}")`}
 # Configure coding agent CLI backend
 config["agents"]["defaults"]["cliBackends"] = ${cliBackendsJson}
 print("Configured cliBackends for ${codingAgentName}")
+
+# Set default agent for ACP (coding agent) sessions
+config.setdefault("acp", {})
+config["acp"]["defaultAgent"] = "default"
+print("Configured acp.defaultAgent = default")
 ${pluginConfigs}
 # Configure agent identity for Slack mentions/tags
 agent_name = os.environ.get("AGENT_NAME", "")
