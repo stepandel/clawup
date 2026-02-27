@@ -1,12 +1,12 @@
 /**
  * Tests for provider-aware config generation.
  *
- * Verifies that generateConfigPatchScript produces correct Python
+ * Verifies that generateConfigPatchBash produces correct bash
  * config patching for different model providers.
  */
 
 import { describe, it, expect } from "vitest";
-import { generateConfigPatchScript, type OpenClawConfigOptions } from "../config-generator";
+import { generateConfigPatchBash, type OpenClawConfigOptions } from "../config-generator";
 
 const BASE_OPTIONS: OpenClawConfigOptions = {
   gatewayToken: "test-gw-token",
@@ -15,9 +15,9 @@ const BASE_OPTIONS: OpenClawConfigOptions = {
   plugins: [],
 };
 
-describe("generateConfigPatchScript — provider-aware config", () => {
+describe("generateConfigPatchBash — provider-aware config", () => {
   it("generates Anthropic auto-detect for anthropic/ models", () => {
-    const script = generateConfigPatchScript(BASE_OPTIONS);
+    const script = generateConfigPatchBash(BASE_OPTIONS);
     expect(script).toContain("Anthropic: auto-detect credential type");
     expect(script).toContain('ANTHROPIC_API_KEY');
     expect(script).toContain('CLAUDE_CODE_OAUTH_TOKEN');
@@ -25,7 +25,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 
   it("generates OpenAI env var config for openai/ models", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openai/gpt-4o",
     });
@@ -35,7 +35,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 
   it("generates Google env var config for google/ models", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "google/gemini-2.5-pro",
     });
@@ -44,7 +44,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 
   it("generates OpenRouter env var config for openrouter/ models", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openrouter/openai/gpt-4o",
     });
@@ -54,7 +54,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
 
   it("throws on unknown provider model prefix", () => {
     expect(() =>
-      generateConfigPatchScript({
+      generateConfigPatchBash({
         ...BASE_OPTIONS,
         model: "mistral/large",
       })
@@ -62,7 +62,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 
   it("sets correct model in config for non-Anthropic providers", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openai/o3",
     });
@@ -70,7 +70,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 
   it("handles backup model with same provider", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openai/gpt-4o",
       backupModel: "openai/o4-mini",
@@ -81,7 +81,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 
   it("handles backup model with different provider (cross-provider fallback)", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openai/gpt-4o",
       backupModel: "anthropic/claude-sonnet-4-5",
@@ -95,7 +95,7 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 
   it("does not add backup provider section when same as primary", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "anthropic/claude-opus-4-6",
       backupModel: "anthropic/claude-sonnet-4-5",
@@ -104,9 +104,9 @@ describe("generateConfigPatchScript — provider-aware config", () => {
   });
 });
 
-describe("generateConfigPatchScript — Codex coding agent", () => {
+describe("generateConfigPatchBash — Codex coding agent", () => {
   it("includes Codex CLI backend config", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       codingAgent: "codex",
     });
@@ -116,25 +116,26 @@ describe("generateConfigPatchScript — Codex coding agent", () => {
   });
 
   it("includes Claude Code CLI backend config (default)", () => {
-    const script = generateConfigPatchScript(BASE_OPTIONS);
+    const script = generateConfigPatchBash(BASE_OPTIONS);
     expect(script).toContain('"claude"');
     expect(script).toContain("code");
   });
 
   it("aliases OPENROUTER_API_KEY to OPENAI_API_KEY when codex + openrouter", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openrouter/openai/gpt-5.2",
       codingAgent: "codex",
     });
     expect(script).toContain('OPENROUTER_API_KEY');
-    expect(script).toContain('config["env"]["OPENAI_API_KEY"]');
-    expect(script).toContain('config["env"]["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"');
+    expect(script).toContain('openclaw config set env.OPENAI_API_KEY');
+    expect(script).toContain('openclaw config set env.OPENAI_BASE_URL');
+    expect(script).toContain("https://openrouter.ai/api/v1");
     expect(script).toContain("Aliased OPENROUTER_API_KEY -> OPENAI_API_KEY");
   });
 
   it("does not alias OPENAI_API_KEY when codex + direct openai", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openai/gpt-4o",
       codingAgent: "codex",
@@ -143,7 +144,7 @@ describe("generateConfigPatchScript — Codex coding agent", () => {
   });
 
   it("does not alias OPENAI_API_KEY when claude-code + openrouter", () => {
-    const script = generateConfigPatchScript({
+    const script = generateConfigPatchBash({
       ...BASE_OPTIONS,
       model: "openrouter/openai/gpt-4o",
       codingAgent: "claude-code",

@@ -2,7 +2,8 @@
  * Tests for provider-aware cloud-init generation.
  *
  * Verifies that generateCloudInit produces correct env var exports
- * for different model providers (Anthropic, OpenAI, Google, OpenRouter).
+ * for different model providers (Anthropic, OpenAI, Google, OpenRouter)
+ * and that openclaw onboard is invoked with correct provider-specific flags.
  */
 
 import { describe, it, expect } from "vitest";
@@ -103,7 +104,7 @@ describe("generateCloudInit — provider-aware env vars", () => {
     expect(script).not.toContain("Auto-detect Anthropic");
   });
 
-  it("creates skeleton config for non-Anthropic providers (no openclaw onboard)", () => {
+  it("uses openclaw onboard for non-Anthropic providers with correct flags", () => {
     const script = generateCloudInit({
       providerApiKeys: { openai: "sk-openai-test" },
       tailscaleAuthKey: "tskey-auth-test",
@@ -114,15 +115,14 @@ describe("generateCloudInit — provider-aware env vars", () => {
       workspaceFiles: {},
       skipTailscale: true,
     });
-    expect(script).toContain("Creating openclaw.json skeleton");
-    expect(script).toContain("openclaw.json");
-    expect(script).not.toContain("openclaw onboard");
+    expect(script).toContain("openclaw onboard --non-interactive");
+    expect(script).toContain("--openai-api-key");
   });
 
-  it("creates skeleton config for anthropic provider (no openclaw onboard)", () => {
+  it("uses openclaw onboard for anthropic provider with correct flags", () => {
     const script = generateCloudInit(BASE_CONFIG);
-    expect(script).toContain("Creating openclaw.json skeleton");
-    expect(script).not.toContain("openclaw onboard");
+    expect(script).toContain("openclaw onboard --non-interactive");
+    expect(script).toContain("--anthropic-api-key");
   });
 
   it("aliases OPENROUTER_API_KEY to OPENAI_API_KEY when codex + openrouter", () => {
@@ -159,5 +159,48 @@ describe("generateCloudInit — provider-aware env vars", () => {
       codingAgent: "codex",
     });
     expect(script).not.toContain("Aliased OPENROUTER_API_KEY");
+  });
+});
+
+describe("generateCloudInit — openclaw onboard provider flags", () => {
+  it("anthropic provider uses --anthropic-api-key flag", () => {
+    const script = generateCloudInit(BASE_CONFIG);
+    expect(script).toContain("openclaw onboard --non-interactive");
+    expect(script).toContain("--anthropic-api-key");
+  });
+
+  it("openai provider uses --openai-api-key flag", () => {
+    const script = generateCloudInit({
+      ...BASE_CONFIG,
+      providerApiKeys: { openai: "sk-openai-test" },
+      modelProvider: "openai",
+      model: "openai/gpt-4o",
+    });
+    expect(script).toContain("openclaw onboard --non-interactive");
+    expect(script).toContain("--openai-api-key");
+  });
+
+  it("google provider uses --gemini-api-key flag", () => {
+    const script = generateCloudInit({
+      ...BASE_CONFIG,
+      providerApiKeys: { google: "google-test" },
+      modelProvider: "google",
+      model: "google/gemini-2.5-pro",
+    });
+    expect(script).toContain("openclaw onboard --non-interactive");
+    expect(script).toContain("--gemini-api-key");
+    expect(script).toContain("--auth-choice gemini-api-key");
+  });
+
+  it("openrouter provider uses --token-provider openrouter flag", () => {
+    const script = generateCloudInit({
+      ...BASE_CONFIG,
+      providerApiKeys: { openrouter: "sk-or-test" },
+      modelProvider: "openrouter",
+      model: "openrouter/auto",
+    });
+    expect(script).toContain("openclaw onboard --non-interactive");
+    expect(script).toContain("--token-provider openrouter");
+    expect(script).toContain("--auth-choice apiKey");
   });
 });

@@ -4,7 +4,7 @@
  */
 
 import * as zlib from "zlib";
-import { generateConfigPatchScript, PluginEntry } from "./config-generator";
+import { generateConfigPatchBash, PluginEntry } from "./config-generator";
 import { CODING_AGENT_REGISTRY, MODEL_PROVIDERS, getProviderForModel, getProviderEnvVar, type CodingAgentEntry } from "@clawup/core";
 
 /**
@@ -124,7 +124,7 @@ export function generateCloudInit(config: CloudInitConfig): string {
   const codingAgentName = config.codingAgent ?? "claude-code";
   const codingAgentEntry = CODING_AGENT_REGISTRY[codingAgentName];
 
-  const configPatchScript = generateConfigPatchScript({
+  const configPatchBash = generateConfigPatchBash({
     gatewayPort,
     gatewayToken: config.gatewayToken,
     model: config.model,
@@ -135,6 +135,14 @@ export function generateCloudInit(config: CloudInitConfig): string {
     backupModel: config.backupModel,
     codingAgent: codingAgentName,
   });
+
+  // Determine provider onboard flags
+  const primaryProviderKeyForOnboard = config.modelProvider ?? "anthropic";
+  const primaryProviderDefForOnboard = MODEL_PROVIDERS[primaryProviderKeyForOnboard];
+  const primaryEnvVarForOnboard = primaryProviderDefForOnboard?.envVar ?? "ANTHROPIC_API_KEY";
+  const providerOnboardFlags = primaryProviderDefForOnboard
+    ? primaryProviderDefForOnboard.onboardFlags(primaryEnvVarForOnboard)
+    : MODEL_PROVIDERS.anthropic.onboardFlags("ANTHROPIC_API_KEY");
 
   // Dynamic dep installation scripts (runs as root)
   const depInstallScript = (config.deps ?? [])
@@ -285,7 +293,7 @@ echo "Enabling Tailscale HTTPS proxy..."
 tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve failed. Enable HTTPS in your Tailscale admin console first."
 `;
 
-  // Collect all secret env vars that need to be passed to the config-patch python script
+  // Collect all secret env vars that need to be passed to the config-patch bash script
   const pluginSecretEnvVarExports: string[] = [];
   for (const plugin of config.plugins ?? []) {
     for (const envVar of Object.values(plugin.secretEnvVars ?? {})) {
@@ -295,12 +303,6 @@ tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve failed. En
   const pluginSecretEnvLine = pluginSecretEnvVarExports.length > 0
     ? ` \\\n${pluginSecretEnvVarExports.join(" \\\n")}`
     : "";
-
-  // Determine the primary provider's env var for backward-compatible references
-  const primaryProviderKey = config.modelProvider ?? "anthropic";
-  const primaryEnvVar = (() => {
-    try { return getProviderEnvVar(primaryProviderKey); } catch { return "ANTHROPIC_API_KEY"; }
-  })();
 
   return `#!/bin/bash
 set -e
@@ -326,7 +328,7 @@ echo "Starting OpenClaw agent provisioning..."
 echo "Updating system packages..."
 apt-get update
 apt-get upgrade -y
-apt-get install -y unzip build-essential sudo python3
+apt-get install -y unzip build-essential sudo
 
 ${config.skipDocker ? "" : `# Install Docker
 echo "Installing Docker..."
@@ -412,31 +414,31 @@ loginctl enable-linger ubuntu
 # Start user's systemd instance (required for user services during cloud-init)
 systemctl start user@1000.service`}
 
-# Create skeleton openclaw.json (Python config-patch + openclaw doctor --fix handle the rest)
-echo "Creating openclaw.json skeleton..."
-sudo -H -u ubuntu bash -c '
-mkdir -p /home/ubuntu/.openclaw
-cat > /home/ubuntu/.openclaw/openclaw.json << SKELETON_CONFIG
-{
-  "gateway": {
-    "port": '"$GATEWAY_PORT"',
-    "mode": "local",
-    "trustedProxies": ["127.0.0.1"],
-    "controlUi": { "enabled": true, "allowInsecureAuth": true },
-    "auth": { "mode": "token", "token": "" }
-  },
-  "agents": { "defaults": {} },
-  "env": {}
-}
-SKELETON_CONFIG
-echo "Created minimal openclaw.json skeleton"
+# Run openclaw onboard for provider auth + skeleton config creation
+echo "Running openclaw onboard..."
+sudo -H -u ubuntu \\
+${Object.entries(config.providerApiKeys).map(([providerKey]) => {
+  const envVar = getProviderEnvVar(providerKey);
+  return `  ${envVar}="\${${envVar}}"`;
+}).join(" \\\n")} \\
+  bash -c '
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+openclaw onboard --non-interactive \\
+  --mode local \\
+  ${providerOnboardFlags} \\
+  --gateway-port ${gatewayPort} \\
+  --gateway-bind loopback \\
+  --skip-skills
+echo "Onboarding complete"
 '
 ${postProvisionHooksScript}
 ${workspaceFilesScript}
 ${pluginInstallScript}
 ${clawhubSkillsScript}
-# Configure gateway for Tailscale Serve (BEFORE daemon install so token matches)
-echo "Configuring OpenClaw gateway..."
+# Configure remaining settings via openclaw config set
+echo "Configuring OpenClaw settings..."
 sudo -H -u ubuntu \\
   GATEWAY_TOKEN="\${GATEWAY_TOKEN}" \\
 ${Object.entries(config.providerApiKeys).map(([providerKey]) => {
@@ -446,9 +448,12 @@ ${Object.entries(config.providerApiKeys).map(([providerKey]) => {
   BRAVE_API_KEY="${braveApiKey ?? ""}" \\
   AGENT_NAME="${config.envVars?.AGENT_NAME ?? ""}" \\
   AGENT_EMOJI="${config.envVars?.AGENT_EMOJI ?? ""}"${pluginSecretEnvLine} \\
-  python3 << 'PYTHON_SCRIPT'
-${configPatchScript}
-PYTHON_SCRIPT
+  bash << 'CONFIG_PATCH'
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+${configPatchBash}
+CONFIG_PATCH
 ${preStartHooksScript}
 ${tailscaleProxySection}
 ${config.foregroundMode ? `# Run openclaw doctor before starting daemon in foreground

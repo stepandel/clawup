@@ -1,13 +1,13 @@
 /**
  * OpenClaw configuration generator
- * Builds the openclaw.json configuration file content
+ * Builds openclaw config set commands for cloud-init provisioning
  */
 
 import { CODING_AGENT_REGISTRY, MODEL_PROVIDERS, getProviderForModel } from "@clawup/core";
 
 /**
  * A single plugin entry for the OpenClaw config.
- * Used to dynamically generate Python config-patch code for each plugin.
+ * Used to dynamically generate `openclaw config set` commands for each plugin.
  */
 export interface PluginEntry {
   /** Plugin package name (e.g., "openclaw-linear") */
@@ -37,41 +37,23 @@ export interface PluginEntry {
 const ENV_VAR_PATTERN = /^\$([A-Z][A-Z0-9_]*)$/;
 
 /**
- * Convert a JS value to a Python literal string (recursive).
- * Booleans: true→True, false→False. null/undefined→None.
- * Arrays and objects are recursively converted.
- *
- * Strings matching $ENV_VAR are emitted as os.environ.get("ENV_VAR", "")
- * instead of literal strings. This works for both dict keys and values,
- * allowing plugin configs to reference runtime environment variables.
+ * Convert a JS value to a JSON string suitable for `openclaw config set`.
+ * Env var references ($VAR_NAME) become bash $VAR references.
+ * Objects/arrays are JSON-stringified.
  */
-function toPythonLiteral(value: unknown): string {
-  if (value === true) return "True";
-  if (value === false) return "False";
-  if (value === null || value === undefined) return "None";
+function toJsonValue(value: unknown): string {
+  if (value === null || value === undefined) return '""';
   if (typeof value === "string") {
     const envMatch = value.match(ENV_VAR_PATTERN);
     if (envMatch) {
-      return `os.environ.get("${envMatch[1]}", "")`;
+      return `"$${envMatch[1]}"`;
     }
-    return JSON.stringify(value);
+    return `'"${value.replace(/'/g, "'\\''")}"'`;
   }
-  if (Array.isArray(value)) {
-    return `[${value.map(toPythonLiteral).join(", ")}]`;
-  }
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .map(([k, v]) => {
-        const keyEnvMatch = k.match(ENV_VAR_PATTERN);
-        const pyKey = keyEnvMatch
-          ? `os.environ.get("${keyEnvMatch[1]}", "")`
-          : `"${k}"`;
-        return `${pyKey}: ${toPythonLiteral(v)}`;
-      })
-      .join(", ");
-    return `{${entries}}`;
-  }
-  return JSON.stringify(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  // Objects and arrays — JSON stringify, wrapping in single quotes for bash
+  return `'${JSON.stringify(value).replace(/'/g, "'\\''")}'`;
 }
 
 export interface OpenClawConfigOptions {
@@ -158,8 +140,6 @@ export function generateOpenClawConfig(options: OpenClawConfigOptions): OpenClaw
     };
   }
 
-  // Note: model config is now handled in generateConfigPatchScript() via agents.defaults.model
-
   if (options.braveApiKey) {
     config.tools = { web: { search: { provider: "brave", apiKey: options.braveApiKey } } };
   }
@@ -180,76 +160,55 @@ export function generateOpenClawConfigJson(options: OpenClawConfigOptions): stri
 }
 
 /**
- * Generates Python code to configure a single plugin in openclaw.json.
- * Secrets are injected from environment variables.
- *
- * The configPath field drives which code path is used:
- * - "channels": writes to config["channels"]["<name>"] (channel config)
- * - "plugins.entries": writes to config["plugins"]["entries"]["<name>"] (plugin entry)
+ * Generates `openclaw config set` commands for a plugins.entries plugin.
  */
-function generatePluginPython(plugin: PluginEntry): string {
+function generatePluginConfigSet(plugin: PluginEntry): string {
   if (plugin.configPath === "channels") {
-    return generateChannelPluginPython(plugin);
+    return generateChannelConfigSet(plugin);
   }
 
   const internalKeys = new Set(plugin.internalKeys ?? []);
+  const lines: string[] = [];
 
-  // Build the config dict, injecting secrets from env vars
-  const configEntries: string[] = [];
+  lines.push(`# Configure ${plugin.name} plugin`);
+  lines.push(`openclaw config set 'plugins.entries.${plugin.name}.enabled' ${plugin.enabled ? "true" : "false"}`);
 
-  // Secret env var values (skip internal keys — they're not valid plugin config properties)
+  // Secret env var values (skip internal keys)
   if (plugin.secretEnvVars) {
     for (const [configKey, envVar] of Object.entries(plugin.secretEnvVars)) {
       if (internalKeys.has(configKey)) continue;
-      configEntries.push(`        "${configKey}": os.environ.get("${envVar}", "")`);
+      lines.push(`openclaw config set 'plugins.entries.${plugin.name}.config.${configKey}' "$${envVar}"`);
     }
   }
 
   // Non-secret config values (filter out internal metadata)
   for (const [key, value] of Object.entries(plugin.config)) {
     if (internalKeys.has(key)) continue;
-    configEntries.push(`        "${key}": ${toPythonLiteral(value)}`);
+    lines.push(`openclaw config set 'plugins.entries.${plugin.name}.config.${key}' ${toJsonValue(value)}`);
   }
 
-  const configBlock = configEntries.length > 0
-    ? `{
-${configEntries.join(",\n")}
-    }`
-    : "{}";
+  lines.push(`echo "Configured ${plugin.name} plugin"`);
 
-  return `
-# Configure ${plugin.name} plugin
-config.setdefault("plugins", {})
-config["plugins"].setdefault("entries", {})
-config["plugins"]["entries"].setdefault("${plugin.name}", {})
-config["plugins"]["entries"]["${plugin.name}"]["enabled"] = ${plugin.enabled ? "True" : "False"}
-config["plugins"]["entries"]["${plugin.name}"].setdefault("config", {})
-config["plugins"]["entries"]["${plugin.name}"]["config"].update(${configBlock})
-print("Configured ${plugin.name} plugin")
-`;
+  return lines.join("\n");
 }
 
 /**
- * Generates Python code for channel-based plugin configuration.
- * Writes to config["channels"]["<name>"] with secrets from env vars
- * and non-secret config from plugin defaults, plus enables the plugin entry.
- *
- * Config transforms (e.g., dm → dmPolicy/allowFrom flattening) are applied
- * generically based on the plugin's configTransforms definition.
+ * Generates `openclaw config set` commands for a channel-type plugin.
+ * Preserves configTransforms support and internalKeys filtering.
  */
-function generateChannelPluginPython(plugin: PluginEntry): string {
+function generateChannelConfigSet(plugin: PluginEntry): string {
   const internalKeys = new Set(plugin.internalKeys ?? []);
   const transforms = plugin.configTransforms ?? [];
   const transformSourceKeys = new Set(transforms.map((t) => t.sourceKey));
+  const lines: string[] = [];
 
-  // Build channel config entries from non-secret plugin config
-  const channelEntries: string[] = [];
+  lines.push(`# Configure ${plugin.name} channel and plugin`);
 
-  // Secret env var values (skip internal keys — they're not valid plugin config properties)
+  // Secret env var values (skip internal keys)
   if (plugin.secretEnvVars) {
     for (const [configKey, envVar] of Object.entries(plugin.secretEnvVars)) {
       if (internalKeys.has(configKey)) continue;
-      channelEntries.push(`    "${configKey}": os.environ.get("${envVar}", "")`);
+      lines.push(`openclaw config set 'channels.${plugin.name}.${configKey}' "$${envVar}"`);
     }
   }
 
@@ -263,67 +222,47 @@ function generateChannelPluginPython(plugin: PluginEntry): string {
       const nested = value as Record<string, unknown>;
       for (const [nestedKey, targetKey] of Object.entries(transform.targetKeys)) {
         if (nested[nestedKey] !== undefined) {
-          channelEntries.push(`    "${targetKey}": ${toPythonLiteral(nested[nestedKey])}`);
+          lines.push(`openclaw config set 'channels.${plugin.name}.${targetKey}' ${toJsonValue(nested[nestedKey])}`);
         }
       }
       // Only skip the source key if removeSource is true
       if (transform.removeSource) continue;
     }
 
-    channelEntries.push(`    "${key}": ${toPythonLiteral(value)}`);
+    lines.push(`openclaw config set 'channels.${plugin.name}.${key}' ${toJsonValue(value)}`);
   }
 
-  // Add enabled flag from plugin config
-  channelEntries.push(`    "enabled": ${plugin.enabled ? "True" : "False"}`);
+  // Enable channel and plugin entry
+  lines.push(`openclaw config set 'channels.${plugin.name}.enabled' true`);
+  lines.push(`openclaw config set 'plugins.entries.${plugin.name}.enabled' ${plugin.enabled ? "true" : "false"}`);
+  lines.push(`echo "Configured ${plugin.name} channel"`);
 
-  const channelBlock = channelEntries.length > 0
-    ? `{
-${channelEntries.join(",\n")}
-}`
-    : "{}";
-
-  return `
-# Configure ${plugin.name} channel and plugin
-config.setdefault("channels", {})
-config["channels"]["${plugin.name}"] = ${channelBlock}
-config.setdefault("plugins", {})
-config["plugins"].setdefault("entries", {})
-config["plugins"]["entries"]["${plugin.name}"] = {"enabled": ${plugin.enabled ? "True" : "False"}}
-print("Configured ${plugin.name} channel")
-`;
+  return lines.join("\n");
 }
 
 /**
- * Generates Python script for modifying existing openclaw.json
- * Used in cloud-init after onboarding creates the initial config
+ * Generates a bash script using `openclaw config set` and `openclaw models set`
+ * for modifying openclaw.json after onboarding.
+ * Replaces the previous Python-based config patching approach.
  */
-export function generateConfigPatchScript(options: OpenClawConfigOptions): string {
-  const configPatches = {
-    trustedProxies: options.trustedProxies ?? ["127.0.0.1"],
-    enableControlUi: options.enableControlUi ?? true,
-  };
+export function generateConfigPatchBash(options: OpenClawConfigOptions): string {
+  const trustedProxies = options.trustedProxies ?? ["127.0.0.1"];
+  const enableControlUi = options.enableControlUi ?? true;
 
   // Build model config (primary + optional fallbacks)
   const model = options.model ?? "anthropic/claude-opus-4-6";
   const backupModel = options.backupModel;
   const providerKey = getProviderForModel(model);
-  const providerDef = MODEL_PROVIDERS[providerKey as keyof typeof MODEL_PROVIDERS] as
-    | (typeof MODEL_PROVIDERS)[keyof typeof MODEL_PROVIDERS]
-    | undefined;
+  const providerDef = MODEL_PROVIDERS[providerKey];
   if (providerKey !== "anthropic" && !providerDef) {
     throw new Error(`Unknown model provider "${providerKey}" from model "${model}". Supported: ${Object.keys(MODEL_PROVIDERS).join(", ")}`);
   }
 
   // Determine backup model provider (may differ from primary)
   const backupProviderKey = backupModel ? getProviderForModel(backupModel) : undefined;
-  const backupProviderDef = backupProviderKey
-    ? MODEL_PROVIDERS[backupProviderKey as keyof typeof MODEL_PROVIDERS] as
-      | (typeof MODEL_PROVIDERS)[keyof typeof MODEL_PROVIDERS]
-      | undefined
-    : undefined;
+  const backupProviderDef = backupProviderKey ? MODEL_PROVIDERS[backupProviderKey] : undefined;
 
   // Build cliBackends config from coding agent registry
-  // Filter out empty-string fields — OpenClaw rejects them for backends that don't support those features
   const codingAgentName = options.codingAgent ?? "claude-code";
   const codingAgentEntry = CODING_AGENT_REGISTRY[codingAgentName];
   const cliBackendsJson = codingAgentEntry
@@ -334,129 +273,127 @@ export function generateConfigPatchScript(options: OpenClawConfigOptions): strin
 
   // Build dynamic plugin config sections
   const pluginConfigs = (options.plugins ?? [])
-    .map((plugin) => generatePluginPython(plugin))
-    .join("");
+    .map((plugin) => generatePluginConfigSet(plugin))
+    .join("\n\n");
 
-  return `
-import json
-import os
+  // Check if slack plugin is present (for allowBots)
+  const hasSlackPlugin = (options.plugins ?? []).some(
+    (p) => p.name === "slack" && p.configPath === "channels"
+  );
 
-config_path = "/home/ubuntu/.openclaw/openclaw.json"
+  const lines: string[] = [];
 
-if os.path.exists(config_path):
-    with open(config_path) as f:
-        config = json.load(f)
-else:
-    # Create default skeleton if onboarding was skipped (e.g., non-Anthropic provider)
-    os.makedirs(os.path.dirname(config_path), exist_ok=True)
-    config = {"gateway": {}, "agents": {"defaults": {}}, "env": {}}
+  // 1. Gateway token
+  lines.push(`# Configure gateway auth token`);
+  lines.push(`openclaw config set gateway.auth '{"mode":"token","token":"'"$GATEWAY_TOKEN"'"}'`);
 
-# Configure gateway for Tailscale Serve
-config["gateway"]["trustedProxies"] = ${JSON.stringify(configPatches.trustedProxies)}
-config["gateway"]["controlUi"] = {
-    "enabled": ${configPatches.enableControlUi ? "True" : "False"},
-    "allowInsecureAuth": True
-}
-config["gateway"]["auth"] = {
-    "mode": "token",
-    "token": os.environ["GATEWAY_TOKEN"]
-}
+  // 2. Trusted proxies
+  lines.push(`# Configure trusted proxies`);
+  lines.push(`openclaw config set gateway.trustedProxies '${JSON.stringify(trustedProxies)}'`);
 
-# Configure environment variables for child processes (model provider API keys)
-config.setdefault("env", {})
-${providerKey === "anthropic" ? `# Anthropic: auto-detect credential type (OAuth token vs API key)
-anthropic_cred = os.environ.get("ANTHROPIC_API_KEY", "")
-if anthropic_cred.startswith("sk-ant-oat"):
-    # OAuth token from Claude Pro/Max subscription (use with CLAUDE_CODE_OAUTH_TOKEN)
-    config["env"]["CLAUDE_CODE_OAUTH_TOKEN"] = anthropic_cred
-    print("Configured environment variables: CLAUDE_CODE_OAUTH_TOKEN (OAuth/subscription)")
-else:
-    # API key from Anthropic Console (use with ANTHROPIC_API_KEY)
-    config["env"]["ANTHROPIC_API_KEY"] = anthropic_cred
-    print("Configured environment variables: ANTHROPIC_API_KEY (API key)")` : `# ${providerDef?.name ?? providerKey}: set provider API key env var
-provider_key = os.environ.get("${providerDef?.envVar ?? "MODEL_API_KEY"}", "")
-config["env"]["${providerDef?.envVar ?? "MODEL_API_KEY"}"] = provider_key
-print("Configured environment variables: ${providerDef?.envVar ?? "MODEL_API_KEY"}")`}
-${backupProviderKey && backupProviderKey !== providerKey && backupProviderDef ? `# Backup model provider: ${backupProviderDef.name} — set ${backupProviderDef.envVar}
-backup_provider_key = os.environ.get("${backupProviderDef.envVar}", "")
-if backup_provider_key:
-    config["env"]["${backupProviderDef.envVar}"] = backup_provider_key
-    print("Configured backup provider env: ${backupProviderDef.envVar}")` : ""}
-${codingAgentName === "codex" && providerKey === "openrouter" ? `# Codex uses OpenAI-compatible API — alias OpenRouter credentials
-config["env"]["OPENAI_API_KEY"] = config["env"].get("OPENROUTER_API_KEY", provider_key)
-config["env"]["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
-print("Aliased OPENROUTER_API_KEY -> OPENAI_API_KEY + OPENAI_BASE_URL for Codex")` : ""}
+  // 3. Control UI
+  lines.push(`# Configure control UI`);
+  lines.push(`openclaw config set gateway.controlUi '{"enabled":${enableControlUi},"allowInsecureAuth":true}'`);
 
-# Configure heartbeat (proactive mode)
-config.setdefault("agents", {})
-config["agents"].setdefault("defaults", {})
-config["agents"]["defaults"]["heartbeat"] = {
-    "every": "1m",
-    "session": "main"
-}
-print("Configured heartbeat: every 1m")
+  // 4. Provider env vars
+  if (providerKey === "anthropic") {
+    lines.push(`# Anthropic: auto-detect credential type (OAuth token vs API key)`);
+    lines.push(`if [[ "$ANTHROPIC_API_KEY" == sk-ant-oat* ]]; then`);
+    lines.push(`  # OAuth token from Claude Pro/Max subscription`);
+    lines.push(`  openclaw config set env.CLAUDE_CODE_OAUTH_TOKEN "$ANTHROPIC_API_KEY"`);
+    lines.push(`  echo "Configured environment variables: CLAUDE_CODE_OAUTH_TOKEN (OAuth/subscription)"`);
+    lines.push(`else`);
+    lines.push(`  # API key from Anthropic Console`);
+    lines.push(`  openclaw config set env.ANTHROPIC_API_KEY "$ANTHROPIC_API_KEY"`);
+    lines.push(`  echo "Configured environment variables: ANTHROPIC_API_KEY (API key)"`);
+    lines.push(`fi`);
+  } else {
+    const envVar = providerDef?.envVar ?? "MODEL_API_KEY";
+    lines.push(`# ${providerDef?.name ?? providerKey}: set provider API key env var`);
+    lines.push(`openclaw config set env.${envVar} "$${envVar}"`);
+    lines.push(`echo "Configured environment variables: ${envVar}"`);
+  }
 
-# Configure model with optional fallbacks
-${backupModel
-    ? `config["agents"]["defaults"]["model"] = {
-    "primary": "${model}",
-    "fallbacks": ["${backupModel}"]
-}
-print("Configured model: ${model} (fallback: ${backupModel})")`
-    : `config["agents"]["defaults"]["model"] = "${model}"
-print("Configured model: ${model}")`}
+  // 5. Backup provider env (if different from primary)
+  if (backupProviderKey && backupProviderKey !== providerKey && backupProviderDef) {
+    lines.push(`# Backup model provider: ${backupProviderDef.name} — set ${backupProviderDef.envVar}`);
+    lines.push(`if [ -n "$${backupProviderDef.envVar}" ]; then`);
+    lines.push(`  openclaw config set env.${backupProviderDef.envVar} "$${backupProviderDef.envVar}"`);
+    lines.push(`  echo "Configured backup provider env: ${backupProviderDef.envVar}"`);
+    lines.push(`fi`);
+  }
 
-# Configure coding agent CLI backend
-config["agents"]["defaults"]["cliBackends"] = ${cliBackendsJson}
-print("Configured cliBackends for ${codingAgentName}")
+  // 6. Codex + OpenRouter aliasing
+  if (codingAgentName === "codex" && providerKey === "openrouter") {
+    lines.push(`# Codex uses OpenAI-compatible API — alias OpenRouter credentials`);
+    lines.push(`openclaw config set env.OPENAI_API_KEY "$OPENROUTER_API_KEY"`);
+    lines.push(`openclaw config set env.OPENAI_BASE_URL '"https://openrouter.ai/api/v1"'`);
+    lines.push(`echo "Aliased OPENROUTER_API_KEY -> OPENAI_API_KEY + OPENAI_BASE_URL for Codex"`);
+  }
 
-# Set default agent for ACP (coding agent) sessions
-config.setdefault("acp", {})
-config["acp"]["defaultAgent"] = "default"
-print("Configured acp.defaultAgent = default")
-${pluginConfigs}
-# Configure agent identity for Slack mentions/tags
-agent_name = os.environ.get("AGENT_NAME", "")
-agent_emoji = os.environ.get("AGENT_EMOJI", "")
-if agent_name:
-    config.setdefault("agents", {})
-    config["agents"].setdefault("list", [])
-    # Find or create the "default" agent entry
-    default_agent = None
-    for agent in config["agents"]["list"]:
-        if agent.get("id") == "default":
-            default_agent = agent
-            break
-    if not default_agent:
-        default_agent = {"id": "default"}
-        config["agents"]["list"].append(default_agent)
-    default_agent.setdefault("identity", {})
-    default_agent["identity"]["name"] = agent_name
-    if agent_emoji:
-        default_agent["identity"]["emoji"] = agent_emoji
-    print(f"Configured agent identity: {agent_name} (:{agent_emoji}:)")
+  // 7. Heartbeat
+  lines.push(`# Configure heartbeat (proactive mode)`);
+  lines.push(`openclaw config set agents.defaults.heartbeat '{"every":"1m","session":"main"}'`);
+  lines.push(`echo "Configured heartbeat: every 1m"`);
 
-    # Enable allowBots so agents can see each other's messages in shared channels
-    if "channels" in config and "slack" in config["channels"]:
-        config["channels"]["slack"]["allowBots"] = True
-        print("Enabled allowBots for Slack channel")
+  // 8. Model
+  if (backupModel) {
+    lines.push(`# Configure model with fallbacks`);
+    lines.push(`openclaw config set agents.defaults.model '{"primary":"${model}","fallbacks":["${backupModel}"]}'`);
+    lines.push(`echo "Configured model: ${model} (fallback: ${backupModel})"`);
+  } else {
+    lines.push(`# Configure model`);
+    lines.push(`openclaw models set "${model}"`);
+    lines.push(`echo "Configured model: ${model}"`);
+  }
 
-    # Add ack reaction for visual feedback when processing messages
-    config.setdefault("messages", {})
-    config["messages"]["ackReaction"] = "eyes"
-    print("Configured ackReaction: eyes")
+  // 9. CLI backends
+  lines.push(`# Configure coding agent CLI backend`);
+  lines.push(`openclaw config set agents.defaults.cliBackends '${cliBackendsJson}'`);
+  lines.push(`echo "Configured cliBackends for ${codingAgentName}"`);
 
-# Configure web search (Brave API key) if available
-brave_api_key = os.environ.get("BRAVE_API_KEY", "")
-if brave_api_key:
-    config.setdefault("tools", {})
-    config["tools"].setdefault("web", {})
-    config["tools"]["web"]["search"] = {"provider": "brave", "apiKey": brave_api_key}
-    print("Configured web search with Brave API key")
+  // 10. ACP default agent
+  lines.push(`# Set default agent for ACP (coding agent) sessions`);
+  lines.push(`openclaw config set acp.defaultAgent '"default"'`);
+  lines.push(`echo "Configured acp.defaultAgent = default"`);
 
-with open(config_path, "w") as f:
-    json.dump(config, f, indent=2)
+  // 11. Plugin configs
+  if (pluginConfigs) {
+    lines.push("");
+    lines.push(pluginConfigs);
+  }
 
-print("Configured gateway with trustedProxies, controlUi, and token auth")
-`.trim();
+  // 12. Agent identity
+  lines.push(`# Configure agent identity for Slack mentions/tags`);
+  lines.push(`if [ -n "$AGENT_NAME" ]; then`);
+  lines.push(`  if [ -n "$AGENT_EMOJI" ]; then`);
+  lines.push(`    openclaw config set agents.list '[{"id":"default","identity":{"name":"'"$AGENT_NAME"'","emoji":"'"$AGENT_EMOJI"'"}}]'`);
+  lines.push(`  else`);
+  lines.push(`    openclaw config set agents.list '[{"id":"default","identity":{"name":"'"$AGENT_NAME"'"}}]'`);
+  lines.push(`  fi`);
+  lines.push(`  echo "Configured agent identity: $AGENT_NAME (:$AGENT_EMOJI:)"`);
+
+  // 13. Slack allowBots (emitted at generation time if Slack plugin present)
+  if (hasSlackPlugin) {
+    lines.push(`  # Enable allowBots so agents can see each other's messages in shared channels`);
+    lines.push(`  openclaw config set channels.slack.allowBots true`);
+    lines.push(`  echo "Enabled allowBots for Slack channel"`);
+  }
+
+  // 14. Ack reaction
+  lines.push(`  # Add ack reaction for visual feedback when processing messages`);
+  lines.push(`  openclaw config set messages.ackReaction '"eyes"'`);
+  lines.push(`  echo "Configured ackReaction: eyes"`);
+  lines.push(`fi`);
+
+  // 15. Brave search
+  lines.push(`# Configure web search (Brave API key) if available`);
+  lines.push(`if [ -n "$BRAVE_API_KEY" ]; then`);
+  lines.push(`  openclaw config set tools.web.search '{"provider":"brave","apiKey":"'"$BRAVE_API_KEY"'"}'`);
+  lines.push(`  echo "Configured web search with Brave API key"`);
+  lines.push(`fi`);
+
+  lines.push(`echo "Configuration complete"`);
+
+  return lines.join("\n");
 }

@@ -3,7 +3,7 @@
  *
  * Exercises the full path: CloudInitConfig → generateCloudInit() → interpolateCloudInit()
  * to catch cross-function integration bugs (like the production bug where non-Anthropic
- * providers failed because `openclaw onboard` requires ANTHROPIC_API_KEY).
+ * providers failed because `openclaw onboard` requires provider-specific flags).
  */
 
 import { describe, it, expect } from "vitest";
@@ -134,37 +134,40 @@ function expectNoLeakedPlaceholders(script: string): void {
 }
 
 /**
- * Extracts the PYTHON_SCRIPT heredoc and asserts it has valid structure.
+ * Extracts the CONFIG_PATCH heredoc and asserts it has valid structure.
  */
-function expectValidPythonBlock(script: string): void {
-  const pythonMatch = script.match(
-    /python3 << 'PYTHON_SCRIPT'\n([\s\S]*?)\nPYTHON_SCRIPT/,
+function expectValidConfigPatchBlock(script: string): void {
+  const match = script.match(
+    /bash << 'CONFIG_PATCH'\n([\s\S]*?)\nCONFIG_PATCH/,
   );
-  expect(pythonMatch, "Expected PYTHON_SCRIPT heredoc block").toBeTruthy();
-  const python = pythonMatch![1];
+  expect(match, "Expected CONFIG_PATCH heredoc block").toBeTruthy();
+  const bash = match![1];
 
-  expect(python).toContain("import json");
-  expect(python).toContain("import os");
-  expect(python).toContain("config_path");
-  expect(python).toContain("json.dump");
-
-  // Roughly balanced braces (Python dicts)
-  const opens = (python.match(/{/g) || []).length;
-  const closes = (python.match(/}/g) || []).length;
-  expect(Math.abs(opens - closes)).toBeLessThanOrEqual(1);
+  expect(bash).toContain("openclaw config set");
+  expect(bash).not.toContain("import json");
+  expect(bash).not.toContain("json.dump");
+  expect(bash).not.toContain("python3");
 }
 
 // ---------------------------------------------------------------------------
-// 1. Unified skeleton onboarding (all providers use the same path)
+// 1. Onboard-based provisioning (all providers use openclaw onboard)
 // ---------------------------------------------------------------------------
 
-describe("cloud-init pipeline — unified skeleton onboarding", () => {
-  it("all providers create skeleton openclaw.json (no openclaw onboard)", () => {
+describe("cloud-init pipeline — onboard-based provisioning", () => {
+  it("all providers run openclaw onboard --non-interactive", () => {
     for (const config of [ANTHROPIC_CLOUD, OPENAI_LOCAL_DOCKER, GOOGLE_CLOUD, MIXED_PROVIDER]) {
       const script = runPipeline(config);
-      expect(script).toContain("Creating openclaw.json skeleton");
-      expect(script).toContain("Created minimal openclaw.json skeleton");
-      expect(script).not.toContain("openclaw onboard");
+      expect(script).toContain("openclaw onboard --non-interactive");
+      expect(script).toContain("Onboarding complete");
+    }
+  });
+
+  it("all providers use bash CONFIG_PATCH block (not Python)", () => {
+    for (const config of [ANTHROPIC_CLOUD, OPENAI_LOCAL_DOCKER, GOOGLE_CLOUD, MIXED_PROVIDER]) {
+      const script = runPipeline(config);
+      expectValidConfigPatchBlock(script);
+      expect(script).not.toContain("python3 << 'PYTHON_SCRIPT'");
+      expect(script).not.toContain("PYTHON_SCRIPT");
     }
   });
 
@@ -182,15 +185,15 @@ describe("cloud-init pipeline — unified skeleton onboarding", () => {
     }
   });
 
-  it("Python config-patch has os.path.exists() fallback as safety net", () => {
+  it("CONFIG_PATCH block uses openclaw config set commands", () => {
     const script = runPipeline(OPENAI_LOCAL_DOCKER);
-    expectValidPythonBlock(script);
-    const pythonMatch = script.match(
-      /python3 << 'PYTHON_SCRIPT'\n([\s\S]*?)\nPYTHON_SCRIPT/,
+    expectValidConfigPatchBlock(script);
+    const match = script.match(
+      /bash << 'CONFIG_PATCH'\n([\s\S]*?)\nCONFIG_PATCH/,
     );
-    const python = pythonMatch![1];
-    expect(python).toContain("os.path.exists(config_path)");
-    expect(python).toContain("Create default skeleton if onboarding was skipped");
+    const bash = match![1];
+    expect(bash).toContain("openclaw config set gateway.auth");
+    expect(bash).toContain("openclaw config set agents.defaults.heartbeat");
   });
 });
 
@@ -312,7 +315,7 @@ describe("cloud-init pipeline — plugins and deps", () => {
     expect(script).toContain("openclaw plugins install openclaw-linear");
   });
 
-  it("non-installable plugin (slack) skips install but configures in Python", () => {
+  it("non-installable plugin (slack) skips install but configures in bash", () => {
     const config: CloudInitConfig = {
       ...ANTHROPIC_CLOUD,
       plugins: [
@@ -328,16 +331,16 @@ describe("cloud-init pipeline — plugins and deps", () => {
     const script = runPipeline(config, { SLACK_BOT_TOKEN: "xoxb-test" });
     // Should NOT have install command
     expect(script).not.toContain("openclaw plugins install slack");
-    // But Python config should have the channel configuration
-    const pythonMatch = script.match(
-      /python3 << 'PYTHON_SCRIPT'\n([\s\S]*?)\nPYTHON_SCRIPT/,
+    // But CONFIG_PATCH should have the channel configuration
+    const match = script.match(
+      /bash << 'CONFIG_PATCH'\n([\s\S]*?)\nCONFIG_PATCH/,
     );
-    expect(pythonMatch).toBeTruthy();
-    expect(pythonMatch![1]).toContain('Configure slack channel');
-    expect(pythonMatch![1]).toContain('"channels"');
+    expect(match).toBeTruthy();
+    expect(match![1]).toContain('Configure slack channel');
+    expect(match![1]).toContain('channels.slack');
   });
 
-  it("plugin config is embedded in Python for plugins.entries path", () => {
+  it("plugin config is embedded in bash for plugins.entries path", () => {
     const config: CloudInitConfig = {
       ...ANTHROPIC_CLOUD,
       plugins: [
@@ -351,18 +354,16 @@ describe("cloud-init pipeline — plugins and deps", () => {
       ],
     };
     const script = runPipeline(config, { LINEAR_API_KEY: "lin_test" });
-    const pythonMatch = script.match(
-      /python3 << 'PYTHON_SCRIPT'\n([\s\S]*?)\nPYTHON_SCRIPT/,
+    const match = script.match(
+      /bash << 'CONFIG_PATCH'\n([\s\S]*?)\nCONFIG_PATCH/,
     );
-    expect(pythonMatch).toBeTruthy();
-    const python = pythonMatch![1];
-    expect(python).toContain('"plugins"');
-    expect(python).toContain('"entries"');
-    expect(python).toContain('"openclaw-linear"');
-    expect(python).toContain('"TEAM-456"');
+    expect(match).toBeTruthy();
+    const bash = match![1];
+    expect(bash).toContain('plugins.entries.openclaw-linear');
+    expect(bash).toContain('"TEAM-456"');
   });
 
-  it("postProvision hooks run before Python patch, preStart hooks run after", () => {
+  it("postProvision hooks run before CONFIG_PATCH, preStart hooks run after", () => {
     const config: CloudInitConfig = {
       ...ANTHROPIC_CLOUD,
       plugins: [
@@ -382,18 +383,18 @@ describe("cloud-init pipeline — plugins and deps", () => {
     expect(script).toContain("POST_PROVISION_MARKER");
     expect(script).toContain("PRE_START_MARKER");
 
-    // postProvision should come before PYTHON_SCRIPT
+    // postProvision should come before CONFIG_PATCH
     const postProvisionIdx = script.indexOf("POST_PROVISION_MARKER");
-    const pythonIdx = script.indexOf("PYTHON_SCRIPT");
-    expect(postProvisionIdx).toBeLessThan(pythonIdx);
+    const configPatchIdx = script.indexOf("CONFIG_PATCH");
+    expect(postProvisionIdx).toBeLessThan(configPatchIdx);
 
-    // preStart should come after PYTHON_SCRIPT
+    // preStart should come after CONFIG_PATCH
     const preStartIdx = script.indexOf("PRE_START_MARKER");
-    const pythonEndIdx = script.lastIndexOf("PYTHON_SCRIPT");
-    expect(preStartIdx).toBeGreaterThan(pythonEndIdx);
+    const configPatchEndIdx = script.lastIndexOf("CONFIG_PATCH");
+    expect(preStartIdx).toBeGreaterThan(configPatchEndIdx);
   });
 
-  it("dep install + post-install scripts included; Brave search configured in Python", () => {
+  it("dep install + post-install scripts included; Brave search configured in bash", () => {
     const config: CloudInitConfig = {
       ...ANTHROPIC_CLOUD,
       deps: [
@@ -416,13 +417,13 @@ describe("cloud-init pipeline — plugins and deps", () => {
     // User-level post-install present
     expect(script).toContain("MARKER_GH_POST_INSTALL");
 
-    // Brave search in Python config patch
-    const pythonMatch = script.match(
-      /python3 << 'PYTHON_SCRIPT'\n([\s\S]*?)\nPYTHON_SCRIPT/,
+    // Brave search in bash config patch
+    const match = script.match(
+      /bash << 'CONFIG_PATCH'\n([\s\S]*?)\nCONFIG_PATCH/,
     );
-    expect(pythonMatch).toBeTruthy();
-    expect(pythonMatch![1]).toContain("brave");
-    expect(pythonMatch![1]).toContain("BRAVE_API_KEY");
+    expect(match).toBeTruthy();
+    expect(match![1]).toContain("brave");
+    expect(match![1]).toContain("BRAVE_API_KEY");
   });
 });
 
@@ -434,17 +435,12 @@ describe("cloud-init pipeline — plugins and deps", () => {
  * Tests that internalKeys are correctly filtered from the generated plugin
  * config. This prevents OpenClaw config validation failures caused by
  * properties that are not in the plugin's configSchema.
- *
- * Context: openclaw-linear's configSchema (openclaw.plugin.json) has
- * additionalProperties: false. Keys like linearUserUuid and agentId are
- * clawup-internal metadata and must not appear in the plugin config.
- * Keys like stateActions and agentMapping ARE valid plugin properties.
  */
 describe("cloud-init pipeline — internalKeys filtering", () => {
-  /** Helper: extract the Python config patch script from the cloud-init output */
-  function extractPython(script: string): string {
+  /** Helper: extract the bash config patch script from the cloud-init output */
+  function extractConfigPatch(script: string): string {
     const match = script.match(
-      /python3 << 'PYTHON_SCRIPT'\n([\s\S]*?)\nPYTHON_SCRIPT/,
+      /bash << 'CONFIG_PATCH'\n([\s\S]*?)\nCONFIG_PATCH/,
     );
     expect(match).toBeTruthy();
     return match![1];
@@ -478,20 +474,22 @@ describe("cloud-init pipeline — internalKeys filtering", () => {
       LINEAR_WEBHOOK_SECRET: "whsec_test",
       LINEAR_USER_UUID: "uuid-1234",
     });
-    const python = extractPython(script);
+    const bash = extractConfigPatch(script);
 
     // Valid secrets should be written to plugin config
-    expect(python).toContain('"apiKey": os.environ.get("LINEAR_API_KEY", "")');
-    expect(python).toContain('"webhookSecret": os.environ.get("LINEAR_WEBHOOK_SECRET", "")');
+    expect(bash).toContain("plugins.entries.openclaw-linear.config.apiKey");
+    expect(bash).toContain("LINEAR_API_KEY");
+    expect(bash).toContain("plugins.entries.openclaw-linear.config.webhookSecret");
+    expect(bash).toContain("LINEAR_WEBHOOK_SECRET");
 
     // Valid config properties should be written
-    expect(python).toContain('"agentMapping"');
-    expect(python).toContain('"stateActions"');
+    expect(bash).toContain("agentMapping");
+    expect(bash).toContain("stateActions");
 
     // Internal keys should NOT appear anywhere in the plugin config
-    expect(python).not.toContain('"agentId"');
-    expect(python).not.toContain('"linearUserUuid"');
-    expect(python).not.toContain("LINEAR_USER_UUID");
+    expect(bash).not.toContain("config.agentId");
+    expect(bash).not.toContain("config.linearUserUuid");
+    expect(bash).not.toContain("LINEAR_USER_UUID");
   });
 
   it("filters internalKeys from channels config", () => {
@@ -518,17 +516,19 @@ describe("cloud-init pipeline — internalKeys filtering", () => {
       SLACK_BOT_TOKEN: "xoxb-test",
       SLACK_APP_TOKEN: "xapp-test",
     });
-    const python = extractPython(script);
+    const bash = extractConfigPatch(script);
 
     // Valid secrets should be written
-    expect(python).toContain('"botToken": os.environ.get("SLACK_BOT_TOKEN", "")');
-    expect(python).toContain('"appToken": os.environ.get("SLACK_APP_TOKEN", "")');
+    expect(bash).toContain("channels.slack.botToken");
+    expect(bash).toContain("SLACK_BOT_TOKEN");
+    expect(bash).toContain("channels.slack.appToken");
+    expect(bash).toContain("SLACK_APP_TOKEN");
 
     // Valid config should remain
-    expect(python).toContain('"mode": "socket"');
+    expect(bash).toContain("channels.slack.mode");
 
     // Internal key should NOT appear
-    expect(python).not.toContain('"agentId"');
+    expect(bash).not.toContain("channels.slack.agentId");
   });
 
   it("passes all config through when internalKeys is empty", () => {
@@ -546,10 +546,11 @@ describe("cloud-init pipeline — internalKeys filtering", () => {
       ],
     };
     const script = runPipeline(config, { TEST_TOKEN: "tok_test" });
-    const python = extractPython(script);
+    const bash = extractConfigPatch(script);
 
-    expect(python).toContain('"someKey": "someValue"');
-    expect(python).toContain('"token": os.environ.get("TEST_TOKEN", "")');
+    expect(bash).toContain("plugins.entries.test-plugin.config.someKey");
+    expect(bash).toContain("plugins.entries.test-plugin.config.token");
+    expect(bash).toContain("TEST_TOKEN");
   });
 });
 

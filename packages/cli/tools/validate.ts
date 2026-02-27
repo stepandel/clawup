@@ -315,11 +315,11 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
           for (const [key, secret] of Object.entries(pluginManifest.secrets)) {
             // Skip internal keys — they're intermediate values not written to plugin config
             if (internalKeys.has(key)) continue;
-            const pyPath = pluginManifest.configPath === "channels"
-              ? `c.get('channels',{}).get('${plugin}',{}).get('${key}')`
-              : `c.get('plugins',{}).get('entries',{}).get('${plugin}',{}).get('config',{}).get('${key}')`;
+            const configPath = pluginManifest.configPath === "channels"
+              ? `channels.${plugin}.${key}`
+              : `plugins.entries.${plugin}.config.${key}`;
             const secretCheck = runCheck(
-              `python3 -c "import json,sys;c=json.load(open('/home/${SSH_USER}/.openclaw/openclaw.json'));sys.exit(0 if ${pyPath} else 1)"`
+              `openclaw config get ${configPath} 2>/dev/null | grep -qv '^$'`
             );
             checks.push({
               name: `${plugin} secret (${secret.envVar})`,

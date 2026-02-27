@@ -104,7 +104,21 @@ export const PLUGINS_DIR = "plugins";
 /**
  * Supported model providers with their API key prefixes and available models
  */
-export const MODEL_PROVIDERS = {
+export interface ModelProviderDef {
+  name: string;
+  envVar: string;
+  keyPrefix: string;
+  models: ReadonlyArray<{ value: string; label: string }>;
+  /** Returns CLI flags for `openclaw onboard --non-interactive` for this provider */
+  onboardFlags: (envVar: string) => string;
+}
+
+export const MODEL_PROVIDERS: Record<string, ModelProviderDef> & {
+  anthropic: ModelProviderDef;
+  openai: ModelProviderDef;
+  google: ModelProviderDef;
+  openrouter: ModelProviderDef;
+} = {
   anthropic: {
     name: "Anthropic",
     envVar: "ANTHROPIC_API_KEY",
@@ -114,6 +128,7 @@ export const MODEL_PROVIDERS = {
       { value: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
       { value: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5" },
     ],
+    onboardFlags: (envVar: string) => `--anthropic-api-key "\$${envVar}"`,
   },
   openai: {
     name: "OpenAI",
@@ -124,6 +139,7 @@ export const MODEL_PROVIDERS = {
       { value: "openai/o3", label: "o3" },
       { value: "openai/o4-mini", label: "o4-mini" },
     ],
+    onboardFlags: (envVar: string) => `--openai-api-key "\$${envVar}"`,
   },
   google: {
     name: "Google Gemini",
@@ -133,14 +149,16 @@ export const MODEL_PROVIDERS = {
       { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
       { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
     ],
+    onboardFlags: (envVar: string) => `--auth-choice gemini-api-key --gemini-api-key "\$${envVar}"`,
   },
   openrouter: {
     name: "OpenRouter",
     envVar: "OPENROUTER_API_KEY",
     keyPrefix: "sk-or-",
-    models: [] as ReadonlyArray<{ value: string; label: string }>,
+    models: [],
+    onboardFlags: (envVar: string) => `--auth-choice apiKey --token-provider openrouter --token "\$${envVar}"`,
   },
-} as const;
+};
 
 /**
  * Extract the provider key from a model string (e.g., "anthropic/claude-opus-4-6" → "anthropic").
@@ -195,7 +213,7 @@ export function getProviderConfigKey(providerKey: string): string {
  * e.g., "openai" → "OPENAI_API_KEY"
  */
 export function getProviderEnvVar(providerKey: string): string {
-  const providerDef = MODEL_PROVIDERS[providerKey as keyof typeof MODEL_PROVIDERS];
+  const providerDef = MODEL_PROVIDERS[providerKey];
   if (!providerDef) {
     throw new Error(`Unknown provider "${providerKey}". Supported: ${Object.keys(MODEL_PROVIDERS).join(", ")}`);
   }
