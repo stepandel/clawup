@@ -308,11 +308,7 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
           const pluginManifest = resolvePlugin(plugin, identityResultMap[agent.name]);
           if (Object.keys(pluginManifest.secrets).length === 0) continue;
 
-          const internalKeys = new Set(pluginManifest.internalKeys ?? []);
           for (const [key, secret] of Object.entries(pluginManifest.secrets)) {
-            // Skip secrets that are internal metadata (not written to plugin config)
-            if (internalKeys.has(key)) continue;
-            // Use configPath to determine where secrets live in openclaw.json
             const pyPath = pluginManifest.configPath === "channels"
               ? `c.get('channels',{}).get('${plugin}',{}).get('${key}')`
               : `c.get('plugins',{}).get('entries',{}).get('${plugin}',{}).get('config',{}).get('${key}')`;

@@ -83,7 +83,7 @@ export const PLUGIN_MANIFEST_REGISTRY: Record<string, PluginManifest> = {
         autoResolvable: true,
       },
     },
-    internalKeys: ["agentId", "linearUserUuid", "stateActions"],
+    internalKeys: ["agentId", "stateActions"],
     configTransforms: [],
     webhookSetup: {
       urlPath: "/hooks/linear",

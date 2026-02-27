@@ -37,7 +37,8 @@ describe("E2E: Linear plugin", () => {
     expect(linearManifest.installable).toBe(true);
     expect(linearManifest.needsFunnel).toBe(true);
     expect(linearManifest.internalKeys).toContain("agentId");
-    expect(linearManifest.internalKeys).toContain("linearUserUuid");
+    expect(linearManifest.internalKeys).toContain("stateActions");
+    expect(linearManifest.internalKeys).not.toContain("linearUserUuid");
   });
 
   it("secret collection returns correct prefixed keys in buildManifestSecrets", () => {

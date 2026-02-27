@@ -197,10 +197,9 @@ function generatePluginPython(plugin: PluginEntry): string {
   // Build the config dict, injecting secrets from env vars
   const configEntries: string[] = [];
 
-  // Secret env var values (skip internal keys like linearUserUuid)
+  // Secret env var values
   if (plugin.secretEnvVars) {
     for (const [configKey, envVar] of Object.entries(plugin.secretEnvVars)) {
-      if (internalKeys.has(configKey)) continue;
       configEntries.push(`        "${configKey}": os.environ.get("${envVar}", "")`);
     }
   }
@@ -245,10 +244,9 @@ function generateChannelPluginPython(plugin: PluginEntry): string {
   // Build channel config entries from non-secret plugin config
   const channelEntries: string[] = [];
 
-  // Secret env var values (skip internal keys)
+  // Secret env var values
   if (plugin.secretEnvVars) {
     for (const [configKey, envVar] of Object.entries(plugin.secretEnvVars)) {
-      if (internalKeys.has(configKey)) continue;
       channelEntries.push(`    "${configKey}": os.environ.get("${envVar}", "")`);
     }
   }
