@@ -122,7 +122,7 @@ describe("E2E: Slack plugin", () => {
     expect(slackManifest.configPath).toBe("channels");
     expect(slackManifest.installable).toBe(false);
     expect(slackManifest.needsFunnel).toBe(false);
-    expect(slackManifest.internalKeys).toEqual([]);
+    expect(slackManifest.internalKeys).toEqual(["agentId"]);
   });
 
   it("secret collection returns correct prefixed keys in buildManifestSecrets", () => {
