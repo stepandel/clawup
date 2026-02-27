@@ -55,6 +55,7 @@ program
   .option("--deploy", "Deploy immediately after setup")
   .option("-y, --yes", "Skip confirmation prompt (for deploy)")
   .option("--skip-hooks", "Skip plugin lifecycle hook execution")
+  .option("--skip-onboard", "Skip plugin onboard hook execution")
   .action(async (opts) => {
     await setupCommand(opts);
   });

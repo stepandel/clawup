@@ -21,7 +21,7 @@ import {
   resolvePlugins,
   PLUGIN_MANIFEST_REGISTRY,
 } from "@clawup/core";
-import { resolvePluginSecrets, runLifecycleHook } from "@clawup/core/manifest-hooks";
+import { resolvePluginSecrets, runLifecycleHook, runOnboardHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
 import { findProjectRoot } from "../lib/project";
 import { selectOrCreateStack, setConfig, qualifiedStackName } from "../lib/pulumi";
@@ -42,6 +42,7 @@ interface SetupOptions {
   deploy?: boolean;
   yes?: boolean;
   skipHooks?: boolean;
+  skipOnboard?: boolean;
 }
 
 /** Fetched identity data stored alongside the agent definition */
@@ -374,6 +375,101 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
 
   if (opts.skipHooks) {
     p.log.warn("Hooks skipped (--skip-hooks)");
+  }
+
+  // -------------------------------------------------------------------------
+  // 7b. Run onboard hooks (interactive first-time plugin setup)
+  // -------------------------------------------------------------------------
+  if (!opts.skipOnboard) {
+    for (const fi of fetchedIdentities) {
+      const plugins = agentPlugins.get(fi.agent.name);
+      if (!plugins) continue;
+
+      for (const pluginName of plugins) {
+        const pluginManifest = resolvePlugin(pluginName, fi.identityResult);
+        const onboard = pluginManifest.hooks?.onboard;
+        if (!onboard) continue;
+
+        // runOnce: skip if all required secrets are already present
+        if (onboard.runOnce) {
+          const allSecretsPresent = Object.entries(pluginManifest.secrets)
+            .filter(([, s]) => s.required)
+            .every(([key]) => {
+              const agentSecrets = resolvedSecrets.perAgent[fi.agent.name] ?? {};
+              return agentSecrets[key] || autoResolvedSecrets[fi.agent.role]?.[key];
+            });
+          if (allSecretsPresent) {
+            p.log.info(`Onboard hook for ${pluginName} (${fi.agent.displayName}): skipped (already configured)`);
+            continue;
+          }
+        }
+
+        p.log.info(`Running onboard hook for ${pluginName} (${fi.agent.displayName}): ${onboard.description}`);
+
+        // Collect inputs — from env or interactive prompt
+        const hookEnv: Record<string, string> = {};
+
+        // Add existing resolved secrets to hook env
+        const agentSecrets = resolvedSecrets.perAgent[fi.agent.name] ?? {};
+        for (const [, sec] of Object.entries(pluginManifest.secrets)) {
+          const envDerivedKey = sec.envVar
+            .toLowerCase()
+            .split("_")
+            .map((part: string, i: number) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
+            .join("");
+          if (agentSecrets[envDerivedKey]) {
+            hookEnv[sec.envVar] = agentSecrets[envDerivedKey];
+          }
+        }
+
+        for (const [inputKey, input] of Object.entries(onboard.inputs)) {
+          // Check env first
+          const envValue = envDict[input.envVar] ?? envDict[`${fi.agent.role.toUpperCase()}_${input.envVar}`];
+          if (envValue) {
+            hookEnv[input.envVar] = envValue;
+            continue;
+          }
+
+          // Interactive prompt
+          if (input.instructions) {
+            p.log.info(input.instructions);
+          }
+          const value = await p.text({
+            message: input.prompt,
+            validate: (val) => {
+              if (!val) return `${inputKey} is required`;
+              if (input.validator && !val.startsWith(input.validator)) {
+                return `${inputKey} must start with "${input.validator}"`;
+              }
+              return undefined;
+            },
+          });
+
+          if (p.isCancel(value)) {
+            exitWithError("Onboard cancelled by user.");
+          }
+
+          hookEnv[input.envVar] = value as string;
+        }
+
+        const result = await runOnboardHook({ script: onboard.script, env: hookEnv });
+        if (result.ok) {
+          if (result.instructions) {
+            console.log();
+            p.log.info(`Follow-up instructions for ${pluginName}:`);
+            console.log(result.instructions);
+            console.log();
+          }
+        } else {
+          p.log.error(`Onboard hook for ${pluginName} failed: ${result.error}`);
+          exitWithError(
+            `Onboard hook failed. Fix the issue and run \`clawup setup\` again, or use --skip-onboard to bypass.`
+          );
+        }
+      }
+    }
+  } else {
+    p.log.warn("Onboard hooks skipped (--skip-onboard)");
   }
 
   // -------------------------------------------------------------------------

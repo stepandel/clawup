@@ -219,3 +219,83 @@ export async function resolvePluginSecrets(params: {
 
   return { ok: true, values: resolvedValues };
 }
+
+/** Result of a successful onboard hook execution */
+export interface OnboardHookSuccess {
+  ok: true;
+  /** Follow-up instructions displayed to the user (captured stdout) */
+  instructions: string;
+}
+
+export type OnboardHookResult = OnboardHookSuccess | HookError;
+
+/**
+ * Execute an onboard hook script.
+ * Captures stdout as follow-up instructions, streams stderr for progress.
+ *
+ * @param script - Shell script to execute
+ * @param env - Environment variables (includes user-provided inputs + existing secrets)
+ * @param timeoutMs - Timeout in milliseconds (default: 120000)
+ * @returns Follow-up instructions (stdout) or an error
+ */
+export function runOnboardHook(params: {
+  script: string;
+  env: Record<string, string>;
+  timeoutMs?: number;
+}): Promise<OnboardHookResult> {
+  const { script, env, timeoutMs = 120000 } = params;
+
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      resolve({
+        ok: false,
+        error: `Onboard hook timed out after ${timeoutMs}ms`,
+      });
+    }, timeoutMs);
+
+    let stdout = "";
+    let stderr = "";
+
+    const child = spawn("/bin/sh", ["-c", script], {
+      env: { ...process.env, ...env },
+      signal: controller.signal,
+    });
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on("data", (chunk) => {
+      const msg = chunk.toString();
+      stderr += msg;
+      process.stderr.write(`[onboard] ${msg}`);
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timeout);
+      if ((err as NodeJS.ErrnoException).code === "ABORT_ERR") {
+        return;
+      }
+      resolve({
+        ok: false,
+        error: `Failed to spawn onboard process: ${err.message}`,
+      });
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+
+      if (code !== 0) {
+        resolve({
+          ok: false,
+          error: `Onboard hook exited with code ${code}. stderr: ${stderr.trim()}`,
+        });
+        return;
+      }
+
+      resolve({ ok: true, instructions: stdout.trim() });
+    });
+  });
+}
