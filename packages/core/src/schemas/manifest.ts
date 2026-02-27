@@ -52,6 +52,10 @@ export const ClawupManifestSchema = z.object({
   workingHours: z.string().optional(),
   /** Additional notes about the owner for agents */
   userNotes: z.string().optional(),
+  /** Model provider (e.g., "anthropic", "openai", "google", "openrouter") */
+  modelProvider: z.string().optional(),
+  /** Default model (e.g., "anthropic/claude-opus-4-6") */
+  defaultModel: z.string().optional(),
   /** Generic template variables (e.g., LINEAR_TEAM, GITHUB_REPO) */
   templateVars: z.record(z.string(), z.string()).optional(),
   /** Global secret references (e.g., `${env:ANTHROPIC_API_KEY}`) */

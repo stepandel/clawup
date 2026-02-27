@@ -5,7 +5,7 @@
 
 import * as zlib from "zlib";
 import { generateConfigPatchScript, PluginEntry } from "./config-generator";
-import { CODING_AGENT_REGISTRY, type CodingAgentEntry } from "@clawup/core";
+import { CODING_AGENT_REGISTRY, MODEL_PROVIDERS, type CodingAgentEntry } from "@clawup/core";
 
 /**
  * Config for a plugin to be installed on an agent.
@@ -41,8 +41,10 @@ export interface PluginInstallConfig {
 }
 
 export interface CloudInitConfig {
-  /** Anthropic API key (for backward compatibility) */
+  /** Model provider API key (named anthropicApiKey for backward compatibility) */
   anthropicApiKey: string;
+  /** Model provider key (e.g., "anthropic", "openai"). Defaults to "anthropic". */
+  modelProvider?: string;
   /** Tailscale auth key */
   tailscaleAuthKey: string;
   /** Gateway authentication token */
@@ -358,8 +360,18 @@ if ! grep -q 'NVM_DIR' ~/.bashrc; then
 fi
 UBUNTU_SCRIPT
 
-# Set environment variables for ubuntu user
-# Auto-detect credential type and export the correct variable
+# Set environment variables for ubuntu user (provider-aware)
+${config.modelProvider && config.modelProvider !== "anthropic"
+  ? (() => {
+    const providerDef = MODEL_PROVIDERS[config.modelProvider as keyof typeof MODEL_PROVIDERS];
+    if (!providerDef) {
+      throw new Error(`Unknown model provider "${config.modelProvider}". Supported: ${Object.keys(MODEL_PROVIDERS).join(", ")}`);
+    }
+    return `# ${config.modelProvider} provider: export ${providerDef.envVar}
+echo 'export ${providerDef.envVar}="\${ANTHROPIC_API_KEY}"' >> /home/ubuntu/.bashrc
+echo "Configured ${providerDef.envVar} for ${config.modelProvider}"`;
+  })()
+  : `# Auto-detect Anthropic credential type and export the correct variable
 if [[ "\${ANTHROPIC_API_KEY}" =~ ^sk-ant-oat ]]; then
   # OAuth token from Claude Pro/Max subscription
   echo 'export CLAUDE_CODE_OAUTH_TOKEN="\${ANTHROPIC_API_KEY}"' >> /home/ubuntu/.bashrc
@@ -368,7 +380,7 @@ else
   # API key from Anthropic Console
   echo 'export ANTHROPIC_API_KEY="\${ANTHROPIC_API_KEY}"' >> /home/ubuntu/.bashrc
   echo "Detected API key, exporting as ANTHROPIC_API_KEY"
-fi
+fi`}
 ${(config.plugins ?? [])
     .flatMap((p) => Object.values(p.secretEnvVars ?? {}))
     .map((envVar) => `[ -n "\${${envVar}:-}" ] && echo 'export ${envVar}="\${${envVar}:-}"' >> /home/ubuntu/.bashrc`)

@@ -20,6 +20,8 @@ import {
   isSecretCoveredByPlugin,
   resolvePlugins,
   PLUGIN_MANIFEST_REGISTRY,
+  MODEL_PROVIDERS,
+  getProviderForModel,
 } from "@clawup/core";
 import { resolvePluginSecrets, runLifecycleHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
@@ -507,7 +509,17 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     }
   }
   // Local provider doesn't need region/cloud config
-  setConfig("anthropicApiKey", resolvedSecrets.global.anthropicApiKey, true, cwd);
+  const modelProvider = manifest.modelProvider ?? "anthropic";
+  setConfig("modelProvider", modelProvider, false, cwd);
+  if (manifest.defaultModel) {
+    setConfig("defaultModel", manifest.defaultModel, false, cwd);
+  }
+  // Set the model provider API key (stored as "anthropicApiKey" in Pulumi for backward compat)
+  const providerDef = MODEL_PROVIDERS[modelProvider as keyof typeof MODEL_PROVIDERS];
+  const providerApiKeyName = providerDef?.envVar
+    ? providerDef.envVar.toLowerCase().split("_").map((p: string, i: number) => i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)).join("")
+    : "anthropicApiKey";
+  setConfig("anthropicApiKey", resolvedSecrets.global[providerApiKeyName] ?? resolvedSecrets.global.anthropicApiKey, true, cwd);
   if (manifest.provider !== "local") {
     setConfig("tailscaleAuthKey", resolvedSecrets.global.tailscaleAuthKey, true, cwd);
     setConfig("tailnetDnsName", resolvedSecrets.global.tailnetDnsName, false, cwd);
@@ -600,6 +612,8 @@ function getValidatorHint(key: string): string {
   // Infrastructure hints
   const infraHints: Record<string, string> = {
     anthropicApiKey: "must start with sk-ant-",
+    openaiApiKey: "must start with sk-",
+    openrouterApiKey: "must start with sk-or-",
     tailscaleAuthKey: "must start with tskey-auth-",
     tailnetDnsName: "must end with .ts.net",
     githubToken: "must start with ghp_ or github_pat_",

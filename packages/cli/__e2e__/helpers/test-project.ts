@@ -51,20 +51,24 @@ interface CreateTestProjectOptions {
   role?: string;
   /** Additional .env content lines (e.g., plugin secrets) */
   extraEnvLines?: string[];
+  /** Override default model (e.g., "openai/gpt-4o") */
+  model?: string;
+  /** Model provider key (e.g., "openai") — defaults to "anthropic" */
+  modelProvider?: string;
 }
 
 /**
  * Create a minimal test project directory with clawup.yaml and .env.
  */
 export function createTestProject(options: CreateTestProjectOptions): void {
-  const { stackName, dir, anthropicApiKey, identityDir, agentName, displayName, role, extraEnvLines } = options;
+  const { stackName, dir, anthropicApiKey, identityDir, agentName, displayName, role, extraEnvLines, model, modelProvider } = options;
   const apiKey = anthropicApiKey ?? process.env.ANTHROPIC_API_KEY ?? "sk-ant-fake-key-for-e2e";
   const identity = identityDir ?? FIXTURE_IDENTITY_DIR;
 
   fs.mkdirSync(dir, { recursive: true });
 
   // Write clawup.yaml
-  const manifest = {
+  const manifest: Record<string, unknown> = {
     stackName,
     provider: "local",
     region: "local",
@@ -72,6 +76,8 @@ export function createTestProject(options: CreateTestProjectOptions): void {
     ownerName: "E2E Tester",
     timezone: "UTC",
     workingHours: "24/7",
+    ...(model ? { defaultModel: model } : {}),
+    ...(modelProvider ? { modelProvider } : {}),
     templateVars: {
       OWNER_NAME: "E2E Tester",
     },

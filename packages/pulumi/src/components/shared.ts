@@ -9,6 +9,7 @@ import * as pulumi from "@pulumi/pulumi";
 import * as tls from "@pulumi/tls";
 import * as crypto from "crypto";
 import { generateCloudInit, interpolateCloudInit, compressCloudInit, CloudInitConfig } from "./cloud-init";
+import { getProviderForModel } from "@clawup/core";
 import type { BaseOpenClawAgentArgs } from "./types";
 
 /**
@@ -117,6 +118,7 @@ export function buildCloudInitUserData(
             gatewayPort: gatewayPort as number,
             browserPort: browserPort as number,
             model: model as string,
+            modelProvider: getProviderForModel(model as string),
             backupModel: args.backupModel as string | undefined,
             codingAgent: args.codingAgent,
             enableSandbox: enableSandbox as boolean,

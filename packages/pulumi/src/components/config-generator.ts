@@ -3,7 +3,7 @@
  * Builds the openclaw.json configuration file content
  */
 
-import { CODING_AGENT_REGISTRY } from "@clawup/core";
+import { CODING_AGENT_REGISTRY, MODEL_PROVIDERS, getProviderForModel } from "@clawup/core";
 
 /**
  * A single plugin entry for the OpenClaw config.
@@ -313,6 +313,13 @@ export function generateConfigPatchScript(options: OpenClawConfigOptions): strin
   // Build model config (primary + optional fallbacks)
   const model = options.model ?? "anthropic/claude-opus-4-6";
   const backupModel = options.backupModel;
+  const providerKey = getProviderForModel(model);
+  const providerDef = MODEL_PROVIDERS[providerKey as keyof typeof MODEL_PROVIDERS] as
+    | (typeof MODEL_PROVIDERS)[keyof typeof MODEL_PROVIDERS]
+    | undefined;
+  if (providerKey !== "anthropic" && !providerDef) {
+    throw new Error(`Unknown model provider "${providerKey}" from model "${model}". Supported: ${Object.keys(MODEL_PROVIDERS).join(", ")}`);
+  }
 
   // Build cliBackends config from coding agent registry
   const codingAgentName = options.codingAgent ?? "claude-code";
@@ -346,8 +353,8 @@ config["gateway"]["auth"] = {
     "token": os.environ["GATEWAY_TOKEN"]
 }
 
-# Configure environment variables for child processes (including Claude Code, Linear CLI)
-# Auto-detect credential type: OAuth token (oat) vs API key (api)
+# Configure environment variables for child processes (model provider API key)
+${providerKey === "anthropic" ? `# Anthropic: auto-detect credential type (OAuth token vs API key)
 anthropic_cred = os.environ.get("ANTHROPIC_API_KEY", "")
 if anthropic_cred.startswith("sk-ant-oat"):
     # OAuth token from Claude Pro/Max subscription (use with CLAUDE_CODE_OAUTH_TOKEN)
@@ -360,7 +367,12 @@ else:
     config["env"] = {
         "ANTHROPIC_API_KEY": anthropic_cred
     }
-    print("Configured environment variables: ANTHROPIC_API_KEY (API key)")
+    print("Configured environment variables: ANTHROPIC_API_KEY (API key)")` : `# ${providerDef?.name ?? providerKey}: set provider API key env var
+provider_key = os.environ.get("${providerDef?.envVar ?? "MODEL_API_KEY"}", "")
+config["env"] = {
+    "${providerDef?.envVar ?? "MODEL_API_KEY"}": provider_key
+}
+print("Configured environment variables: ${providerDef?.envVar ?? "MODEL_API_KEY"}")`}
 
 # Configure heartbeat (proactive mode)
 config.setdefault("agents", {})

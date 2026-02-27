@@ -88,4 +88,51 @@ echo "Claude Code default model set to \${MODEL} (fast mode)"
       systemPromptWhen: "always",
     },
   },
+  codex: {
+    displayName: "Codex (OpenAI)",
+    installScript: `
+# Install Codex CLI for ubuntu user
+echo "Installing Codex CLI..."
+sudo -u ubuntu bash << 'CODEX_INSTALL_SCRIPT' || echo "WARNING: Codex installation failed. Install manually with: npm install -g @openai/codex"
+set -e
+cd ~
+
+# Source NVM for npm access
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+# Install Codex via npm
+npm install -g @openai/codex
+
+# Verify installation
+if command -v codex &>/dev/null; then
+  echo "Codex CLI installed successfully"
+else
+  echo "WARNING: Codex CLI installation may have failed"
+  exit 1
+fi
+CODEX_INSTALL_SCRIPT`.trim(),
+    configureModelScript: `
+# Configure Codex default model
+sudo -u ubuntu bash -c '
+mkdir -p ~/.codex
+cat > ~/.codex/config.toml << CODEX_CONFIG
+model = "\${MODEL}"
+CODEX_CONFIG
+echo "Codex default model set to \${MODEL}"
+'`.trim(),
+    secrets: {
+      OpenaiApiKey: { envVar: "OPENAI_API_KEY", scope: "agent" },
+    },
+    cliBackend: {
+      command: "codex",
+      args: ["exec", "--full-auto"],
+      output: "text",
+      modelArg: "--model",
+      sessionArg: "",
+      sessionMode: "never",
+      systemPromptArg: "",
+      systemPromptWhen: "never",
+    },
+  },
 };

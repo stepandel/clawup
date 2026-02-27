@@ -35,6 +35,7 @@ export {
   PLUGINS_DIR,
   PROVIDERS,
   SSH_USER,
+  getProviderForModel,
   hetznerServerTypes,
   slackAppManifest,
   tailscaleHostname,

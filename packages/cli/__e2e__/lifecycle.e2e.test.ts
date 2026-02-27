@@ -243,6 +243,17 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
 
       // Assert: outro with next steps
       expect(ui.outros.some((m) => m.includes("validate"))).toBe(true);
+
+      // Assert: cloud-init uses Anthropic auto-detect (default provider)
+      const envResult = execSync(
+        `docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' ${containerName}`,
+        { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+      );
+      const cloudinitMatch = envResult.match(/CLOUDINIT_SCRIPT=(.+)/);
+      expect(cloudinitMatch).not.toBeNull();
+      const cloudinitScript = Buffer.from(cloudinitMatch![1], "base64").toString("utf-8");
+      expect(cloudinitScript).toContain("Auto-detect Anthropic credential type");
+      expect(cloudinitScript).toContain("ANTHROPIC_API_KEY");
     } finally {
       dispose();
     }
