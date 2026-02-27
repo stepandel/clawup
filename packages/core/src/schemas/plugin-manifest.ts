@@ -58,6 +58,18 @@ export const ConfigTransformSchema = z.object({
 });
 
 /**
+ * Lifecycle hooks for plugin provisioning and setup.
+ */
+export const PluginHooksSchema = z.object({
+  /** Per-secret resolution scripts: secretKey -> shell script that outputs the resolved value */
+  resolve: z.record(z.string().min(1, "Resolve hook script cannot be empty")).optional(),
+  /** Script to run after base provisioning, before workspace injection */
+  postProvision: z.string().min(1, "postProvision hook script cannot be empty").optional(),
+  /** Script to run after workspace files are in place, before gateway start */
+  preStart: z.string().min(1, "preStart hook script cannot be empty").optional(),
+});
+
+/**
  * The enriched plugin manifest — consolidates ALL plugin metadata.
  */
 export const PluginManifestSchema = z.object({
@@ -81,6 +93,8 @@ export const PluginManifestSchema = z.object({
   configTransforms: z.array(ConfigTransformSchema).default([]),
   /** Webhook setup configuration (for plugins that need incoming webhooks) */
   webhookSetup: WebhookSetupSchema.optional(),
+  /** Lifecycle hooks for provisioning and secret resolution */
+  hooks: PluginHooksSchema.optional(),
 }).superRefine((data, ctx) => {
   // Validate that webhookSetup.secretKey references an existing secret
   if (data.webhookSetup && !(data.webhookSetup.secretKey in data.secrets)) {
@@ -89,5 +103,25 @@ export const PluginManifestSchema = z.object({
       path: ["webhookSetup", "secretKey"],
       message: `webhookSetup.secretKey "${data.webhookSetup.secretKey}" does not exist in secrets`,
     });
+  }
+
+  // Validate that resolve hook keys correspond to autoResolvable secrets
+  if (data.hooks?.resolve) {
+    for (const resolveKey of Object.keys(data.hooks.resolve)) {
+      const secret = data.secrets[resolveKey];
+      if (!secret) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["hooks", "resolve", resolveKey],
+          message: `Resolve hook key "${resolveKey}" does not correspond to any secret in secrets`,
+        });
+      } else if (!secret.autoResolvable) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["hooks", "resolve", resolveKey],
+          message: `Resolve hook key "${resolveKey}" references secret that is not autoResolvable`,
+        });
+      }
+    }
   }
 });

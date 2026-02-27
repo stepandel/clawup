@@ -96,6 +96,11 @@ export const PLUGIN_MANIFEST_REGISTRY: Record<string, PluginManifest> = {
       ],
       configJsonPath: "plugins.entries.openclaw-linear.config.webhookSecret",
     },
+    hooks: {
+      resolve: {
+        linearUserUuid: 'curl -s -X POST https://api.linear.app/graphql -H "Authorization: $LINEAR_API_KEY" -H "Content-Type: application/json" -d \'{"query":"{ viewer { id } }"}\' | jq -r ".data.viewer.id"',
+      },
+    },
   },
   slack: {
     name: "slack",

@@ -56,6 +56,9 @@ export {
   isSecretCoveredByPlugin,
 } from "./plugin-loader";
 
+// Manifest hooks — re-exported from "@clawup/core/manifest-hooks" subpath
+// to avoid pulling child_process into browser bundles.
+
 // Coding agent registry
 export type { CodingAgentEntry, CodingAgentSecret } from "./coding-agent-registry";
 export { CODING_AGENT_REGISTRY } from "./coding-agent-registry";
@@ -83,6 +86,7 @@ export {
   IdentityManifestSchema,
   PluginManifestSchema,
   PluginSecretSchema,
+  PluginHooksSchema,
   WebhookSetupSchema,
   ConfigTransformSchema,
 } from "./schemas";

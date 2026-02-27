@@ -264,6 +264,7 @@ function buildPluginsForAgent(
       configPath: manifest.configPath,
       internalKeys: manifest.internalKeys.length > 0 ? manifest.internalKeys : undefined,
       configTransforms: manifest.configTransforms.length > 0 ? manifest.configTransforms : undefined,
+      hooks: manifest.hooks,
     });
 
     // Collect secret outputs from Pulumi config

@@ -32,6 +32,12 @@ export interface PluginInstallConfig {
     targetKeys: Record<string, string>;
     removeSource: boolean;
   }>;
+  /** Lifecycle hooks from the plugin manifest */
+  hooks?: {
+    resolve?: Record<string, string>;
+    postProvision?: string;
+    preStart?: string;
+  };
 }
 
 export interface CloudInitConfig {
@@ -169,6 +175,38 @@ ${installablePlugins.map((p) =>
 echo "Plugin installation complete"
 `
     : "";
+
+  // Plugin postProvision hooks (run after base provisioning, before workspace injection)
+  const postProvisionHooksScript = (config.plugins ?? [])
+    .filter((p) => p.hooks?.postProvision)
+    .map((p) => `
+# postProvision hook: ${p.name}
+echo "Running postProvision hook for ${p.name}..."
+sudo -H -u ubuntu bash << 'HOOK_POST_PROVISION_${p.name.toUpperCase().replace(/-/g, "_")}'
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+${p.hooks!.postProvision}
+HOOK_POST_PROVISION_${p.name.toUpperCase().replace(/-/g, "_")}
+echo "postProvision hook for ${p.name} complete"
+`)
+    .join("\n");
+
+  // Plugin preStart hooks (run after workspace + config, before gateway start)
+  const preStartHooksScript = (config.plugins ?? [])
+    .filter((p) => p.hooks?.preStart)
+    .map((p) => `
+# preStart hook: ${p.name}
+echo "Running preStart hook for ${p.name}..."
+sudo -H -u ubuntu bash << 'HOOK_PRE_START_${p.name.toUpperCase().replace(/-/g, "_")}'
+export HOME=/home/ubuntu
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+${p.hooks!.preStart}
+HOOK_PRE_START_${p.name.toUpperCase().replace(/-/g, "_")}
+echo "preStart hook for ${p.name} complete"
+`)
+    .join("\n");
 
   // Dynamic clawhub skill install steps
   const clawhubSkillsScript = (config.clawhubSkills ?? []).length > 0
@@ -370,6 +408,7 @@ openclaw onboard --non-interactive --accept-risk \\
   --skip-daemon \\
   --skip-skills || echo "WARNING: OpenClaw onboarding failed. Run openclaw onboard manually."
 '
+${postProvisionHooksScript}
 ${workspaceFilesScript}
 ${pluginInstallScript}
 ${clawhubSkillsScript}
@@ -384,6 +423,7 @@ sudo -H -u ubuntu \\
   python3 << 'PYTHON_SCRIPT'
 ${configPatchScript}
 PYTHON_SCRIPT
+${preStartHooksScript}
 ${tailscaleProxySection}
 ${config.foregroundMode ? `# Run openclaw doctor before starting daemon in foreground
 echo "Running openclaw doctor..."

@@ -17,4 +17,5 @@ export {
   PluginSecretSchema,
   WebhookSetupSchema,
   ConfigTransformSchema,
+  PluginHooksSchema,
 } from "./plugin-manifest";

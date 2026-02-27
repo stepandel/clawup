@@ -15,7 +15,8 @@
     "./dep-registry": "./dist/dep-registry.js",
     "./plugin-registry": "./dist/plugin-registry.js",
     "./coding-agent-registry": "./dist/coding-agent-registry.js",
-    "./schemas": "./dist/schemas/index.js"
+    "./schemas": "./dist/schemas/index.js",
+    "./manifest-hooks": "./dist/manifest-hooks.js"
   },
   "typesVersions": {
     "*": {
@@ -27,7 +28,8 @@
       "dep-registry": ["dist/dep-registry.d.ts"],
       "plugin-registry": ["dist/plugin-registry.d.ts"],
       "coding-agent-registry": ["dist/coding-agent-registry.d.ts"],
-      "schemas": ["dist/schemas/index.d.ts"]
+      "schemas": ["dist/schemas/index.d.ts"],
+      "manifest-hooks": ["dist/manifest-hooks.d.ts"]
     }
   },
   "scripts": {

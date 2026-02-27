@@ -21,6 +21,7 @@ import {
   resolvePlugins,
   PLUGIN_MANIFEST_REGISTRY,
 } from "@clawup/core";
+import { resolvePluginSecrets, runLifecycleHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
 import { findProjectRoot } from "../lib/project";
 import { selectOrCreateStack, setConfig, qualifiedStackName } from "../lib/pulumi";
@@ -40,6 +41,7 @@ interface SetupOptions {
   envFile?: string;
   deploy?: boolean;
   yes?: boolean;
+  skipHooks?: boolean;
 }
 
 /** Fetched identity data stored alongside the agent definition */
@@ -292,9 +294,8 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   p.log.success("All secrets resolved");
 
   // -------------------------------------------------------------------------
-  // 7. Auto-resolve secrets (e.g., Linear UUID fetch)
+  // 7. Auto-resolve secrets (via manifest hooks or env overrides)
   // -------------------------------------------------------------------------
-  // Generic: for each plugin with auto-resolvable secrets, attempt resolution
   const autoResolvedSecrets: Record<string, Record<string, string>> = {};
 
   for (const fi of fetchedIdentities) {
@@ -302,8 +303,8 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     if (!plugins) continue;
 
     for (const pluginName of plugins) {
-      const manifest = resolvePlugin(pluginName, fi.identityResult);
-      for (const [key, secret] of Object.entries(manifest.secrets)) {
+      const pluginManifest = resolvePlugin(pluginName, fi.identityResult);
+      for (const [key, secret] of Object.entries(pluginManifest.secrets)) {
         if (!secret.autoResolvable) continue;
 
         const roleUpper = fi.agent.role.toUpperCase();
@@ -324,73 +325,55 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
           autoResolvedSecrets[fi.agent.role][key] = envValue;
           continue;
         }
+      }
 
-        // Plugin-specific auto-resolution logic
-        const resolved = await autoResolveSecret(pluginName, key, fi, resolvedSecrets, envDict);
-        if (resolved) {
-          if (!autoResolvedSecrets[fi.agent.role]) autoResolvedSecrets[fi.agent.role] = {};
-          autoResolvedSecrets[fi.agent.role][key] = resolved;
+      // Use manifest resolve hooks (if not skipped and hooks exist)
+      if (!opts.skipHooks && pluginManifest.hooks?.resolve) {
+        // Build env for resolve hooks — include resolved secrets for this agent
+        const hookEnv: Record<string, string> = {};
+        const agentSecrets = resolvedSecrets.perAgent[fi.agent.name] ?? {};
+        for (const [k, v] of Object.entries(agentSecrets)) {
+          // Map camelCase key back to env var using plugin secret definitions
+          for (const [, sec] of Object.entries(pluginManifest.secrets)) {
+            const envDerivedKey = sec.envVar
+              .toLowerCase()
+              .split("_")
+              .map((part: string, i: number) => i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1))
+              .join("");
+            if (envDerivedKey === k) {
+              hookEnv[sec.envVar] = v;
+            }
+          }
+        }
+
+        const s = p.spinner();
+        s.start(`Resolving secrets for ${fi.agent.displayName} (${pluginName})...`);
+        const hookResult = await resolvePluginSecrets({ manifest: pluginManifest, env: hookEnv });
+        if (hookResult.ok) {
+          // Map resolved env vars back to secret keys
+          for (const [secretKey, secret] of Object.entries(pluginManifest.secrets)) {
+            if (hookResult.values[secret.envVar]) {
+              // Skip if already resolved above
+              if (autoResolvedSecrets[fi.agent.role]?.[secretKey]) continue;
+              if (!autoResolvedSecrets[fi.agent.role]) autoResolvedSecrets[fi.agent.role] = {};
+              autoResolvedSecrets[fi.agent.role][secretKey] = hookResult.values[secret.envVar];
+            }
+          }
+          s.stop(`Resolved secrets for ${fi.agent.displayName} (${pluginName})`);
+        } else {
+          s.stop(`Failed to resolve secrets for ${fi.agent.displayName}`);
+          const roleUpper = fi.agent.role.toUpperCase();
+          exitWithError(
+            `${hookResult.error}\n` +
+            `Set the required env vars in your .env file (prefixed with ${roleUpper}_) to bypass hook resolution, then run \`clawup setup\` again.`
+          );
         }
       }
     }
   }
 
-  /**
-   * Auto-resolve a secret for a specific plugin.
-   * Currently supports Linear UUID fetch; future plugins can add their own resolvers here.
-   */
-  async function autoResolveSecret(
-    pluginName: string,
-    key: string,
-    fi: FetchedIdentity,
-    secrets: ReturnType<typeof loadEnvSecrets>,
-    _envDict: Record<string, string>,
-  ): Promise<string | undefined> {
-    if (pluginName === "openclaw-linear" && key === "linearUserUuid") {
-      const linearApiKey = secrets.perAgent[fi.agent.name]?.linearApiKey;
-      if (!linearApiKey) {
-        exitWithError(
-          `Cannot fetch Linear user UUID for ${fi.agent.displayName}: linearApiKey not resolved.`
-        );
-      }
-
-      const roleUpper = fi.agent.role.toUpperCase();
-      const s = p.spinner();
-      s.start(`Fetching Linear user ID for ${fi.agent.displayName}...`);
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15_000);
-        const res = await fetch("https://api.linear.app/graphql", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: linearApiKey,
-          },
-          body: JSON.stringify({ query: "{ viewer { id } }" }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
-        const data = (await res.json()) as { data?: { viewer?: { id?: string } }; errors?: Array<{ message: string }> };
-        if (data.errors && data.errors.length > 0) {
-          throw new Error(`GraphQL error: ${data.errors[0].message}`);
-        }
-        const uuid = data?.data?.viewer?.id;
-        if (!uuid) throw new Error("No user ID in response");
-        s.stop(`${fi.agent.displayName}: ${uuid}`);
-        return uuid;
-      } catch (err) {
-        s.stop(`Could not fetch Linear user ID for ${fi.agent.displayName}`);
-        exitWithError(
-          `Failed to fetch Linear user UUID: ${err instanceof Error ? err.message : String(err)}\n` +
-          `Set ${roleUpper}_LINEAR_USER_UUID in your .env file to bypass the API call, then run \`clawup setup\` again.`
-        );
-      }
-    }
-
-    return undefined;
+  if (opts.skipHooks) {
+    p.log.warn("Hooks skipped (--skip-hooks)");
   }
 
   // -------------------------------------------------------------------------

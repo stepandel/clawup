@@ -54,6 +54,7 @@ program
   .option("--env-file <path>", "Path to .env file (defaults to .env in project root)")
   .option("--deploy", "Deploy immediately after setup")
   .option("-y, --yes", "Skip confirmation prompt (for deploy)")
+  .option("--skip-hooks", "Skip plugin lifecycle hook execution")
   .action(async (opts) => {
     await setupCommand(opts);
   });
