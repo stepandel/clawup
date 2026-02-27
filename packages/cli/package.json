@@ -1,6 +1,6 @@
 {
   "name": "clawup",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "description": "Deploy and manage a fleet of OpenClaw AI agents on AWS or Hetzner",
   "bin": {
     "clawup": "dist/bin.js"
