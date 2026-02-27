@@ -424,7 +424,134 @@ describe("cloud-init pipeline — plugins and deps", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Compression
+// 5. Plugin internalKeys filtering
+// ---------------------------------------------------------------------------
+
+/**
+ * Tests that internalKeys are correctly filtered from the generated plugin
+ * config. This prevents OpenClaw config validation failures caused by
+ * properties that are not in the plugin's configSchema.
+ *
+ * Context: openclaw-linear's configSchema (openclaw.plugin.json) has
+ * additionalProperties: false. Keys like linearUserUuid and agentId are
+ * clawup-internal metadata and must not appear in the plugin config.
+ * Keys like stateActions and agentMapping ARE valid plugin properties.
+ */
+describe("cloud-init pipeline — internalKeys filtering", () => {
+  /** Helper: extract the Python config patch script from the cloud-init output */
+  function extractPython(script: string): string {
+    const match = script.match(
+      /python3 << 'PYTHON_SCRIPT'\n([\s\S]*?)\nPYTHON_SCRIPT/,
+    );
+    expect(match).toBeTruthy();
+    return match![1];
+  }
+
+  it("filters internalKeys from plugins.entries config and secretEnvVars", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      plugins: [
+        {
+          name: "openclaw-linear",
+          installable: true,
+          configPath: "plugins.entries",
+          config: {
+            agentId: "pm",                              // internalKey — should be filtered
+            linearUserUuid: "uuid-1234",                // internalKey — should be filtered
+            agentMapping: { "uuid-1234": "default" },   // valid plugin property — should remain
+            stateActions: { started: "add" },            // valid plugin property — should remain
+          },
+          secretEnvVars: {
+            apiKey: "LINEAR_API_KEY",
+            webhookSecret: "LINEAR_WEBHOOK_SECRET",
+            linearUserUuid: "LINEAR_USER_UUID",         // internalKey in secretEnvVars — should be filtered
+          },
+          internalKeys: ["agentId", "linearUserUuid"],
+        },
+      ],
+    };
+    const script = runPipeline(config, {
+      LINEAR_API_KEY: "lin_api_test",
+      LINEAR_WEBHOOK_SECRET: "whsec_test",
+      LINEAR_USER_UUID: "uuid-1234",
+    });
+    const python = extractPython(script);
+
+    // Valid secrets should be written to plugin config
+    expect(python).toContain('"apiKey": os.environ.get("LINEAR_API_KEY", "")');
+    expect(python).toContain('"webhookSecret": os.environ.get("LINEAR_WEBHOOK_SECRET", "")');
+
+    // Valid config properties should be written
+    expect(python).toContain('"agentMapping"');
+    expect(python).toContain('"stateActions"');
+
+    // Internal keys should NOT appear anywhere in the plugin config
+    expect(python).not.toContain('"agentId"');
+    expect(python).not.toContain('"linearUserUuid"');
+    expect(python).not.toContain("LINEAR_USER_UUID");
+  });
+
+  it("filters internalKeys from channels config", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      plugins: [
+        {
+          name: "slack",
+          installable: false,
+          configPath: "channels",
+          config: {
+            agentId: "eng",         // internalKey — should be filtered
+            mode: "socket",         // valid — should remain
+          },
+          secretEnvVars: {
+            botToken: "SLACK_BOT_TOKEN",
+            appToken: "SLACK_APP_TOKEN",
+          },
+          internalKeys: ["agentId"],
+        },
+      ],
+    };
+    const script = runPipeline(config, {
+      SLACK_BOT_TOKEN: "xoxb-test",
+      SLACK_APP_TOKEN: "xapp-test",
+    });
+    const python = extractPython(script);
+
+    // Valid secrets should be written
+    expect(python).toContain('"botToken": os.environ.get("SLACK_BOT_TOKEN", "")');
+    expect(python).toContain('"appToken": os.environ.get("SLACK_APP_TOKEN", "")');
+
+    // Valid config should remain
+    expect(python).toContain('"mode": "socket"');
+
+    // Internal key should NOT appear
+    expect(python).not.toContain('"agentId"');
+  });
+
+  it("passes all config through when internalKeys is empty", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      plugins: [
+        {
+          name: "test-plugin",
+          installable: true,
+          configPath: "plugins.entries",
+          config: { someKey: "someValue" },
+          secretEnvVars: { token: "TEST_TOKEN" },
+          internalKeys: [],
+        },
+      ],
+    };
+    const script = runPipeline(config, { TEST_TOKEN: "tok_test" });
+    const python = extractPython(script);
+
+    expect(python).toContain('"someKey": "someValue"');
+    expect(python).toContain('"token": os.environ.get("TEST_TOKEN", "")');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Compression
 // ---------------------------------------------------------------------------
 
 describe("cloud-init pipeline — compression", () => {
