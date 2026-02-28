@@ -5,7 +5,7 @@ export { generateCloudInit, interpolateCloudInit, CloudInitConfig, PluginInstall
 export {
   generateOpenClawConfig,
   generateOpenClawConfigJson,
-  generateConfigPatchScript,
+  generateFullOpenClawConfig,
   OpenClawConfigOptions,
   OpenClawConfig,
 } from "./config-generator";

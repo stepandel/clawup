@@ -4,8 +4,7 @@
  */
 
 import * as zlib from "zlib";
-import { generateConfigPatchScript, PluginEntry } from "./config-generator";
-import { CODING_AGENT_REGISTRY, MODEL_PROVIDERS, getProviderForModel, getProviderEnvVar, type CodingAgentEntry } from "@clawup/core";
+import { CODING_AGENT_REGISTRY, type CodingAgentEntry } from "@clawup/core";
 
 /**
  * Config for a plugin to be installed on an agent.
@@ -41,24 +40,20 @@ export interface PluginInstallConfig {
 }
 
 export interface CloudInitConfig {
+  /** Pre-built openclaw.json content (complete, with secrets resolved) */
+  openclawConfigJson: string;
+  /** OAuth-resolved provider env var map for .profile exports: { envVarName: value } */
+  providerEnv?: Record<string, string>;
   /** Per-provider API keys: { providerKey: resolvedValue } e.g., { anthropic: "sk-ant-...", openai: "sk-..." } */
   providerApiKeys: Record<string, string>;
-  /** Model provider key (e.g., "anthropic", "openai"). Defaults to "anthropic". */
-  modelProvider?: string;
   /** Tailscale auth key */
   tailscaleAuthKey: string;
   /** Gateway authentication token */
   gatewayToken: string;
   /** Gateway port (default: 18789) */
   gatewayPort?: number;
-  /** Browser control port (default: 18791) */
-  browserPort?: number;
-  /** Enable Docker sandbox (default: true) */
-  enableSandbox?: boolean;
   /** AI model to use (default: anthropic/claude-opus-4-6) */
   model?: string;
-  /** Backup/fallback model for OpenClaw (e.g., "anthropic/claude-sonnet-4-5") */
-  backupModel?: string;
   /** Coding agent CLI name (e.g., "claude-code"). Defaults to "claude-code". */
   codingAgent?: string;
   /** Node.js version to install (default: 22) */
@@ -67,8 +62,6 @@ export interface CloudInitConfig {
   nvmVersion?: string;
   /** OpenClaw version (default: latest) */
   openclawVersion?: string;
-  /** Trusted proxies for gateway (default: ["127.0.0.1"]) */
-  trustedProxies?: string[];
   /** Workspace files to inject (path -> content) */
   workspaceFiles?: Record<string, string>;
   /** Additional environment variables */
@@ -89,8 +82,6 @@ export interface CloudInitConfig {
   plugins?: PluginInstallConfig[];
   /** Resolved dep entries to install */
   deps?: { name: string; installScript: string; postInstallScript: string; secrets: Record<string, { envVar: string }> }[];
-  /** Resolved dep secret values merged into additionalSecrets for interpolation */
-  depSecrets?: Record<string, string>;
   /** Whether to enable Tailscale Funnel (public HTTPS) instead of Serve */
   enableFunnel?: boolean;
   /** Public skill slugs to install via `clawhub install` */
@@ -105,36 +96,9 @@ export function generateCloudInit(config: CloudInitConfig): string {
   const nodeVersion = config.nodeVersion ?? 22;
   const nvmVersion = config.nvmVersion ?? "0.40.1";
   const openclawVersion = config.openclawVersion ?? "latest";
-  const trustedProxies = config.trustedProxies ?? ["127.0.0.1"];
-
-  // Build PluginEntry[] for config-generator from PluginInstallConfig[]
-  const pluginEntries: PluginEntry[] = (config.plugins ?? []).map((p) => ({
-    name: p.name,
-    enabled: true,
-    config: p.config ?? {},
-    secretEnvVars: p.secretEnvVars,
-    configPath: p.configPath,
-    internalKeys: p.internalKeys,
-    configTransforms: p.configTransforms,
-  }));
-
-  // Extract braveApiKey from depSecrets for config-generator (special case)
-  const braveApiKey = config.depSecrets?.["BRAVE_API_KEY"];
 
   const codingAgentName = config.codingAgent ?? "claude-code";
   const codingAgentEntry = CODING_AGENT_REGISTRY[codingAgentName];
-
-  const configPatchScript = generateConfigPatchScript({
-    gatewayPort,
-    gatewayToken: config.gatewayToken,
-    model: config.model,
-    trustedProxies,
-    enableControlUi: true,
-    plugins: pluginEntries,
-    braveApiKey: braveApiKey,
-    backupModel: config.backupModel,
-    codingAgent: codingAgentName,
-  });
 
   // Dynamic dep installation scripts (runs as root)
   const depInstallScript = (config.deps ?? [])
@@ -285,23 +249,6 @@ echo "Enabling Tailscale HTTPS proxy..."
 tailscale serve --bg ${gatewayPort} || echo "WARNING: tailscale serve failed. Enable HTTPS in your Tailscale admin console first."
 `;
 
-  // Collect all secret env vars that need to be passed to the config-patch python script
-  const pluginSecretEnvVarExports: string[] = [];
-  for (const plugin of config.plugins ?? []) {
-    for (const envVar of Object.values(plugin.secretEnvVars ?? {})) {
-      pluginSecretEnvVarExports.push(`  ${envVar}="\${${envVar}:-}"`);
-    }
-  }
-  const pluginSecretEnvLine = pluginSecretEnvVarExports.length > 0
-    ? ` \\\n${pluginSecretEnvVarExports.join(" \\\n")}`
-    : "";
-
-  // Determine the primary provider's env var for backward-compatible references
-  const primaryProviderKey = config.modelProvider ?? "anthropic";
-  const primaryEnvVar = (() => {
-    try { return getProviderEnvVar(primaryProviderKey); } catch { return "ANTHROPIC_API_KEY"; }
-  })();
-
   return `#!/bin/bash
 set -e
 
@@ -326,7 +273,7 @@ echo "Starting OpenClaw agent provisioning..."
 echo "Updating system packages..."
 apt-get update
 apt-get upgrade -y
-apt-get install -y unzip build-essential sudo python3
+apt-get install -y unzip build-essential sudo
 
 ${config.skipDocker ? "" : `# Install Docker
 echo "Installing Docker..."
@@ -366,29 +313,10 @@ if ! grep -q 'NVM_DIR' ~/.bashrc; then
 fi
 UBUNTU_SCRIPT
 
-# Set environment variables for ubuntu user (provider-aware)
-${Object.entries(config.providerApiKeys).map(([providerKey]) => {
-  const envVar = getProviderEnvVar(providerKey);
-  if (providerKey === "anthropic") {
-    return `# Auto-detect Anthropic credential type and export the correct variable
-if [[ "\${${envVar}}" =~ ^sk-ant-oat ]]; then
-  # OAuth token from Claude Pro/Max subscription
-  echo 'export CLAUDE_CODE_OAUTH_TOKEN="\${${envVar}}"' >> /home/ubuntu/.profile
-  echo "Detected OAuth token, exporting as CLAUDE_CODE_OAUTH_TOKEN"
-else
-  # API key from Anthropic Console
-  echo 'export ${envVar}="\${${envVar}}"' >> /home/ubuntu/.profile
-  echo "Detected API key, exporting as ${envVar}"
-fi`;
-  }
-  return `# ${providerKey} provider: export ${envVar}
-echo 'export ${envVar}="\${${envVar}}"' >> /home/ubuntu/.profile
-echo "Configured ${envVar} for ${providerKey}"`;
-}).join("\n")}
-${codingAgentName === "codex" && Object.keys(config.providerApiKeys).includes("openrouter") ? `# Codex uses OpenAI-compatible API — alias OpenRouter credentials
-echo 'export OPENAI_API_KEY="\${OPENROUTER_API_KEY}"' >> /home/ubuntu/.profile
-echo 'export OPENAI_BASE_URL="https://openrouter.ai/api/v1"' >> /home/ubuntu/.profile
-echo "Aliased OPENROUTER_API_KEY -> OPENAI_API_KEY + OPENAI_BASE_URL for Codex"` : ""}
+# Set provider environment variables for ubuntu user
+${Object.keys(config.providerEnv ?? {}).map((envVar) =>
+  `echo 'export ${envVar}="\${${envVar}}"' >> /home/ubuntu/.profile`
+).join("\n")}
 ${(config.plugins ?? [])
     .flatMap((p) => Object.values(p.secretEnvVars ?? {}))
     .map((envVar) => `[ -n "\${${envVar}:-}" ] && echo 'export ${envVar}="\${${envVar}:-}"' >> /home/ubuntu/.profile`)
@@ -412,55 +340,21 @@ loginctl enable-linger ubuntu
 # Start user's systemd instance (required for user services during cloud-init)
 systemctl start user@1000.service`}
 
-# Create skeleton openclaw.json (Python config-patch + openclaw doctor --fix handle the rest)
-echo "Creating openclaw.json skeleton..."
-sudo -H -u ubuntu bash -c '
+# Write complete openclaw.json (pre-generated by Pulumi)
+echo "Writing openclaw.json..."
 mkdir -p /home/ubuntu/.openclaw
-cat > /home/ubuntu/.openclaw/openclaw.json << SKELETON_CONFIG
-{
-  "gateway": {
-    "port": '"$GATEWAY_PORT"',
-    "mode": "local",
-    "trustedProxies": ["127.0.0.1"],
-    "controlUi": { "enabled": true, "allowInsecureAuth": true },
-    "auth": { "mode": "token", "token": "" }
-  },
-  "agents": { "defaults": {} },
-  "env": {}
-}
-SKELETON_CONFIG
-echo "Created minimal openclaw.json skeleton"
-'
+cat > /home/ubuntu/.openclaw/openclaw.json << 'OPENCLAW_CONFIG'
+${config.openclawConfigJson}
+OPENCLAW_CONFIG
+chown -R ubuntu:ubuntu /home/ubuntu/.openclaw
+echo "Created openclaw.json"
 ${postProvisionHooksScript}
 ${workspaceFilesScript}
 ${pluginInstallScript}
 ${clawhubSkillsScript}
-# Configure gateway for Tailscale Serve (BEFORE daemon install so token matches)
-echo "Configuring OpenClaw gateway..."
-sudo -H -u ubuntu \\
-  GATEWAY_TOKEN="\${GATEWAY_TOKEN}" \\
-${Object.entries(config.providerApiKeys).map(([providerKey]) => {
-  const envVar = getProviderEnvVar(providerKey);
-  return `  ${envVar}="\${${envVar}}"`;
-}).join(" \\\n")} \\
-  BRAVE_API_KEY="${braveApiKey ?? ""}" \\
-  AGENT_NAME="${config.envVars?.AGENT_NAME ?? ""}" \\
-  AGENT_EMOJI="${config.envVars?.AGENT_EMOJI ?? ""}"${pluginSecretEnvLine} \\
-  python3 << 'PYTHON_SCRIPT'
-${configPatchScript}
-PYTHON_SCRIPT
 ${preStartHooksScript}
 ${tailscaleProxySection}
-${config.foregroundMode ? `# Run openclaw doctor before starting daemon in foreground
-echo "Running openclaw doctor..."
-sudo -H -u ubuntu bash -c '
-export HOME=/home/ubuntu
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-openclaw doctor --fix --non-interactive || echo "WARNING: openclaw doctor failed"
-'
-
-${postSetupScript}
+${config.foregroundMode ? `${postSetupScript}
 echo "============================================"
 echo "OpenClaw agent setup complete!"
 echo "============================================"
@@ -489,7 +383,7 @@ else
 fi
 
 wait $GW_PID
-'` : `# Install daemon service AFTER config patch so gateway token matches
+'` : `# Install OpenClaw daemon service
 echo "Installing OpenClaw daemon..."
 sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
 export HOME=/home/ubuntu
@@ -499,15 +393,13 @@ export NVM_DIR="$HOME/.nvm"
 openclaw daemon install || echo "WARNING: Daemon install failed. Run openclaw daemon install manually."
 '
 
-# Run openclaw doctor to fix any remaining config issues
-echo "Running openclaw doctor..."
+# Auto-approve pending device pairing (gateway creates a request on first boot)
+echo "Auto-approving device pairing..."
 sudo -H -u ubuntu bash -c '
 export HOME=/home/ubuntu
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-openclaw doctor --fix --non-interactive || echo "WARNING: openclaw doctor failed"
 
-# Auto-approve pending device pairing (gateway creates a request on first boot)
 sleep 2
 if openclaw devices approve --latest --token "\${GATEWAY_TOKEN}" 2>/dev/null; then
   echo "Auto-approved gateway device pairing"

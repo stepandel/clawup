@@ -1,14 +1,28 @@
 /**
  * Tests for provider-aware cloud-init generation.
  *
- * Verifies that generateCloudInit produces correct env var exports
- * for different model providers (Anthropic, OpenAI, Google, OpenRouter).
+ * Verifies that generateCloudInit produces correct .profile exports
+ * and writes the pre-built openclaw.json from providerEnv.
  */
 
 import { describe, it, expect } from "vitest";
 import { generateCloudInit, type CloudInitConfig } from "../cloud-init";
 
+/** Minimal openclaw.json for test fixtures */
+function minimalJson(token: string, env: Record<string, string> = {}): string {
+  return JSON.stringify({
+    gateway: { port: 18789, mode: "local", trustedProxies: ["127.0.0.1"],
+      controlUi: { enabled: true, allowInsecureAuth: true },
+      auth: { mode: "token", token } },
+    env,
+    agents: { defaults: { heartbeat: { every: "1m", session: "main" } } },
+    acp: { defaultAgent: "default" },
+  }, null, 2);
+}
+
 const BASE_CONFIG: CloudInitConfig = {
+  openclawConfigJson: minimalJson("gw-token-test", { ANTHROPIC_API_KEY: "test-api-key" }),
+  providerEnv: { ANTHROPIC_API_KEY: "test-api-key" },
   providerApiKeys: { anthropic: "test-api-key" },
   tailscaleAuthKey: "tskey-auth-test",
   gatewayToken: "gw-token-test",
@@ -18,144 +32,112 @@ const BASE_CONFIG: CloudInitConfig = {
   skipTailscale: true,
 };
 
-describe("generateCloudInit — provider-aware env vars", () => {
-  it("exports ANTHROPIC_API_KEY with auto-detect for anthropic provider (default)", () => {
+describe("generateCloudInit — provider env var exports", () => {
+  it("exports ANTHROPIC_API_KEY from providerEnv to .profile", () => {
     const script = generateCloudInit(BASE_CONFIG);
-    expect(script).toContain("Auto-detect Anthropic credential type");
-    expect(script).toContain('ANTHROPIC_API_KEY=');
-    expect(script).toContain('CLAUDE_CODE_OAUTH_TOKEN=');
-    expect(script).not.toContain("OPENAI_API_KEY");
+    expect(script).toContain('export ANTHROPIC_API_KEY=');
+    expect(script).not.toContain("Auto-detect Anthropic");
   });
 
-  it("exports ANTHROPIC_API_KEY when modelProvider is explicitly 'anthropic'", () => {
-    const script = generateCloudInit({ ...BASE_CONFIG, modelProvider: "anthropic" });
-    expect(script).toContain("Auto-detect Anthropic credential type");
-    expect(script).not.toContain("OPENAI_API_KEY");
-  });
-
-  it("exports OPENAI_API_KEY for openai provider", () => {
+  it("exports CLAUDE_CODE_OAUTH_TOKEN when OAuth key in providerEnv", () => {
     const script = generateCloudInit({
       ...BASE_CONFIG,
-      providerApiKeys: { openai: "sk-test-openai" },
-      modelProvider: "openai",
+      openclawConfigJson: minimalJson("gw-token-test", { CLAUDE_CODE_OAUTH_TOKEN: "sk-ant-oat-test" }),
+      providerEnv: { CLAUDE_CODE_OAUTH_TOKEN: "sk-ant-oat-test" },
+    });
+    expect(script).toContain('export CLAUDE_CODE_OAUTH_TOKEN=');
+    expect(script).not.toContain("ANTHROPIC_API_KEY");
+  });
+
+  it("exports OPENAI_API_KEY for OpenAI provider", () => {
+    const script = generateCloudInit({
+      ...BASE_CONFIG,
+      openclawConfigJson: minimalJson("gw-token-test", { OPENAI_API_KEY: "sk-openai-test" }),
+      providerEnv: { OPENAI_API_KEY: "sk-openai-test" },
+      providerApiKeys: { openai: "sk-openai-test" },
       model: "openai/gpt-4o",
     });
     expect(script).toContain("OPENAI_API_KEY");
-    expect(script).toContain("openai provider");
-    expect(script).not.toContain("Auto-detect Anthropic");
   });
 
-  it("exports GOOGLE_API_KEY for google provider", () => {
+  it("exports GOOGLE_API_KEY for Google provider", () => {
     const script = generateCloudInit({
       ...BASE_CONFIG,
+      openclawConfigJson: minimalJson("gw-token-test", { GOOGLE_API_KEY: "google-test-key" }),
+      providerEnv: { GOOGLE_API_KEY: "google-test-key" },
       providerApiKeys: { google: "google-test-key" },
-      modelProvider: "google",
       model: "google/gemini-2.5-pro",
     });
     expect(script).toContain("GOOGLE_API_KEY");
-    expect(script).toContain("google provider");
-    expect(script).not.toContain("Auto-detect Anthropic");
   });
 
-  it("exports OPENROUTER_API_KEY for openrouter provider", () => {
+  it("exports OPENROUTER_API_KEY for OpenRouter provider", () => {
     const script = generateCloudInit({
       ...BASE_CONFIG,
+      openclawConfigJson: minimalJson("gw-token-test", { OPENROUTER_API_KEY: "sk-or-test" }),
+      providerEnv: { OPENROUTER_API_KEY: "sk-or-test" },
       providerApiKeys: { openrouter: "sk-or-test" },
-      modelProvider: "openrouter",
       model: "openrouter/auto",
     });
     expect(script).toContain("OPENROUTER_API_KEY");
-    expect(script).toContain("openrouter provider");
-    expect(script).not.toContain("Auto-detect Anthropic");
   });
 
-  it("uses anthropic flow when modelProvider is undefined", () => {
-    const config = { ...BASE_CONFIG };
-    delete config.modelProvider;
-    const script = generateCloudInit(config);
-    expect(script).toContain("Auto-detect Anthropic credential type");
-  });
-
-  it("exports env vars for multiple providers (primary + backup)", () => {
+  it("exports multiple provider env vars for multi-provider configs", () => {
     const script = generateCloudInit({
       ...BASE_CONFIG,
+      openclawConfigJson: minimalJson("gw-token-test", {
+        OPENAI_API_KEY: "sk-openai-test",
+        ANTHROPIC_API_KEY: "sk-ant-test",
+      }),
+      providerEnv: { OPENAI_API_KEY: "sk-openai-test", ANTHROPIC_API_KEY: "sk-ant-test" },
       providerApiKeys: { openai: "sk-openai-test", anthropic: "sk-ant-test" },
-      modelProvider: "openai",
       model: "openai/gpt-4o",
-      backupModel: "anthropic/claude-sonnet-4-5",
     });
     expect(script).toContain("OPENAI_API_KEY");
     expect(script).toContain("ANTHROPIC_API_KEY");
   });
+});
 
-  it("works with openai-only deploy (no anthropic key)", () => {
-    const script = generateCloudInit({
-      providerApiKeys: { openai: "sk-openai-test" },
-      tailscaleAuthKey: "tskey-auth-test",
-      gatewayToken: "gw-token-test",
-      model: "openai/gpt-4o",
-      modelProvider: "openai",
-      codingAgent: "claude-code",
-      workspaceFiles: {},
-      skipTailscale: true,
-    });
-    expect(script).toContain("OPENAI_API_KEY");
+describe("generateCloudInit — JSON config writing", () => {
+  it("writes openclaw.json via OPENCLAW_CONFIG heredoc", () => {
+    const script = generateCloudInit(BASE_CONFIG);
+    expect(script).toContain("Writing openclaw.json");
+    expect(script).toContain("OPENCLAW_CONFIG");
+    expect(script).toContain("Created openclaw.json");
+  });
+
+  it("does NOT contain Python heredoc or openclaw onboard", () => {
+    const script = generateCloudInit(BASE_CONFIG);
+    expect(script).not.toContain("PYTHON_SCRIPT");
+    expect(script).not.toContain("python3 <<");
+    expect(script).not.toContain("openclaw onboard");
+    expect(script).not.toContain("openclaw doctor");
+  });
+
+  it("embeds the provided JSON in the heredoc", () => {
+    const script = generateCloudInit(BASE_CONFIG);
+    // The JSON should appear between OPENCLAW_CONFIG heredoc markers
+    const match = script.match(/cat > .*openclaw\.json << 'OPENCLAW_CONFIG'\n([\s\S]*?)\nOPENCLAW_CONFIG/);
+    expect(match).toBeTruthy();
+    const embedded = JSON.parse(match![1]);
+    expect(embedded.gateway.auth.token).toBe("gw-token-test");
+  });
+});
+
+describe("generateCloudInit — no bash-level OAuth or aliasing", () => {
+  it("does not contain bash-level OAuth detection", () => {
+    const script = generateCloudInit(BASE_CONFIG);
+    expect(script).not.toContain("sk-ant-oat");
     expect(script).not.toContain("Auto-detect Anthropic");
   });
 
-  it("creates skeleton config for non-Anthropic providers (no openclaw onboard)", () => {
-    const script = generateCloudInit({
-      providerApiKeys: { openai: "sk-openai-test" },
-      tailscaleAuthKey: "tskey-auth-test",
-      gatewayToken: "gw-token-test",
-      model: "openai/gpt-5.3",
-      modelProvider: "openai",
-      codingAgent: "codex",
-      workspaceFiles: {},
-      skipTailscale: true,
-    });
-    expect(script).toContain("Creating openclaw.json skeleton");
-    expect(script).toContain("openclaw.json");
-    expect(script).not.toContain("openclaw onboard");
-  });
-
-  it("creates skeleton config for anthropic provider (no openclaw onboard)", () => {
-    const script = generateCloudInit(BASE_CONFIG);
-    expect(script).toContain("Creating openclaw.json skeleton");
-    expect(script).not.toContain("openclaw onboard");
-  });
-
-  it("aliases OPENROUTER_API_KEY to OPENAI_API_KEY when codex + openrouter", () => {
+  it("does not contain bash-level Codex aliasing", () => {
     const script = generateCloudInit({
       ...BASE_CONFIG,
+      openclawConfigJson: minimalJson("gw-token-test", { OPENROUTER_API_KEY: "sk-or-test" }),
+      providerEnv: { OPENROUTER_API_KEY: "sk-or-test" },
       providerApiKeys: { openrouter: "sk-or-test" },
-      modelProvider: "openrouter",
-      model: "openrouter/openai/gpt-5.2",
-      codingAgent: "codex",
-    });
-    expect(script).toContain("OPENROUTER_API_KEY");
-    expect(script).toContain('OPENAI_API_KEY=');
-    expect(script).toContain('OPENAI_BASE_URL="https://openrouter.ai/api/v1"');
-    expect(script).toContain("Aliased OPENROUTER_API_KEY -> OPENAI_API_KEY");
-  });
-
-  it("does not alias when claude-code + openrouter", () => {
-    const script = generateCloudInit({
-      ...BASE_CONFIG,
-      providerApiKeys: { openrouter: "sk-or-test" },
-      modelProvider: "openrouter",
       model: "openrouter/auto",
-      codingAgent: "claude-code",
-    });
-    expect(script).not.toContain("Aliased OPENROUTER_API_KEY");
-  });
-
-  it("does not alias when codex + direct openai", () => {
-    const script = generateCloudInit({
-      ...BASE_CONFIG,
-      providerApiKeys: { openai: "sk-openai-test" },
-      modelProvider: "openai",
-      model: "openai/gpt-4o",
       codingAgent: "codex",
     });
     expect(script).not.toContain("Aliased OPENROUTER_API_KEY");

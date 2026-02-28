@@ -302,9 +302,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
     // Generate cloud-init user data
     const userData = buildCloudInitUserData(name, args, gatewayTokenValue, {
       gatewayPort: gatewayPort as number,
-      browserPort: browserPort as number,
       model: model as string,
-      enableSandbox: enableSandbox as boolean,
     });
 
     // Create EC2 instance

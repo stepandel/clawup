@@ -9,7 +9,8 @@ import * as pulumi from "@pulumi/pulumi";
 import * as tls from "@pulumi/tls";
 import * as crypto from "crypto";
 import { generateCloudInit, interpolateCloudInit, compressCloudInit, CloudInitConfig } from "./cloud-init";
-import { getProviderForModel, getProviderEnvVar } from "@clawup/core";
+import { generateFullOpenClawConfig, type PluginEntry } from "./config-generator";
+import { getProviderEnvVar } from "@clawup/core";
 import type { BaseOpenClawAgentArgs } from "./types";
 
 /**
@@ -49,9 +50,7 @@ export function generateKeyPairAndToken(
  */
 export interface CloudInitDefaults {
   gatewayPort?: number;
-  browserPort?: number;
   model?: string;
-  enableSandbox?: boolean;
   createUbuntuUser?: boolean;
   /** Compress output for providers with user_data size limits (e.g., Hetzner 32KB) */
   compress?: boolean;
@@ -66,8 +65,9 @@ export interface CloudInitDefaults {
 /**
  * Build the cloud-init user data script from base agent args.
  *
- * Resolves all Pulumi secrets/outputs, assembles a CloudInitConfig,
- * generates + interpolates the script, and optionally compresses it.
+ * Resolves all Pulumi secrets/outputs, performs OAuth detection,
+ * generates the complete openclaw.json, assembles the cloud-init script,
+ * interpolates secrets, and optionally compresses it.
  */
 export function buildCloudInitUserData(
   name: string,
@@ -106,40 +106,78 @@ export function buildCloudInitUserData(
       return pulumi
         .all([
           pulumi.output(defaults?.gatewayPort ?? args.gatewayPort ?? 18789),
-          pulumi.output(defaults?.browserPort ?? args.browserPort ?? 18791),
           pulumi.output(defaults?.model ?? args.model ?? "anthropic/claude-opus-4-6"),
-          pulumi.output(defaults?.enableSandbox ?? args.enableSandbox ?? true),
         ])
-        .apply(([gatewayPort, browserPort, model, enableSandbox]) => {
+        .apply(([gatewayPort, model]) => {
           const tsHostname = `${pulumi.getStack()}-${name}`;
 
-          // Build additional secrets map from plugin secrets + dep secrets + provider API keys
-          const additionalSecrets: Record<string, string> = {};
-
-          // Add all provider API keys as env var placeholders for interpolation
+          // OAuth detection: determine correct env var for each provider key
+          const providerEnv: Record<string, string> = {};
           for (const [providerKey, value] of Object.entries(resolvedProviderKeys)) {
-            const envVar = getProviderEnvVar(providerKey);
+            if (providerKey === "anthropic" && value.startsWith("sk-ant-oat")) {
+              // OAuth token from Claude Pro/Max subscription
+              providerEnv["CLAUDE_CODE_OAUTH_TOKEN"] = value;
+            } else {
+              const envVar = getProviderEnvVar(providerKey);
+              providerEnv[envVar] = value;
+            }
+          }
+
+          // Build additional secrets map for interpolateCloudInit
+          const additionalSecrets: Record<string, string> = {};
+          for (const [envVar, value] of Object.entries(providerEnv)) {
             additionalSecrets[envVar] = value;
           }
 
+          // Resolve plugin secrets
+          const resolvedSecrets: Record<string, string> = {};
           pluginSecretEntries.forEach(([envVar], idx) => {
-            additionalSecrets[envVar] = remainingSecrets[idx] as string;
+            const value = remainingSecrets[idx] as string;
+            resolvedSecrets[envVar] = value;
+            additionalSecrets[envVar] = value;
           });
+
+          // Resolve dep secrets
           depSecretEntries.forEach(([envVar], idx) => {
             additionalSecrets[envVar] = remainingSecrets[pluginSecretEntries.length + idx] as string;
           });
 
+          // Build plugin entries for config generator
+          const pluginEntries: PluginEntry[] = (args.plugins ?? []).map((p) => ({
+            name: p.name,
+            enabled: true,
+            config: p.config ?? {},
+            secretEnvVars: p.secretEnvVars,
+            configPath: p.configPath,
+            internalKeys: p.internalKeys,
+            configTransforms: p.configTransforms,
+          }));
+
+          // Generate complete openclaw.json
+          const openclawConfig = generateFullOpenClawConfig({
+            gatewayPort: gatewayPort as number,
+            gatewayToken: gwToken,
+            model: model as string,
+            backupModel: args.backupModel as string | undefined,
+            codingAgent: args.codingAgent,
+            plugins: pluginEntries,
+            braveApiKey: additionalSecrets["BRAVE_API_KEY"],
+            agentName: args.envVars?.AGENT_NAME,
+            agentEmoji: args.envVars?.AGENT_EMOJI,
+            providerEnv,
+            resolvedSecrets,
+          });
+          const openclawConfigJson = JSON.stringify(openclawConfig, null, 2);
+
           const cloudInitConfig: CloudInitConfig = {
+            openclawConfigJson,
+            providerEnv,
             providerApiKeys: resolvedProviderKeys,
             tailscaleAuthKey: tsAuthKey,
             gatewayToken: gwToken,
             gatewayPort: gatewayPort as number,
-            browserPort: browserPort as number,
             model: model as string,
-            modelProvider: getProviderForModel(model as string),
-            backupModel: args.backupModel as string | undefined,
             codingAgent: args.codingAgent,
-            enableSandbox: enableSandbox as boolean,
             tailscaleHostname: tsHostname,
             workspaceFiles: args.workspaceFiles,
             envVars: args.envVars,
@@ -152,7 +190,6 @@ export function buildCloudInitUserData(
             enableFunnel: args.enableFunnel,
             clawhubSkills: args.clawhubSkills,
             deps: args.deps,
-            depSecrets: additionalSecrets,
           };
 
           const script = generateCloudInit(cloudInitConfig);

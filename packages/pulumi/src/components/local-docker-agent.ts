@@ -86,7 +86,6 @@ export class LocalDockerOpenClawAgent extends pulumi.ComponentResource {
       foregroundMode: true,
       createUbuntuUser: true,
       compress: false,
-      enableSandbox: false,
     });
 
     // Pull the base image
