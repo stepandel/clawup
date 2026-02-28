@@ -1,154 +1,254 @@
 /**
- * Tests for provider-aware config generation.
+ * Tests for provider-aware provisioner config generation.
  *
- * Verifies that generateConfigPatchBash produces correct bash
- * config patching for different model providers.
+ * Verifies that buildProvisionerConfig produces correct config set commands,
+ * env vars, and onboard flags for different model providers.
  */
 
 import { describe, it, expect } from "vitest";
-import { generateConfigPatchBash, type OpenClawConfigOptions } from "../config-generator";
+import { buildProvisionerConfig, type ConfigSetCommand } from "../provisioner-config";
+import type { CloudInitConfig } from "../cloud-init";
 
-const BASE_OPTIONS: OpenClawConfigOptions = {
+const BASE_CONFIG: CloudInitConfig = {
+  providerApiKeys: { anthropic: "sk-ant-api03-test-key" },
+  tailscaleAuthKey: "tskey-auth-test",
   gatewayToken: "test-gw-token",
   model: "anthropic/claude-opus-4-6",
   codingAgent: "claude-code",
-  plugins: [],
+  workspaceFiles: {},
+  skipTailscale: true,
 };
 
-describe("generateConfigPatchBash — provider-aware config", () => {
-  it("generates Anthropic auto-detect for anthropic/ models", () => {
-    const script = generateConfigPatchBash(BASE_OPTIONS);
-    expect(script).toContain("Anthropic: auto-detect credential type");
-    expect(script).toContain('ANTHROPIC_API_KEY');
-    expect(script).toContain('CLAUDE_CODE_OAUTH_TOKEN');
-    expect(script).toContain('sk-ant-oat');
+/** Helper to find config set commands by key pattern */
+function findCmds(cmds: ConfigSetCommand[], pattern: string): ConfigSetCommand[] {
+  return cmds.filter((c) => c.key.includes(pattern));
+}
+
+describe("buildProvisionerConfig — provider-aware config", () => {
+  it("sets Anthropic API key env var for anthropic/ models", () => {
+    const config = buildProvisionerConfig(BASE_CONFIG);
+    const envCmds = findCmds(config.configSetCommands, "env.ANTHROPIC_API_KEY");
+    expect(envCmds.length).toBe(1);
+    expect(envCmds[0].value).toBe("sk-ant-api03-test-key");
   });
 
-  it("generates OpenAI env var config for openai/ models", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+  it("detects Anthropic OAuth token (sk-ant-oat prefix)", () => {
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { anthropic: "sk-ant-oat-subscription-token" },
+    });
+    const oauthCmds = findCmds(config.configSetCommands, "env.CLAUDE_CODE_OAUTH_TOKEN");
+    expect(oauthCmds.length).toBe(1);
+    expect(oauthCmds[0].value).toBe("sk-ant-oat-subscription-token");
+
+    // Should NOT have ANTHROPIC_API_KEY
+    const apiKeyCmds = findCmds(config.configSetCommands, "env.ANTHROPIC_API_KEY");
+    expect(apiKeyCmds.length).toBe(0);
+
+    // Profile env should also use CLAUDE_CODE_OAUTH_TOKEN
+    expect(config.profileEnvVars["CLAUDE_CODE_OAUTH_TOKEN"]).toBe("sk-ant-oat-subscription-token");
+    expect(config.profileEnvVars["ANTHROPIC_API_KEY"]).toBeUndefined();
+  });
+
+  it("sets OpenAI env var for openai/ models", () => {
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openai: "sk-openai-test" },
+      modelProvider: "openai",
       model: "openai/gpt-4o",
     });
-    expect(script).toContain("OpenAI: set provider API key env var");
-    expect(script).toContain('OPENAI_API_KEY');
-    expect(script).not.toContain("auto-detect credential type");
+    const envCmds = findCmds(config.configSetCommands, "env.OPENAI_API_KEY");
+    expect(envCmds.length).toBe(1);
+    expect(envCmds[0].value).toBe("sk-openai-test");
+
+    // Should NOT have Anthropic env
+    expect(findCmds(config.configSetCommands, "env.ANTHROPIC_API_KEY").length).toBe(0);
   });
 
-  it("generates Google env var config for google/ models", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+  it("sets Google env var for google/ models", () => {
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { google: "google-test-key" },
+      modelProvider: "google",
       model: "google/gemini-2.5-pro",
     });
-    expect(script).toContain("Google Gemini: set provider API key env var");
-    expect(script).toContain('GOOGLE_API_KEY');
+    const envCmds = findCmds(config.configSetCommands, "env.GOOGLE_API_KEY");
+    expect(envCmds.length).toBe(1);
+    expect(envCmds[0].value).toBe("google-test-key");
   });
 
-  it("generates OpenRouter env var config for openrouter/ models", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+  it("sets OpenRouter env var for openrouter/ models", () => {
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openrouter: "sk-or-test" },
+      modelProvider: "openrouter",
       model: "openrouter/openai/gpt-4o",
     });
-    expect(script).toContain("OpenRouter: set provider API key env var");
-    expect(script).toContain('OPENROUTER_API_KEY');
-  });
-
-  it("throws on unknown provider model prefix", () => {
-    expect(() =>
-      generateConfigPatchBash({
-        ...BASE_OPTIONS,
-        model: "mistral/large",
-      })
-    ).toThrow(/Unknown model provider "mistral"/);
+    const envCmds = findCmds(config.configSetCommands, "env.OPENROUTER_API_KEY");
+    expect(envCmds.length).toBe(1);
+    expect(envCmds[0].value).toBe("sk-or-test");
   });
 
   it("sets correct model in config for non-Anthropic providers", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openai: "sk-openai-test" },
+      modelProvider: "openai",
       model: "openai/o3",
     });
-    expect(script).toContain('"openai/o3"');
+    const modelCmds = config.configSetCommands.filter(
+      (c) => c.type === "models_set" || c.key === "agents.defaults.model",
+    );
+    expect(modelCmds.length).toBe(1);
+    expect(modelCmds[0].value).toBe("openai/o3");
   });
 
-  it("handles backup model with same provider", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+  it("handles backup model with same provider (no duplicate env)", () => {
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openai: "sk-openai-test" },
+      modelProvider: "openai",
       model: "openai/gpt-4o",
       backupModel: "openai/o4-mini",
     });
-    expect(script).toContain('"openai/gpt-4o"');
-    expect(script).toContain('"openai/o4-mini"');
-    expect(script).toContain('OPENAI_API_KEY');
+
+    // Model should use primary+fallbacks format
+    const modelCmd = config.configSetCommands.find(
+      (c) => c.key === "agents.defaults.model",
+    );
+    expect(modelCmd).toBeTruthy();
+    expect(modelCmd!.value).toEqual({
+      primary: "openai/gpt-4o",
+      fallbacks: ["openai/o4-mini"],
+    });
+
+    // Only one OPENAI_API_KEY env
+    const envCmds = findCmds(config.configSetCommands, "env.OPENAI_API_KEY");
+    expect(envCmds.length).toBe(1);
   });
 
   it("handles backup model with different provider (cross-provider fallback)", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openai: "sk-openai-test", anthropic: "sk-ant-test" },
+      modelProvider: "openai",
       model: "openai/gpt-4o",
       backupModel: "anthropic/claude-sonnet-4-5",
     });
-    expect(script).toContain('"openai/gpt-4o"');
-    expect(script).toContain('"anthropic/claude-sonnet-4-5"');
-    expect(script).toContain('OPENAI_API_KEY');
-    // Should also set ANTHROPIC_API_KEY for the backup provider
-    expect(script).toContain('ANTHROPIC_API_KEY');
-    expect(script).toContain("Backup model provider");
+
+    // Both provider env vars should be set
+    expect(findCmds(config.configSetCommands, "env.OPENAI_API_KEY").length).toBe(1);
+    expect(findCmds(config.configSetCommands, "env.ANTHROPIC_API_KEY").length).toBeGreaterThanOrEqual(1);
+
+    // Model should have fallbacks
+    const modelCmd = config.configSetCommands.find(
+      (c) => c.key === "agents.defaults.model",
+    );
+    expect(modelCmd!.value).toEqual({
+      primary: "openai/gpt-4o",
+      fallbacks: ["anthropic/claude-sonnet-4-5"],
+    });
   });
 
   it("does not add backup provider section when same as primary", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
-      model: "anthropic/claude-opus-4-6",
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
       backupModel: "anthropic/claude-sonnet-4-5",
     });
-    expect(script).not.toContain("Backup model provider");
+    // Should NOT have a "Backup model provider" comment
+    const backupCmds = config.configSetCommands.filter(
+      (c) => c.comment?.includes("Backup model provider"),
+    );
+    expect(backupCmds.length).toBe(0);
   });
 });
 
-describe("generateConfigPatchBash — Codex coding agent", () => {
+describe("buildProvisionerConfig — Codex coding agent", () => {
   it("includes Codex CLI backend config", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
       codingAgent: "codex",
     });
-    expect(script).toContain('"codex"');
-    expect(script).toContain("exec");
-    expect(script).toContain("full-auto");
+    const backendCmd = config.configSetCommands.find(
+      (c) => c.key === "agents.defaults.cliBackends",
+    );
+    expect(backendCmd).toBeTruthy();
+    expect(backendCmd!.comment).toContain("codex");
+
+    // Codex backend should have command=codex and args containing exec, full-auto
+    const backends = backendCmd!.value as Record<string, Record<string, unknown>>;
+    const claudeCli = backends["claude-cli"];
+    expect(claudeCli).toBeTruthy();
+    expect(claudeCli.command).toBe("codex");
+    expect(claudeCli.args).toContain("exec");
+    expect(claudeCli.args).toContain("--full-auto");
   });
 
   it("includes Claude Code CLI backend config (default)", () => {
-    const script = generateConfigPatchBash(BASE_OPTIONS);
-    expect(script).toContain('"claude"');
-    expect(script).toContain("code");
+    const config = buildProvisionerConfig(BASE_CONFIG);
+    const backendCmd = config.configSetCommands.find(
+      (c) => c.key === "agents.defaults.cliBackends",
+    );
+    expect(backendCmd).toBeTruthy();
+    expect(backendCmd!.comment).toContain("claude-code");
+
+    const backends = backendCmd!.value as Record<string, Record<string, unknown>>;
+    const claudeCli = backends["claude-cli"];
+    expect(claudeCli).toBeTruthy();
+    expect(claudeCli.command).toBe("claude");
   });
 
   it("aliases OPENROUTER_API_KEY to OPENAI_API_KEY when codex + openrouter", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openrouter: "sk-or-test" },
+      modelProvider: "openrouter",
       model: "openrouter/openai/gpt-5.2",
       codingAgent: "codex",
     });
-    expect(script).toContain('OPENROUTER_API_KEY');
-    expect(script).toContain('openclaw config set env.OPENAI_API_KEY');
-    expect(script).toContain('openclaw config set env.OPENAI_BASE_URL');
-    expect(script).toContain("https://openrouter.ai/api/v1");
-    expect(script).toContain("Aliased OPENROUTER_API_KEY -> OPENAI_API_KEY");
+
+    // Should have OPENAI_API_KEY aliased from OPENROUTER
+    const aliasCmds = config.configSetCommands.filter(
+      (c) => c.key === "env.OPENAI_API_KEY" && c.comment?.includes("Aliased"),
+    );
+    expect(aliasCmds.length).toBe(1);
+    expect(aliasCmds[0].value).toBe("sk-or-test");
+
+    // Should have OPENAI_BASE_URL
+    const baseCmds = findCmds(config.configSetCommands, "env.OPENAI_BASE_URL");
+    expect(baseCmds.length).toBe(1);
+    expect(baseCmds[0].value).toBe("https://openrouter.ai/api/v1");
+
+    // Profile env vars should also have the alias
+    expect(config.profileEnvVars["OPENAI_API_KEY"]).toBe("sk-or-test");
+    expect(config.profileEnvVars["OPENAI_BASE_URL"]).toBe("https://openrouter.ai/api/v1");
   });
 
   it("does not alias OPENAI_API_KEY when codex + direct openai", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openai: "sk-openai-test" },
+      modelProvider: "openai",
       model: "openai/gpt-4o",
       codingAgent: "codex",
     });
-    expect(script).not.toContain("Aliased OPENROUTER_API_KEY");
+    const aliasCmds = config.configSetCommands.filter(
+      (c) => c.comment?.includes("Aliased OPENROUTER"),
+    );
+    expect(aliasCmds.length).toBe(0);
   });
 
   it("does not alias OPENAI_API_KEY when claude-code + openrouter", () => {
-    const script = generateConfigPatchBash({
-      ...BASE_OPTIONS,
+    const config = buildProvisionerConfig({
+      ...BASE_CONFIG,
+      providerApiKeys: { openrouter: "sk-or-test" },
+      modelProvider: "openrouter",
       model: "openrouter/openai/gpt-4o",
       codingAgent: "claude-code",
     });
-    expect(script).not.toContain("Aliased OPENROUTER_API_KEY");
+    const aliasCmds = config.configSetCommands.filter(
+      (c) => c.comment?.includes("Aliased OPENROUTER"),
+    );
+    expect(aliasCmds.length).toBe(0);
   });
 });

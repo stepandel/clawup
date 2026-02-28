@@ -8,7 +8,7 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as tls from "@pulumi/tls";
 import * as crypto from "crypto";
-import { generateCloudInit, interpolateCloudInit, compressCloudInit, CloudInitConfig } from "./cloud-init";
+import { generateCloudInit, compressCloudInit, CloudInitConfig } from "./cloud-init";
 import { getProviderForModel, getProviderEnvVar } from "@clawup/core";
 import type { BaseOpenClawAgentArgs } from "./types";
 
@@ -155,14 +155,10 @@ export function buildCloudInitUserData(
             depSecrets: additionalSecrets,
           };
 
+          // Secrets are now embedded directly in the provisioner JSON config.
+          // No interpolation pass needed — generateCloudInit bakes them in.
           const script = generateCloudInit(cloudInitConfig);
-          const interpolated = interpolateCloudInit(script, {
-            tailscaleAuthKey: tsAuthKey,
-            gatewayToken: gwToken,
-            additionalSecrets,
-          });
-
-          return defaults?.compress ? compressCloudInit(interpolated) : interpolated;
+          return defaults?.compress ? compressCloudInit(script) : script;
         });
     });
 }
