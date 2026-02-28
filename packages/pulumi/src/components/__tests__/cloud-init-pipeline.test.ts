@@ -82,12 +82,11 @@ function generateScript(config: CloudInitConfig): string {
   return generateCloudInit(config);
 }
 
-/** Decode the CONFIG_B64 blob from a generated script */
+/** Extract the CONFIG_JSON heredoc from a generated script */
 function extractConfigJson(script: string): ProvisionerConfig {
-  const match = script.match(/CONFIG_B64="([^"]+)"/);
-  expect(match, "Expected CONFIG_B64 in script").toBeTruthy();
-  const json = Buffer.from(match![1], "base64").toString("utf-8");
-  return JSON.parse(json);
+  const match = script.match(/cat <<'__CLAWUP_CONFIG__'\n([\s\S]*?)\n__CLAWUP_CONFIG__/);
+  expect(match, "Expected __CLAWUP_CONFIG__ heredoc in script").toBeTruthy();
+  return JSON.parse(match![1]);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,10 +94,10 @@ function extractConfigJson(script: string): ProvisionerConfig {
 // ---------------------------------------------------------------------------
 
 describe("cloud-init pipeline — provisioner template structure", () => {
-  it("generates a bash script with CONFIG_B64 and phase functions", () => {
+  it("generates a bash script with heredoc config and phase functions", () => {
     const script = generateScript(ANTHROPIC_CLOUD);
     expect(script).toContain("#!/bin/bash");
-    expect(script).toContain("CONFIG_B64=");
+    expect(script).toContain("__CLAWUP_CONFIG__");
     expect(script).toContain("phase_system");
     expect(script).toContain("phase_onboard");
     expect(script).toContain("phase_config");
@@ -107,7 +106,7 @@ describe("cloud-init pipeline — provisioner template structure", () => {
     expect(script).toContain("run_as_ubuntu()");
   });
 
-  it("embeds valid JSON config in CONFIG_B64", () => {
+  it("embeds valid JSON config in heredoc", () => {
     const script = generateScript(ANTHROPIC_CLOUD);
     const config = extractConfigJson(script);
     expect(config.gatewayPort).toBe(18789);

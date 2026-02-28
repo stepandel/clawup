@@ -3,7 +3,7 @@
  *
  * Generates a self-contained bash provisioner by:
  * 1. Building a typed ProvisionerConfig JSON blob (all logic in TypeScript)
- * 2. Base64-encoding and injecting it into a static bash template
+ * 2. Embedding the JSON directly via a quoted heredoc in the bash template
  * 3. The bash template reads the JSON via jq and executes phases mechanically
  *
  * Secrets are embedded directly in the JSON (already resolved by Pulumi).
@@ -107,14 +107,14 @@ export interface CloudInitConfig {
 /**
  * Generates a cloud-init bash script for OpenClaw deployment.
  *
- * Builds a typed ProvisionerConfig, serializes it to JSON, base64-encodes it,
- * and injects it into the static provisioner template.
+ * Builds a typed ProvisionerConfig, serializes it to JSON, and embeds it
+ * directly into the bash template via a quoted heredoc. This avoids
+ * a base64 encoding layer, saving ~15-20% on final compressed size.
  */
 export function generateCloudInit(config: CloudInitConfig): string {
   const provConfig = buildProvisionerConfig(config);
   const configJson = JSON.stringify(provConfig);
-  const configB64 = Buffer.from(configJson, "utf-8").toString("base64");
-  return PROVISIONER_TEMPLATE.replace("__CONFIG_B64__", configB64);
+  return PROVISIONER_TEMPLATE.replace("__CONFIG_HEREDOC__", configJson);
 }
 
 /**

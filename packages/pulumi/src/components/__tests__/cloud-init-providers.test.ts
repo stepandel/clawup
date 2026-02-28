@@ -20,12 +20,11 @@ const BASE_CONFIG: CloudInitConfig = {
   skipTailscale: true,
 };
 
-/** Decode the CONFIG_B64 blob from a generated script */
+/** Extract the CONFIG_JSON heredoc from a generated script */
 function extractConfigJson(script: string): ProvisionerConfig {
-  const match = script.match(/CONFIG_B64="([^"]+)"/);
-  expect(match, "Expected CONFIG_B64 in script").toBeTruthy();
-  const json = Buffer.from(match![1], "base64").toString("utf-8");
-  return JSON.parse(json);
+  const match = script.match(/cat <<'__CLAWUP_CONFIG__'\n([\s\S]*?)\n__CLAWUP_CONFIG__/);
+  expect(match, "Expected __CLAWUP_CONFIG__ heredoc in script").toBeTruthy();
+  return JSON.parse(match![1]);
 }
 
 /** Find config set commands matching a key pattern */

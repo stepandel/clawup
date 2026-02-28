@@ -1,8 +1,8 @@
 /**
  * Static bash provisioner template.
  *
- * This is a self-contained bash script with one placeholder: __CONFIG_B64__
- * which gets replaced with a base64-encoded JSON config blob at build time.
+ * This is a self-contained bash script with one placeholder: __CONFIG_HEREDOC__
+ * which gets replaced with a raw JSON config blob embedded via a quoted heredoc.
  *
  * The bash reads the JSON via jq and executes provisioning phases mechanically.
  * All decision-making logic lives in provisioner-config.ts (TypeScript).
@@ -18,8 +18,10 @@ export DEBIAN_FRONTEND=noninteractive
 # ============================================
 
 # ===== CONFIG =====
-CONFIG_B64="__CONFIG_B64__"
-CONFIG_JSON=$(echo "$CONFIG_B64" | base64 -d)
+CONFIG_JSON=$(cat <<'__CLAWUP_CONFIG__'
+__CONFIG_HEREDOC__
+__CLAWUP_CONFIG__
+)
 
 # ===== HELPERS =====
 cfg()     { echo "$CONFIG_JSON" | jq -r "$1"; }
