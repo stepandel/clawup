@@ -3,6 +3,8 @@
  *
  * Similar to DEP_REGISTRY but for coding agent CLIs (Claude Code, Codex, Amp, etc.)
  * that OpenClaw uses as its backend for AI-assisted coding sessions.
+ *
+ * Install scripts run as the `openclaw` user. Node.js is on PATH via Nix (no NVM).
  */
 
 export interface CodingAgentSecret {
@@ -15,7 +17,7 @@ export interface CodingAgentSecret {
 export interface CodingAgentEntry {
   /** Human-readable display name */
   displayName: string;
-  /** Bash script to install the coding agent CLI (runs as ubuntu user via sudo) */
+  /** Bash script to install the coding agent CLI (runs as openclaw user) */
   installScript: string;
   /**
    * Bash script to configure the agent's default model.
@@ -47,9 +49,9 @@ export const CODING_AGENT_REGISTRY: Record<string, CodingAgentEntry> = {
       ClaudeCodeOAuthToken: { envVar: "CLAUDE_CODE_OAUTH_TOKEN", scope: "agent" },
     },
     installScript: `
-# Install Claude Code CLI for ubuntu user
+# Install Claude Code CLI
 echo "Installing Claude Code..."
-sudo -u ubuntu bash << 'CLAUDE_CODE_INSTALL_SCRIPT' || echo "WARNING: Claude Code installation failed. Install manually with: curl -fsSL https://claude.ai/install.sh | bash"
+sudo -u openclaw bash << 'CLAUDE_CODE_INSTALL_SCRIPT' || echo "WARNING: Claude Code installation failed. Install manually with: curl -fsSL https://claude.ai/install.sh | bash"
 set -e
 cd ~
 
@@ -72,7 +74,7 @@ fi
 CLAUDE_CODE_INSTALL_SCRIPT`.trim(),
     configureModelScript: `
 # Configure Claude Code default model
-sudo -u ubuntu bash -c '
+sudo -u openclaw bash -c '
 mkdir -p ~/.claude
 echo '"'"'{"model":"\${MODEL}","fastMode":true}'"'"' > ~/.claude/settings.json
 echo "Claude Code default model set to \${MODEL} (fast mode)"
@@ -91,20 +93,16 @@ echo "Claude Code default model set to \${MODEL} (fast mode)"
   codex: {
     displayName: "Codex (OpenAI)",
     installScript: `
-# Install Codex CLI for ubuntu user
+# Install Codex CLI
 echo "Installing Codex CLI..."
-sudo -u ubuntu bash << 'CODEX_INSTALL_SCRIPT' || echo "WARNING: Codex installation failed. Install manually with: npm install -g @openai/codex"
+sudo -u openclaw bash << 'CODEX_INSTALL_SCRIPT' || echo "WARNING: Codex installation failed. Install manually with: npm install -g @openai/codex"
 set -e
 cd ~
 
-# Source NVM for npm access
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-
-# Install Codex via npm
+# Install Codex via npm (Node.js on PATH via Nix)
 npm install -g @openai/codex
 
-# Symlink to .local/bin so codex is available without sourcing NVM
+# Symlink to .local/bin for PATH consistency
 mkdir -p "$HOME/.local/bin"
 CODEX_BIN=$(command -v codex 2>/dev/null || true)
 if [ -n "$CODEX_BIN" ]; then
@@ -117,7 +115,7 @@ fi
 CODEX_INSTALL_SCRIPT`.trim(),
     configureModelScript: `
 # Configure Codex default model
-sudo -u ubuntu bash -c '
+sudo -u openclaw bash -c '
 mkdir -p ~/.codex
 cat > ~/.codex/config.toml << CODEX_CONFIG
 model = "\${MODEL}"

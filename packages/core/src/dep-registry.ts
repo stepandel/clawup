@@ -3,6 +3,9 @@
  *
  * Similar to PLUGIN_REGISTRY but for system-level tools (gh, brave-search, etc.)
  * that agents need but that aren't OpenClaw plugins.
+ *
+ * Install scripts are empty — tools are baked into the NixOS image.
+ * Post-install scripts handle auth/config and run as the `openclaw` user.
  */
 
 export interface DepSecret {
@@ -17,9 +20,9 @@ export interface DepSecret {
 export interface DepRegistryEntry {
   /** Human-readable name for display */
   displayName: string;
-  /** Bash script to install the dep (runs as root in cloud-init). Empty string = no install needed. */
+  /** Bash script to install the dep (empty — tools are baked into the NixOS image) */
   installScript: string;
-  /** Bash script to run after install for auth/config (runs as ubuntu user).
+  /** Bash script to run after install for auth/config (runs as openclaw user).
    *  Can reference ${ENV_VAR} placeholders. Empty string = no post-install. */
   postInstallScript: string;
   /** Secret env vars this dep needs. Key = config key suffix, value = env var details. */
@@ -29,17 +32,7 @@ export interface DepRegistryEntry {
 export const DEP_REGISTRY: Record<string, DepRegistryEntry> = {
   gh: {
     displayName: "GitHub CLI",
-    installScript: `
-# Install GitHub CLI
-echo "Installing GitHub CLI..."
-type -p curl >/dev/null || apt-get install -y curl
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-apt-get update
-apt-get install -y gh
-echo "GitHub CLI installed: $(gh --version | head -n1)"
-`,
+    installScript: "",  // gh is baked into the NixOS image
     postInstallScript: `
 if echo "\${GITHUB_TOKEN}" | gh auth login --with-token 2>&1; then
   gh auth setup-git
@@ -65,7 +58,7 @@ fi
       BraveApiKey: {
         envVar: "BRAVE_API_KEY",
         scope: "global",
-        checkCommand: `python3 -c "import json,sys;c=json.load(open('/home/ubuntu/.openclaw/openclaw.json'));sys.exit(0 if c.get('tools',{}).get('web',{}).get('search',{}).get('apiKey') else 1)"`,
+        checkCommand: `jq -e '.tools.web.search.apiKey // empty' /home/openclaw/.openclaw/openclaw.json > /dev/null 2>&1`,
       },
     },
   },

@@ -1,12 +1,12 @@
 /**
  * HetznerOpenClaw Agent - Reusable Pulumi ComponentResource
- * Provisions a single OpenClaw agent on Hetzner Cloud
+ * Provisions a single OpenClaw agent on Hetzner Cloud using a pre-built NixOS image
  */
 
 import * as pulumi from "@pulumi/pulumi";
 import * as hcloud from "@pulumi/hcloud";
 import type { BaseOpenClawAgentArgs } from "./types";
-import { generateKeyPairAndToken, buildCloudInitUserData } from "./shared";
+import { generateKeyPairAndToken, buildNixCloudInitUserData } from "./shared";
 
 /**
  * Arguments for creating a Hetzner OpenClaw Agent
@@ -23,6 +23,9 @@ export interface HetznerOpenClawAgentArgs extends BaseOpenClawAgentArgs {
    * Options: nbg1, fsn1, hel1, ash, hil
    */
   location?: pulumi.Input<string>;
+
+  /** Pre-built NixOS image ID or name on Hetzner */
+  imageId: pulumi.Input<string>;
 
   /**
    * Allowed SSH source IPs (optional)
@@ -41,14 +44,14 @@ export interface HetznerOpenClawAgentArgs extends BaseOpenClawAgentArgs {
  * Provisions a complete OpenClaw agent on Hetzner Cloud including:
  * - SSH key for access
  * - Firewall allowing only SSH inbound
- * - Server with Ubuntu 24.04
- * - Docker, Node.js 22, and OpenClaw installation
+ * - Server with pre-built NixOS image
  * - Tailscale for secure HTTPS access
- * - Systemd service for auto-start
+ * - Minimal cloud-init (config + secrets only)
  *
  * @example
  * ```typescript
  * const agent = new HetznerOpenClawAgent("my-agent", {
+ *   imageId: config.require("imageId"),
  *   providerApiKeys: { anthropic: config.requireSecret("anthropicApiKey") },
  *   tailscaleAuthKey: config.requireSecret("tailscaleAuthKey"),
  *   tailnetDnsName: config.require("tailnetDnsName"),
@@ -132,9 +135,8 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
       defaultResourceOptions
     );
 
-    // Generate cloud-init user data (compressed for Hetzner's 32KB limit)
-    const userData = buildCloudInitUserData(name, args, gatewayTokenValue, {
-      createUbuntuUser: true,
+    // Generate NixOS cloud-init (compressed for Hetzner's 32KB limit)
+    const userData = buildNixCloudInitUserData(name, args, gatewayTokenValue, {
       compress: true,
     });
 
@@ -143,7 +145,7 @@ export class HetznerOpenClawAgent extends pulumi.ComponentResource {
       `${name}-server`,
       {
         serverType: serverType,
-        image: "ubuntu-24.04",
+        image: args.imageId,
         location: location,
         sshKeys: [hcloudSshKey.id],
         firewallIds: [firewall.id.apply((id) => parseInt(id, 10))],

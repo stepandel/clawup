@@ -67,11 +67,9 @@ function runDockerCheck(
   containerName: string,
   command: string,
 ): { ok: boolean; output: string } {
-  // Run as ubuntu user (-u) to match SSH behavior (gh auth, NVM, etc.)
-  // Source NVM so Node.js-based CLIs (codex, etc.) can find `node`
-  const nvmPreamble = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; ';
-  // Escape $ so the host shell passes them through to the container's bash
-  const escaped = (nvmPreamble + command).replace(/"/g, '\\"').replace(/\$/g, '\\$');
+  // Run as openclaw user (-u) to match SSH behavior (gh auth, etc.)
+  // Node.js is on PATH via Nix — no NVM sourcing needed
+  const escaped = command.replace(/"/g, '\\"').replace(/\$/g, '\\$');
   const result = exec.capture("docker", [
     "exec", "-u", SSH_USER, containerName, "bash", "-c", `"${escaped}"`,
   ]);
@@ -195,7 +193,7 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
       // Check 2: OpenClaw gateway running
       const gatewayCmd = isLocal
         ? "pgrep -f 'openclaw' > /dev/null && echo active || echo inactive"
-        : "systemctl --user is-active openclaw-gateway";
+        : "systemctl is-active openclaw-gateway";
       const gateway = runCheck(gatewayCmd);
       const gatewayRunning = gateway.ok && (isLocal ? gateway.output.trim().includes("active") : true);
       checks.push({
@@ -315,11 +313,11 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
           for (const [key, secret] of Object.entries(pluginManifest.secrets)) {
             // Skip internal keys — they're intermediate values not written to plugin config
             if (internalKeys.has(key)) continue;
-            const pyPath = pluginManifest.configPath === "channels"
-              ? `c.get('channels',{}).get('${plugin}',{}).get('${key}')`
-              : `c.get('plugins',{}).get('entries',{}).get('${plugin}',{}).get('config',{}).get('${key}')`;
+            const jqPath = pluginManifest.configPath === "channels"
+              ? `.channels["${plugin}"]["${key}"]`
+              : `.plugins.entries["${plugin}"].config["${key}"]`;
             const secretCheck = runCheck(
-              `python3 -c "import json,sys;c=json.load(open('/home/${SSH_USER}/.openclaw/openclaw.json'));sys.exit(0 if ${pyPath} else 1)"`
+              `jq -e '${jqPath} // empty' /home/${SSH_USER}/.openclaw/openclaw.json > /dev/null 2>&1`
             );
             checks.push({
               name: `${plugin} secret (${secret.envVar})`,

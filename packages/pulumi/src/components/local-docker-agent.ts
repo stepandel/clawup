@@ -1,22 +1,17 @@
 /**
  * LocalDockerOpenClaw Agent - Reusable Pulumi ComponentResource
- * Provisions a single OpenClaw agent in a local Docker container (for testing)
+ * Provisions a single OpenClaw agent in a local Docker container using the pre-built Nix image
  */
 
 import * as pulumi from "@pulumi/pulumi";
 import * as docker from "@pulumi/docker";
 import type { BaseOpenClawAgentArgs } from "./types";
-import { generateKeyPairAndToken, buildCloudInitUserData } from "./shared";
+import { generateKeyPairAndToken, buildNixEntrypoint } from "./shared";
 
 /**
  * Arguments for creating a Local Docker OpenClaw Agent
  */
 export interface LocalDockerOpenClawAgentArgs extends BaseOpenClawAgentArgs {
-  /**
-   * Docker image to use (default: ubuntu:24.04)
-   */
-  image?: string;
-
   /**
    * Host port to map the gateway to (required)
    * Each agent needs a unique port.
@@ -25,16 +20,22 @@ export interface LocalDockerOpenClawAgentArgs extends BaseOpenClawAgentArgs {
 
   /** Additional labels to apply to the container */
   labels?: Record<string, string>;
+
+  /**
+   * Name of the Nix-built Docker image (default: "clawup-openclaw:latest").
+   * Build with: `nix build .#docker-image && docker load < result`
+   */
+  imageName?: string;
 }
 
 /**
  * LocalDockerOpenClaw Agent ComponentResource
  *
  * Provisions an OpenClaw agent in a local Docker container:
- * - Uses same cloud-init script as cloud providers
+ * - Uses pre-built Nix Docker image + minimal entrypoint
  * - Skips Docker-in-Docker and Tailscale
  * - Maps gateway port to host for direct access
- * - Runs daemon in foreground to keep container alive
+ * - Runs gateway in foreground to keep container alive
  *
  * @example
  * ```typescript
@@ -73,47 +74,38 @@ export class LocalDockerOpenClawAgent extends pulumi.ComponentResource {
 
     const defaultResourceOptions: pulumi.ResourceOptions = { parent: this };
 
-    const image = args.image ?? "ubuntu:24.04";
     const baseLabels = args.labels ?? {};
 
     // Generate SSH key pair + gateway token (reuse shared helper)
     const { sshKey, gatewayTokenValue } = generateKeyPairAndToken(name, defaultResourceOptions);
 
-    // Build cloud-init user data (no compression, no Docker, no Tailscale, foreground mode)
-    const userData = buildCloudInitUserData(name, args, gatewayTokenValue, {
-      skipDocker: true,
-      skipTailscale: true,
-      foregroundMode: true,
-      createUbuntuUser: true,
-      compress: false,
-      enableSandbox: false,
-    });
-
-    // Pull the base image
-    const remoteImage = new docker.RemoteImage(
-      `${name}-image`,
-      { name: image },
-      defaultResourceOptions
-    );
-
     // Resolve the gateway port
     const hostPort = pulumi.output(args.gatewayPort);
     const containerGatewayPort = 18789;
 
-    // Create the container
-    // The cloud-init script is passed as a base64-encoded env var and decoded+executed as the entrypoint
+    const containerLabels = Object.entries({
+      ...baseLabels,
+      "clawup.project": "clawup",
+      "clawup.stack": pulumi.getStack(),
+      "clawup.agent": name,
+    }).map(([label, value]) => ({ label, value }));
+
+    // Use pre-built Nix image + minimal entrypoint
+    const nixImage = args.imageName ?? "clawup-openclaw:latest";
+    const entrypoint = buildNixEntrypoint(name, args, gatewayTokenValue);
+
+    // No docker.RemoteImage needed — image is loaded locally via `docker load`
     const container = new docker.Container(
       `${name}-container`,
       {
         name: `clawup-${pulumi.getStack()}-${name}`,
-        image: remoteImage.imageId,
-        // Decode the cloud-init script from env var and execute it
+        image: nixImage,
         entrypoints: ["/bin/bash", "-c"],
-        command: ["echo $CLOUDINIT_SCRIPT | base64 -d | bash"],
+        command: ["echo $ENTRYPOINT_SCRIPT | base64 -d | bash"],
         envs: [
-          userData.apply((script) => {
-            const encoded = Buffer.from(script).toString("base64");
-            return `CLOUDINIT_SCRIPT=${encoded}`;
+          entrypoint.apply((s) => {
+            const encoded = Buffer.from(s).toString("base64");
+            return `ENTRYPOINT_SCRIPT=${encoded}`;
           }),
         ],
         ports: [
@@ -122,15 +114,10 @@ export class LocalDockerOpenClawAgent extends pulumi.ComponentResource {
             external: hostPort,
           },
         ],
-        labels: Object.entries({
-          ...baseLabels,
-          "clawup.project": "clawup",
-          "clawup.stack": pulumi.getStack(),
-          "clawup.agent": name,
-        }).map(([label, value]) => ({ label, value })),
+        labels: containerLabels,
         mustRun: true,
       },
-      defaultResourceOptions
+      defaultResourceOptions,
     );
 
     // Set outputs
