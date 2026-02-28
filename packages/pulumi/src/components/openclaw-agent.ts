@@ -1,13 +1,13 @@
 /**
  * OpenClaw Agent - Reusable Pulumi ComponentResource
- * Provisions a single OpenClaw agent on AWS EC2
+ * Provisions a single OpenClaw agent on AWS EC2 using a pre-built NixOS AMI
  */
 
 import * as pulumi from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 import * as zlib from "zlib";
 import type { BaseOpenClawAgentArgs } from "./types";
-import { generateKeyPairAndToken, buildCloudInitUserData } from "./shared";
+import { generateKeyPairAndToken, buildNixCloudInitUserData } from "./shared";
 
 /**
  * Arguments for creating an OpenClaw Agent
@@ -18,6 +18,9 @@ export interface OpenClawAgentArgs extends BaseOpenClawAgentArgs {
    * WARNING: Do not use t3.micro - 1GB memory is insufficient
    */
   instanceType?: pulumi.Input<string>;
+
+  /** Pre-built NixOS AMI ID */
+  amiId: pulumi.Input<string>;
 
   /** Existing VPC ID. If not provided, creates a new VPC */
   vpcId?: pulumi.Input<string>;
@@ -76,14 +79,14 @@ export interface OpenClawAgentOutputs {
  *
  * Provisions a complete OpenClaw agent on AWS EC2 including:
  * - VPC, subnet, and security group (or uses existing)
- * - EC2 instance with Ubuntu 24.04
- * - Docker, Node.js 22, and OpenClaw installation
+ * - EC2 instance with pre-built NixOS AMI
  * - Tailscale for secure HTTPS access
- * - Systemd service for auto-start
+ * - Minimal cloud-init (config + secrets only)
  *
  * @example
  * ```typescript
  * const agent = new OpenClawAgent("my-agent", {
+ *   amiId: config.require("amiId"),
  *   providerApiKeys: { anthropic: config.requireSecret("anthropicApiKey") },
  *   tailscaleAuthKey: config.requireSecret("tailscaleAuthKey"),
  *   tailnetDnsName: config.require("tailnetDnsName"),
@@ -125,11 +128,7 @@ export class OpenClawAgent extends pulumi.ComponentResource {
 
     // Defaults
     const instanceType = args.instanceType ?? "t3.medium";
-    const gatewayPort = args.gatewayPort ?? 18789;
-    const browserPort = args.browserPort ?? 18791;
     const volumeSize = args.volumeSize ?? 30;
-    const model = args.model ?? "anthropic/claude-opus-4-6";
-    const enableSandbox = args.enableSandbox ?? true;
     const baseTags = args.tags ?? {};
 
     // Generate SSH key pair + gateway token
@@ -281,35 +280,14 @@ export class OpenClawAgent extends pulumi.ComponentResource {
       defaultResourceOptions
     );
 
-    // Get Ubuntu 24.04 AMI
-    const ami = aws.ec2.getAmiOutput(
-      {
-        owners: ["099720109477"], // Canonical
-        mostRecent: true,
-        filters: [
-          {
-            name: "name",
-            values: [
-              "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*",
-            ],
-          },
-          { name: "virtualization-type", values: ["hvm"] },
-        ],
-      },
-      defaultResourceOptions
-    );
-
-    // Generate cloud-init user data
-    const userData = buildCloudInitUserData(name, args, gatewayTokenValue, {
-      gatewayPort: gatewayPort as number,
-      model: model as string,
-    });
+    // Generate NixOS cloud-init (config + secrets only)
+    const userData = buildNixCloudInitUserData(name, args, gatewayTokenValue);
 
     // Create EC2 instance
     const instance = new aws.ec2.Instance(
       `${name}-instance`,
       {
-        ami: ami.id,
+        ami: args.amiId,
         instanceType: instanceType,
         subnetId: subnetId,
         vpcSecurityGroupIds: [securityGroupId],

@@ -1,7 +1,7 @@
 export { OpenClawAgent, OpenClawAgentArgs } from "./openclaw-agent";
 export { HetznerOpenClawAgent, HetznerOpenClawAgentArgs } from "./hetzner-agent";
 export { LocalDockerOpenClawAgent, LocalDockerOpenClawAgentArgs } from "./local-docker-agent";
-export { generateCloudInit, interpolateCloudInit, CloudInitConfig, PluginInstallConfig } from "./cloud-init";
+export { interpolateCloudInit, PluginInstallConfig } from "./cloud-init";
 export {
   generateOpenClawConfig,
   generateOpenClawConfigJson,
@@ -10,5 +10,6 @@ export {
   OpenClawConfig,
 } from "./config-generator";
 export { generateNixEntrypoint, type NixEntrypointConfig } from "./nix-entrypoint";
+export { generateNixCloudInit, compressNixCloudInit, type NixCloudInitConfig } from "./nix-cloud-init";
 export type { BaseOpenClawAgentArgs, DepInstallConfig } from "./types";
-export { generateKeyPairAndToken, buildCloudInitUserData, buildNixEntrypoint } from "./shared";
+export { generateKeyPairAndToken, buildNixEntrypoint, buildNixCloudInitUserData } from "./shared";

@@ -59,8 +59,8 @@ export function hetznerServerTypes(location: string) {
     : HETZNER_SERVER_TYPES_EU;
 }
 
-/** Default SSH user for agent instances (Ubuntu 24.04 AMI default) */
-export const SSH_USER = "ubuntu";
+/** SSH user for agent instances */
+export const SSH_USER = "openclaw";
 
 /** Estimated monthly cost per instance type (AWS) */
 export const COST_ESTIMATES: Record<string, number> = {

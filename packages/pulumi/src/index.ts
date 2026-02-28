@@ -53,6 +53,10 @@ const timezone = config.get("timezone") ?? "PST (America/Los_Angeles)";
 const workingHours = config.get("workingHours") ?? "9am-6pm";
 const userNotes = config.get("userNotes") ?? "No additional notes provided yet.";
 
+// NixOS image IDs (pre-built via `nix build`, provider-specific)
+const amiId = configProvider === "aws" ? config.require("amiId") : undefined;
+const hetznerImageId = configProvider === "hetzner" ? config.require("imageId") : undefined;
+
 // Identity cache directory
 const identityCacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
 
@@ -449,6 +453,7 @@ for (const agent of manifest.agents) {
       ...baseArgs,
       instanceType: agent.instanceType ?? instanceType,
       volumeSize: agentVolumeSize ?? 30,
+      amiId: amiId!,
       vpcId: sharedVpc!.vpcId,
       subnetId: sharedVpc!.subnetId,
       securityGroupId: sharedVpc!.securityGroupId,
@@ -492,6 +497,7 @@ for (const agent of manifest.agents) {
       ...baseArgs,
       serverType: agent.instanceType ?? instanceType,
       location: manifest.region,
+      imageId: hetznerImageId!,
       labels: {
         ...baseTags,
         AgentRole: agent.role,

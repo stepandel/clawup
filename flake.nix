@@ -1,5 +1,5 @@
 {
-  description = "Clawup — pre-built NixOS Docker image for local OpenClaw agents";
+  description = "Clawup — pre-built NixOS images for OpenClaw agents (Docker, AWS, Hetzner)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -21,10 +21,27 @@
 
       # Convenience alias: `nix build .#docker-image`
       packages.${system}.default = self.packages.${system}.docker-image;
+
+      # NixOS VM images for cloud providers
+      nixosConfigurations.clawup-agent-aws = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          nix-openclaw.nixosModules.default
+          ./nix/images/aws.nix
+        ];
+      };
+
+      nixosConfigurations.clawup-agent-hetzner = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = [
+          nix-openclaw.nixosModules.default
+          ./nix/images/hetzner.nix
+        ];
+      };
     };
 
-  # Build + load:
-  #   nix build .#docker-image
-  #   docker load < result
-  #   docker images | grep clawup-openclaw
+  # Build images:
+  #   Docker:  nix build .#docker-image && docker load < result
+  #   AWS:     nix build .#nixosConfigurations.clawup-agent-aws.config.system.build.amazonImage
+  #   Hetzner: nix build .#nixosConfigurations.clawup-agent-hetzner.config.system.build.qcow2
 }
