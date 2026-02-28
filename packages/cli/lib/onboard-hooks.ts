@@ -59,7 +59,7 @@ export async function runOnboardHooks(args: {
   } = args;
 
   if (skipOnboard) {
-    p.log.warn("Onboard hooks skipped (--skip-onboard)");
+    p.log.info("Onboard hooks skipped. Use --onboard flag or run `clawup onboard` separately.");
     return;
   }
 
@@ -152,7 +152,7 @@ export async function runOnboardHooks(args: {
       } else {
         p.log.error(`Onboard hook for ${pluginName} failed: ${result.error}`);
         exitWithError(
-          "Onboard hook failed. Fix the issue and run `clawup setup` again, or use --skip-onboard to bypass."
+          "Onboard hook failed. Fix the issue and run `clawup setup --onboard` again, or run `clawup onboard` separately."
         );
       }
     }

@@ -43,7 +43,7 @@ interface SetupOptions {
   deploy?: boolean;
   yes?: boolean;
   skipHooks?: boolean;
-  skipOnboard?: boolean;
+  onboard?: boolean;
 }
 
 /** Fetched identity data stored alongside the resolved agent */
@@ -397,7 +397,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     p,
     runOnboardHook,
     exitWithError,
-    skipOnboard: !!opts.skipOnboard,
+    skipOnboard: !opts.onboard,
   });
 
   // 8. Regenerate .env.example (no longer writes plugins/secrets back to manifest)

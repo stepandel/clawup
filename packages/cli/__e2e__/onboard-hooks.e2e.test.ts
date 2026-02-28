@@ -188,7 +188,7 @@ describe("Onboard Hooks: setup with onboard hook lifecycle", () => {
       ],
     });
 
-    await setupCommand({ envFile: path.join(tempDir, ".env") });
+    await setupCommand({ envFile: path.join(tempDir, ".env"), onboard: true });
 
     // Assert: p.text was NOT called for config token (resolved from env)
     expect(textCalls.filter((msg) => msg.includes("config token"))).toHaveLength(0);
@@ -238,17 +238,17 @@ describe("Onboard Hooks: setup with onboard hook lifecycle", () => {
       ],
     });
 
-    await setupCommand({ envFile: path.join(tempDir, ".env") });
+    await setupCommand({ envFile: path.join(tempDir, ".env"), onboard: true });
 
     // Assert: p.text WAS called for the onboard hook input (config token)
     expect(textCalls.some((msg) => msg.toLowerCase().includes("config token"))).toBe(true);
   }, 60_000);
 
   // -------------------------------------------------------------------------
-  // Test 3: setup with --skip-onboard bypasses onboard hooks
+  // Test 3: setup skips onboard hooks by default
   // -------------------------------------------------------------------------
 
-  it("setup --skip-onboard skips onboard hooks", async () => {
+  it("setup skips onboard hooks by default", async () => {
     textCalls.length = 0;
 
     // Clean up old stack
@@ -278,14 +278,13 @@ describe("Onboard Hooks: setup with onboard hook lifecycle", () => {
 
     await setupCommand({
       envFile: path.join(tempDir, ".env"),
-      skipOnboard: true,
     });
 
     // Assert: no p.text calls for config token
     expect(textCalls.filter((msg) => msg.includes("config token"))).toHaveLength(0);
 
-    // Assert: p.log.warn was called with skip message
-    expect(vi.mocked(p.log.warn)).toHaveBeenCalledWith(
+    // Assert: p.log.info was called with skip message
+    expect(vi.mocked(p.log.info)).toHaveBeenCalledWith(
       expect.stringContaining("Onboard hooks skipped")
     );
   }, 60_000);
@@ -329,7 +328,7 @@ describe("Onboard Hooks: setup with onboard hook lifecycle", () => {
         ],
       });
 
-      await setupCommand({ envFile: path.join(tempDir, ".env") });
+      await setupCommand({ envFile: path.join(tempDir, ".env"), onboard: true });
 
       // Assert: no interactive prompt for onboard input (all secrets present → runOnce skips)
       expect(textCalls.filter((msg) => msg.includes("config token"))).toHaveLength(0);
