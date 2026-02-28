@@ -171,27 +171,33 @@ function buildPluginConfigCommands(
     });
   } else {
     // plugins.entries plugin (e.g., openclaw-linear)
+    // Build entire config object atomically to avoid validation errors
+    // when setting individual keys (e.g., apiKey without webhookSecret)
+    const fullConfig: Record<string, unknown> = {};
+
+    // Secret values
+    for (const [configKey, envVar] of Object.entries(secretEnvVars)) {
+      if (internalKeys.has(configKey)) continue;
+      fullConfig[configKey] = allSecrets[envVar] ?? "";
+    }
+
+    // Non-secret config
+    for (const [key, value] of Object.entries(pluginConfig)) {
+      if (internalKeys.has(key)) continue;
+      fullConfig[key] = value;
+    }
+
     cmds.push({
       key: `plugins.entries.${plugin.name}.enabled`,
       value: true,
       comment: `Configure ${plugin.name} plugin`,
     });
 
-    // Secret values
-    for (const [configKey, envVar] of Object.entries(secretEnvVars)) {
-      if (internalKeys.has(configKey)) continue;
+    if (Object.keys(fullConfig).length > 0) {
       cmds.push({
-        key: `plugins.entries.${plugin.name}.config.${configKey}`,
-        value: allSecrets[envVar] ?? "",
-      });
-    }
-
-    // Non-secret config
-    for (const [key, value] of Object.entries(pluginConfig)) {
-      if (internalKeys.has(key)) continue;
-      cmds.push({
-        key: `plugins.entries.${plugin.name}.config.${key}`,
-        value,
+        key: `plugins.entries.${plugin.name}.config`,
+        value: fullConfig,
+        comment: `${plugin.name} plugin config`,
       });
     }
   }
@@ -254,7 +260,7 @@ function buildConfigSetCommands(config: CloudInitConfig): ConfigSetCommand[] {
       }
     } else {
       const envVar = getProviderEnvVar(providerKey);
-      const providerDef = MODEL_PROVIDERS[providerKey];
+      const providerDef = MODEL_PROVIDERS[providerKey as keyof typeof MODEL_PROVIDERS];
       cmds.push({
         key: `env.${envVar}`,
         value: apiKeyValue,
@@ -268,7 +274,7 @@ function buildConfigSetCommands(config: CloudInitConfig): ConfigSetCommand[] {
     ? getProviderForModel(backupModel)
     : undefined;
   if (backupProviderKey && backupProviderKey !== primaryProviderKey) {
-    const backupProviderDef = MODEL_PROVIDERS[backupProviderKey];
+    const backupProviderDef = MODEL_PROVIDERS[backupProviderKey as keyof typeof MODEL_PROVIDERS];
     const backupApiKey = config.providerApiKeys[backupProviderKey];
     if (backupProviderDef && backupApiKey) {
       if (
@@ -436,7 +442,7 @@ export function buildProvisionerConfig(
       onboardProviderFlags = `--auth-choice apiKey --token-provider openrouter --token ${shellEscape(primaryApiKeyValue)}`;
       break;
     default: {
-      const providerDef = MODEL_PROVIDERS[primaryProviderKey];
+      const providerDef = MODEL_PROVIDERS[primaryProviderKey as keyof typeof MODEL_PROVIDERS];
       onboardProviderFlags = providerDef
         ? providerDef
             .onboardFlags(providerDef.envVar)
@@ -450,7 +456,7 @@ export function buildProvisionerConfig(
   }
 
   const onboardCommand = [
-    "openclaw onboard --non-interactive",
+    "openclaw onboard --non-interactive --accept-risk",
     "--mode local",
     onboardProviderFlags,
     `--gateway-port ${gatewayPort}`,

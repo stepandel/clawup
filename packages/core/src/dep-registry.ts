@@ -41,13 +41,18 @@ apt-get install -y gh
 echo "GitHub CLI installed: $(gh --version | head -n1)"
 `,
     postInstallScript: `
-if echo "\${GITHUB_TOKEN}" | gh auth login --with-token 2>&1; then
+# Temporarily unset GITHUB_TOKEN so gh auth login stores the credential
+# (gh refuses --with-token when the env var is already set)
+_GH_TOKEN="\${GITHUB_TOKEN}"
+unset GITHUB_TOKEN
+if echo "\$_GH_TOKEN" | gh auth login --with-token 2>&1; then
   gh auth setup-git
   echo "GitHub CLI authenticated successfully"
 else
   echo "WARNING: GitHub CLI authentication failed"
   echo "   You can authenticate manually later with: gh auth login"
 fi
+export GITHUB_TOKEN="\$_GH_TOKEN"
 `,
     secrets: {
       GithubToken: {

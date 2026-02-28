@@ -34,6 +34,7 @@ run_as_ubuntu() {
     CONFIG_JSON="$CONFIG_JSON" \\
     RUN_CMD="$1" \\
     bash -c '
+      [ -s "$HOME/.profile" ] && . "$HOME/.profile"
       export NVM_DIR="$HOME/.nvm"
       [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
       eval "$RUN_CMD"
@@ -50,6 +51,7 @@ run_encoded_script() {
       CONFIG_JSON="$CONFIG_JSON" \\
       ENCODED_SCRIPT="$encoded" \\
       bash -c '
+        [ -s "$HOME/.profile" ] && . "$HOME/.profile"
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
         echo "$ENCODED_SCRIPT" | base64 -d | bash
@@ -204,7 +206,7 @@ phase_systemd() {
 # ===== PHASE: Onboard =====
 phase_onboard() {
   echo "Running openclaw onboard..."
-  run_as_ubuntu "$(cfg '.onboard.command')"
+  run_as_ubuntu "$(cfg '.onboard.command') || echo 'WARNING: onboard exited non-zero (gateway not yet running — expected)'"
   echo "Onboarding complete"
 }
 
