@@ -130,7 +130,7 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
         name: a.name,
         role: a.role,
         displayName: a.displayName,
-        requiredSecrets: fi?.identityResult.manifest.requiredSecrets,
+        requiredSecrets: fi?.identityResult.manifest.requiredSecrets ?? [],
       };
     }),
     allPluginNames,

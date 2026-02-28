@@ -5,7 +5,7 @@ import { redactSecretsFromString } from "./redact.js";
 // setup.ts is already a large command; extracting this orchestration keeps the
 // behavior identical while reducing file size.
 
-type PromptLike = {
+interface PromptLike {
   log: {
     info: (msg: string) => void;
     warn: (msg: string) => void;
@@ -17,7 +17,7 @@ type PromptLike = {
     validate?: (val: string) => string | undefined;
   }) => Promise<string | symbol>;
   isCancel: (val: unknown) => boolean;
-};
+}
 
 function envVarToCamel(envVar: string): string {
   return envVar
@@ -27,7 +27,7 @@ function envVarToCamel(envVar: string): string {
     .join("");
 }
 
-export async function runOnboardHooks(args: {
+interface RunOnboardHooksArgs {
   fetchedIdentities: Array<{
     agent: { name: string; role: string; displayName: string };
     identityResult: IdentityResult;
@@ -44,7 +44,9 @@ export async function runOnboardHooks(args: {
   >;
   exitWithError: (message: string) => never;
   skipOnboard: boolean;
-}): Promise<void> {
+}
+
+export async function runOnboardHooks(args: RunOnboardHooksArgs): Promise<void> {
   const {
     fetchedIdentities,
     agentPlugins,

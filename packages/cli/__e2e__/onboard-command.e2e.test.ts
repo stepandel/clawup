@@ -182,8 +182,10 @@ describe("Standalone onboard command", () => {
     textCalls.length = 0;
     vi.mocked(p.log.info).mockClear();
 
-    // Temporarily patch the test-linear manifest to set runOnce: true
-    const manifestPath = path.join(PLUGIN_IDENTITY_DIR, "plugins", "test-linear.yaml");
+    // Use an isolated copy of the identity fixture to avoid mutating the shared fixture
+    const identityDirForRunOnce = fs.mkdtempSync(path.join(tempDir, "identity-runonce-"));
+    fs.cpSync(PLUGIN_IDENTITY_DIR, identityDirForRunOnce, { recursive: true });
+    const manifestPath = path.join(identityDirForRunOnce, "plugins", "test-linear.yaml");
     const originalManifest = fs.readFileSync(manifestPath, "utf-8");
     fs.writeFileSync(manifestPath, originalManifest.replace("runOnce: false", "runOnce: true"), "utf-8");
 
@@ -191,7 +193,7 @@ describe("Standalone onboard command", () => {
       createTestProject({
         stackName: "e2e-onboard-cmd-runonce",
         dir: tempDir,
-        identityDir: PLUGIN_IDENTITY_DIR,
+        identityDir: identityDirForRunOnce,
         agentName: "agent-e2e-onboard-cmd",
         displayName: "OnboardBot",
         role: "onboardtester",
@@ -214,8 +216,7 @@ describe("Standalone onboard command", () => {
         expect.stringContaining("skipped (already configured)"),
       );
     } finally {
-      // Restore original manifest
-      fs.writeFileSync(manifestPath, originalManifest, "utf-8");
+      fs.rmSync(identityDirForRunOnce, { recursive: true, force: true });
     }
   }, 30_000);
 

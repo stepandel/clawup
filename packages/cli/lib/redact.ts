@@ -8,7 +8,8 @@ export function redactSecretsFromString(input: string): string {
   if (!input) return input;
 
   // Redact common KEY=VALUE patterns.
-  const keyValue = /\b([A-Z0-9_]*(?:TOKEN|SECRET|API_KEY|KEY|PASS|PASSWORD)[A-Z0-9_]*)\b\s*=\s*([^\s\n\r]+)/g;
+  const keyValue =
+    /\b([A-Z0-9_]*(?:TOKEN|SECRET|API_KEY|KEY|PASS|PASSWORD)[A-Z0-9_]*)\b\s*=\s*(?:"[^"]*"|'[^']*'|[^\s\n\r]+)/gi;
   let out = input.replace(keyValue, (_m, key) => `${key}=[REDACTED]`);
 
   // Redact common Slack/GitHub/Linear token formats when they appear anywhere.
