@@ -3,8 +3,10 @@
 # without requiring a full Nix build.
 FROM ubuntu:24.04
 
+# No curl — prevents the entrypoint from installing the real Claude CLI,
+# so the stub binary is used instead for predictable test behavior.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash coreutils gzip git curl ca-certificates jq python3 \
+    bash coreutils gzip git ca-certificates jq python3 \
   && rm -rf /var/lib/apt/lists/*
 
 # Create openclaw user (uid 1000) matching the Nix image.
@@ -22,8 +24,11 @@ RUN existing=$(getent passwd 1000 | cut -d: -f1) \
 RUN mkdir -p /usr/local/bin \
   && printf '#!/bin/bash\nif [ "$1" = "gateway" ]; then\n  exec sleep infinity\nelif [ "$1" = "devices" ]; then\n  exit 0\nelif [ "$1" = "plugins" ]; then\n  exit 0\nfi\n' > /usr/local/bin/openclaw \
   && chmod +x /usr/local/bin/openclaw \
-  && printf '#!/bin/bash\necho "claude-code 1.0.0-e2e-stub"\n' > /usr/local/bin/claude \
+  && printf '#!/bin/bash\nif [ "$1" = "--version" ]; then echo "claude-code 1.0.0-e2e-stub"; exit 0; fi\necho "not authenticated"; exit 1\n' > /usr/local/bin/claude \
   && chmod +x /usr/local/bin/claude \
+  && mkdir -p /home/openclaw/.local/bin \
+  && ln -s /usr/local/bin/claude /home/openclaw/.local/bin/claude \
+  && chown -R openclaw:openclaw /home/openclaw/.local \
   && printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/clawhub \
   && chmod +x /usr/local/bin/clawhub
 
