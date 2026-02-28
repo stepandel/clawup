@@ -319,7 +319,7 @@ timeout 15 /home/${SSH_USER}/.local/bin/${cmd} -p 'hi' 2>&1 | head -5
               ? `channels.${plugin}.${key}`
               : `plugins.entries.${plugin}.config.${key}`;
             const secretCheck = runCheck(
-              `openclaw config get ${configPath} 2>/dev/null | grep -qv '^$'`
+              `openclaw config get ${configPath} 2>/dev/null | grep -q '[^[:space:]]'`
             );
             checks.push({
               name: `${plugin} secret (${secret.envVar})`,

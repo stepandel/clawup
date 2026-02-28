@@ -65,7 +65,7 @@ fi
       BraveApiKey: {
         envVar: "BRAVE_API_KEY",
         scope: "global",
-        checkCommand: `openclaw config get tools.web.search.apiKey 2>/dev/null | grep -qv '^$'`,
+        checkCommand: `openclaw config get tools.web.search.apiKey 2>/dev/null | grep -q '[^[:space:]]'`,
       },
     },
   },

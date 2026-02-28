@@ -9,7 +9,7 @@
  */
 
 export const PROVISIONER_TEMPLATE = `#!/bin/bash
-set -e
+set -eo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ============================================
@@ -170,7 +170,7 @@ phase_env_vars() {
   echo "Setting environment variables..."
 
   # Write all profile env vars
-  echo "$CONFIG_JSON" | jq -r '.profileEnvVars | to_entries[] | "export \\(.key)=\\"\\(.value)\\""' | while IFS= read -r line; do
+  echo "$CONFIG_JSON" | jq -r '.profileEnvVars | to_entries[] | "export \\(.key)=\\(.value | @sh)"' | while IFS= read -r line; do
     echo "$line" >> /home/ubuntu/.profile
   done
 

@@ -416,7 +416,8 @@ export function buildProvisionerConfig(
 
   const codingAgentName = config.codingAgent ?? "claude-code";
   const codingAgentEntry = CODING_AGENT_REGISTRY[codingAgentName];
-  const primaryProviderKey = config.modelProvider ?? "anthropic";
+  const model = config.model ?? "anthropic/claude-opus-4-6";
+  const primaryProviderKey = getProviderForModel(model);
   const primaryApiKeyValue = config.providerApiKeys[primaryProviderKey] ?? "";
 
   // --- Onboard command ---
