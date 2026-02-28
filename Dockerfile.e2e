@@ -1,0 +1,25 @@
+# Lightweight test image for CI e2e tests.
+# Mimics the structure of the Nix-built clawup-openclaw image
+# without requiring a full Nix build.
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash coreutils gzip git curl ca-certificates jq python3 \
+  && rm -rf /var/lib/apt/lists/*
+
+# Create openclaw user (uid 1000) matching the Nix image.
+# Remove existing uid-1000 user (ubuntu) first if present.
+RUN existing=$(getent passwd 1000 | cut -d: -f1) \
+  && [ -n "$existing" ] && userdel -r "$existing" || true \
+  && useradd -m -u 1000 -s /bin/bash openclaw \
+  && mkdir -p /home/openclaw/.openclaw/workspace \
+  && chown -R openclaw:openclaw /home/openclaw
+
+USER openclaw
+WORKDIR /home/openclaw
+ENV HOME=/home/openclaw
+ENV PATH="/home/openclaw/.local/bin:${PATH}"
+
+EXPOSE 18789
+
+CMD ["/bin/bash"]

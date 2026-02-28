@@ -68,6 +68,9 @@ jobs:
           mkdir -p "${{ github.workspace }}/.pulumi-state"
           pulumi login "$PULUMI_BACKEND_URL"
 
+      - name: Build e2e test Docker image
+        run: docker build -t clawup-openclaw:latest -f Dockerfile.e2e .
+
       - name: Run E2E tests
         run: pnpm exec vitest run --config packages/cli/__e2e__/vitest.e2e.config.ts
         env:
