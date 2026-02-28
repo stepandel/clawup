@@ -8,7 +8,7 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
-import { requireManifest } from "../lib/config";
+import { requireResolvedManifest } from "../lib/config";
 import { SSH_USER, tailscaleHostname, resolvePlugin } from "@clawup/core";
 import type { IdentityManifest, PluginManifest } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
@@ -64,10 +64,10 @@ export const webhooksSetupTool: ToolImplementation<WebhooksSetupOptions> = async
   }
   const cwd = getWorkspaceDir();
 
-  // Load manifest
+  // Load manifest (resolves agent fields from identities)
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);

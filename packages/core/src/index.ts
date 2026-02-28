@@ -12,8 +12,13 @@ export type {
   PrereqResult,
   VoidResult,
   Result,
+  ResolvedAgent,
+  ResolvedManifest,
 } from "./types";
 export { validateAgentDefinition } from "./types";
+
+// Manifest resolver — re-exported from "@clawup/core/resolve" subpath
+// to avoid pulling Node.js-only modules (fs, child_process) into browser bundles.
 
 // Constants
 export {

@@ -5,9 +5,9 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
-import { requireManifest, syncManifestToProject } from "../lib/config";
+import { requireResolvedManifest, syncManifestToProject } from "../lib/config";
 import { COST_ESTIMATES, HETZNER_COST_ESTIMATES, LOCAL_COST_ESTIMATES, resolvePlugin } from "@clawup/core";
-import type { ClawupManifest } from "@clawup/core";
+import type { ClawupManifest, ResolvedManifest } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
 import * as path from "path";
 import * as os from "os";
@@ -45,10 +45,10 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
   }
   const cwd = getWorkspaceDir();
 
-  // Load manifest
+  // Load manifest (resolves agent fields from identities)
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);
@@ -56,7 +56,7 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
 
   // --local: override provider in memory, use separate stack
   if (options.local) {
-    manifest = { ...manifest, provider: "local" } as ClawupManifest;
+    manifest = { ...manifest, provider: "local" } as ResolvedManifest;
   }
 
   // Select/create stack (use org-qualified name if organization is set)

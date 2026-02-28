@@ -30,9 +30,9 @@ import {
   generateEnvExample,
 } from "../lib/env";
 
-/** Fetched identity data stored alongside the agent definition */
+/** Fetched identity data stored alongside the identity path */
 interface FetchedIdentity {
-  agent: AgentDefinition;
+  identityPath: string;
   manifest: IdentityManifest;
 }
 
@@ -76,14 +76,7 @@ export async function initCommand(): Promise<void> {
   for (const identityPath of identityPaths) {
     try {
       const identity = await fetchIdentity(identityPath, identityCacheDir);
-      const agent: AgentDefinition = {
-        name: `agent-${identity.manifest.name}`,
-        displayName: identity.manifest.displayName,
-        role: identity.manifest.role,
-        identity: identityPath,
-        volumeSize: identity.manifest.volumeSize,
-      };
-      fetchedIdentities.push({ agent, manifest: identity.manifest });
+      fetchedIdentities.push({ identityPath, manifest: identity.manifest });
     } catch (err) {
       spinner.stop(`Failed to fetch identity: ${identityPath}`);
       exitWithError(
@@ -97,11 +90,8 @@ export async function initCommand(): Promise<void> {
 
   spinner.stop(`Discovered ${fetchedIdentities.length} local identit${fetchedIdentities.length === 1 ? "y" : "ies"}`);
 
-  const agents = fetchedIdentities.map((fi) => fi.agent);
-
-  // Build plugin/dep maps
-  const { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, allModels } =
-    buildPluginDepMaps(fetchedIdentities);
+  // Slim agent entries — only identity path, fields resolved at deploy time
+  const agents = fetchedIdentities.map((fi) => ({ identity: fi.identityPath }));
 
   // Collect all template vars declared by identities
   const allTemplateVarNames = new Set<string>();
@@ -145,7 +135,7 @@ export async function initCommand(): Promise<void> {
   };
 
   // Write manifest + .env.example
-  writeManifest(manifest, fetchedIdentities, agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, process.cwd(), allModels);
+  writeManifest(manifest, fetchedIdentities, process.cwd());
 
   p.log.success("Created clawup.yaml and .env.example");
   p.note(
@@ -222,26 +212,23 @@ async function repairMode(projectRoot: string): Promise<void> {
   // Match discovered identities to manifest agents
   const { matched, unmatchedAgents, unmatchedPaths } = matchIdentitiesToAgents(agents, discovered);
 
-  // Update identity-owned fields for matched agents
+  // Update identity path for matched agents (slim: only update identity path)
   for (const { agent, discovered: d } of matched) {
     agent.identity = d.relPath;
-    agent.displayName = d.manifest.displayName;
-    agent.role = d.manifest.role;
-    agent.volumeSize = d.manifest.volumeSize;
 
     const identity = await fetchIdentity(path.resolve(projectRoot, d.relPath), identityCacheDir);
-    fetchedIdentities.push({ agent, manifest: identity.manifest });
+    fetchedIdentities.push({ identityPath: d.relPath, manifest: identity.manifest });
   }
 
   // Fallback for unmatched agents: try fetching their existing identity path
   for (const agent of unmatchedAgents) {
-    p.log.warn(`Agent "${agent.name}" has no matching local identity directory`);
+    p.log.warn(`Agent "${agent.identity}" has no matching local identity directory`);
     try {
       const identity = await fetchIdentity(agent.identity, identityCacheDir);
-      fetchedIdentities.push({ agent, manifest: identity.manifest });
+      fetchedIdentities.push({ identityPath: agent.identity, manifest: identity.manifest });
     } catch (err) {
       p.log.warn(
-        `Could not resolve identity "${agent.identity}" for agent "${agent.name}": ${
+        `Could not resolve identity "${agent.identity}": ${
           err instanceof Error ? err.message : String(err)
         }`
       );
@@ -292,12 +279,8 @@ async function repairMode(projectRoot: string): Promise<void> {
 
   manifest.templateVars = templateVars;
 
-  // Build plugin/dep maps
-  const { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, allModels } =
-    buildPluginDepMaps(fetchedIdentities);
-
   // Write updated manifest
-  writeManifest(manifest, fetchedIdentities, agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, projectRoot, allModels);
+  writeManifest(manifest, fetchedIdentities, projectRoot);
 
   p.log.success(`${MANIFEST_FILE} and .env.example updated`);
   p.outro("Run `clawup setup` to validate secrets and configure Pulumi.");
@@ -354,6 +337,7 @@ export function matchIdentitiesToAgents(
 
   // Tier 2: name match (agent.name === "agent-" + manifest.name)
   for (const agent of remainingAgents) {
+    if (!agent.name) continue;
     for (const d of remainingDiscovered) {
       if (agent.name === `agent-${d.manifest.name}`) {
         matched.push({ agent, discovered: d });
@@ -368,9 +352,11 @@ export function matchIdentitiesToAgents(
   // Only match when exactly one unmatched agent and one unmatched identity share a role
   const agentsByRole = new Map<string, AgentDefinition[]>();
   for (const agent of remainingAgents) {
-    const list = agentsByRole.get(agent.role) ?? [];
+    const role = agent.role;
+    if (!role) continue;
+    const list = agentsByRole.get(role) ?? [];
     list.push(agent);
-    agentsByRole.set(agent.role, list);
+    agentsByRole.set(role, list);
   }
 
   const discoveredByRole = new Map<string, DiscoveredIdentity[]>();
@@ -398,68 +384,46 @@ export function matchIdentitiesToAgents(
   };
 }
 
-/** Build plugin/dep maps and collect all model strings from fetched identities */
-function buildPluginDepMaps(fetchedIdentities: FetchedIdentity[]) {
-  const agentPlugins = new Map<string, Set<string>>();
-  const agentDeps = new Map<string, Set<string>>();
-  const allPluginNames = new Set<string>();
-  const allDepNames = new Set<string>();
-  const allModels: string[] = [];
-
-  for (const fi of fetchedIdentities) {
-    const plugins = new Set(fi.manifest.plugins ?? []);
-    const deps = new Set(fi.manifest.deps ?? []);
-    agentPlugins.set(fi.agent.name, plugins);
-    agentDeps.set(fi.agent.name, deps);
-    for (const pl of plugins) allPluginNames.add(pl);
-    for (const d of deps) allDepNames.add(d);
-
-    const model = fi.manifest.model ?? "anthropic/claude-opus-4-6";
-    allModels.push(model);
-    if (fi.manifest.backupModel) {
-      allModels.push(fi.manifest.backupModel);
-    }
-  }
-
-  const identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>> = {};
-  for (const fi of fetchedIdentities) {
-    if (fi.manifest.pluginDefaults) {
-      identityPluginDefaults[fi.agent.name] = fi.manifest.pluginDefaults;
-    }
-  }
-
-  return { agentPlugins, agentDeps, allPluginNames, allDepNames, identityPluginDefaults, allModels };
-}
-
-/** Write/update clawup.yaml + .env.example with current identity data */
+/**
+ * Write/update clawup.yaml + .env.example with current identity data.
+ * Slim manifest: agent entries are minimal, secrets/plugins derived at deploy time.
+ */
 function writeManifest(
   manifest: ClawupManifest,
   fetchedIdentities: FetchedIdentity[],
-  agentPlugins: Map<string, Set<string>>,
-  agentDeps: Map<string, Set<string>>,
-  allPluginNames: Set<string>,
-  allDepNames: Set<string>,
-  identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>>,
   outputDir: string,
-  allModels: string[],
 ): void {
   const s = p.spinner();
   s.start(`Writing ${MANIFEST_FILE}...`);
 
-  const agents = manifest.agents;
+  // Build global secrets from identity data (for .env.example)
+  const allPluginNames = new Set<string>();
+  const allDepNames = new Set<string>();
+  const agentPlugins = new Map<string, Set<string>>();
+  const agentDeps = new Map<string, Set<string>>();
+  const allModels: string[] = [];
 
-  // Build secrets section
+  for (const fi of fetchedIdentities) {
+    const agentName = `agent-${fi.manifest.name}`;
+    const plugins = new Set(fi.manifest.plugins ?? []);
+    const deps = new Set(fi.manifest.deps ?? []);
+    agentPlugins.set(agentName, plugins);
+    agentDeps.set(agentName, deps);
+    for (const pl of plugins) allPluginNames.add(pl);
+    for (const d of deps) allDepNames.add(d);
+    allModels.push(fi.manifest.model ?? "anthropic/claude-opus-4-6");
+    if (fi.manifest.backupModel) allModels.push(fi.manifest.backupModel);
+  }
+
+  // Build secrets for global section + .env.example generation
   const manifestSecrets = buildManifestSecrets({
     provider: manifest.provider,
-    agents: agents.map((a) => {
-      const fi = fetchedIdentities.find((f) => f.agent.name === a.name);
-      return {
-        name: a.name,
-        role: a.role,
-        displayName: a.displayName,
-        requiredSecrets: fi?.manifest.requiredSecrets,
-      };
-    }),
+    agents: fetchedIdentities.map((fi) => ({
+      name: `agent-${fi.manifest.name}`,
+      role: fi.manifest.role,
+      displayName: fi.manifest.displayName,
+      requiredSecrets: fi.manifest.requiredSecrets,
+    })),
     allPluginNames,
     allDepNames,
     agentPlugins,
@@ -467,7 +431,7 @@ function writeManifest(
     allModels,
   });
 
-  // Prune stale managed global keys, then merge fresh ones
+  // Set global secrets on manifest (not per-agent — those are derived at deploy time)
   const existingGlobal = { ...(manifest.secrets ?? {}) };
   for (const key of manifestSecrets.managedGlobalKeys) {
     if (!(key in manifestSecrets.global)) {
@@ -476,61 +440,19 @@ function writeManifest(
   }
   manifest.secrets = { ...existingGlobal, ...manifestSecrets.global };
 
-  // Per-agent: prune stale managed keys, then merge fresh ones
-  for (const agent of agents) {
-    const perAgentSec = manifestSecrets.perAgent[agent.name];
-    const managedKeys = manifestSecrets.managedPerAgentKeys[agent.name] ?? [];
-    const existing = { ...(agent.secrets ?? {}) };
-    for (const key of managedKeys) {
-      if (!perAgentSec?.[key]) {
-        delete existing[key];
-      }
-    }
-    if (perAgentSec && Object.keys(perAgentSec).length > 0) {
-      agent.secrets = { ...existing, ...perAgentSec };
-    } else if (Object.keys(existing).length > 0) {
-      agent.secrets = existing;
-    }
-  }
-
-  // Inline plugin config (minus linearUserUuid — set by setup)
-  for (const fi of fetchedIdentities) {
-    const rolePlugins = agentPlugins.get(fi.agent.name);
-    if (!rolePlugins || rolePlugins.size === 0) continue;
-
-    const inlinePlugins: Record<string, Record<string, unknown>> = {};
-    const defaults = identityPluginDefaults[fi.agent.name] ?? {};
-    // Preserve existing plugin config (e.g., linearUserUuid from a previous setup run)
-    const existingPlugins = (fi.agent.plugins ?? {}) as Record<string, Record<string, unknown>>;
-
-    for (const pluginName of rolePlugins) {
-      const pluginDefaults = defaults[pluginName] ?? {};
-      const existingConfig = existingPlugins[pluginName] ?? {};
-      inlinePlugins[pluginName] = {
-        ...pluginDefaults,
-        ...existingConfig,
-        agentId: fi.agent.name,
-      };
-    }
-
-    if (Object.keys(inlinePlugins).length > 0) {
-      fi.agent.plugins = inlinePlugins;
-    }
-  }
-
   // Write manifest
   const manifestPath = path.join(outputDir, MANIFEST_FILE);
   fs.writeFileSync(manifestPath, YAML.stringify(manifest), "utf-8");
 
-  // Generate .env.example
-  const perAgentSecrets: Record<string, Record<string, string>> = {};
-  for (const agent of agents) {
-    if (agent.secrets) perAgentSecrets[agent.name] = agent.secrets;
-  }
+  // Generate .env.example (uses identity data for agent info)
   const envExampleContent = generateEnvExample({
     globalSecrets: manifest.secrets ?? {},
-    agents: agents.map((a) => ({ name: a.name, displayName: a.displayName, role: a.role })),
-    perAgentSecrets,
+    agents: fetchedIdentities.map((fi) => ({
+      name: `agent-${fi.manifest.name}`,
+      displayName: fi.manifest.displayName,
+      role: fi.manifest.role,
+    })),
+    perAgentSecrets: manifestSecrets.perAgent,
   });
   fs.writeFileSync(path.join(outputDir, ".env.example"), envExampleContent, "utf-8");
 

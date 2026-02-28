@@ -10,11 +10,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
-import { requireManifest } from "../lib/config";
+import { requireResolvedManifest } from "../lib/config";
 import { SSH_USER, tailscaleHostname, dockerContainerName } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, selectOrCreateStack, qualifiedStackName } from "../lib/pulumi";
-import type { AgentDefinition } from "@clawup/core";
+import type { ResolvedAgent } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
 import { classifySkills } from "@clawup/core";
 import { resolveDeps } from "@clawup/core";
@@ -153,7 +153,7 @@ function dockerSyncDir(
 /**
  * Resolve an agent query (name, role, alias, displayName) against the manifest.
  */
-function findAgent(agents: AgentDefinition[], query: string): AgentDefinition | undefined {
+function findAgent(agents: ResolvedAgent[], query: string): ResolvedAgent | undefined {
   const q = query.toLowerCase();
   const resolvedRole = q;
   return agents.find(
@@ -184,7 +184,7 @@ export const pushTool: ToolImplementation<PushOptions> = async (
   const cwd = getWorkspaceDir();
 
   // Load manifest
-  let manifest = requireManifest();
+  let manifest = requireResolvedManifest();
 
   // --local: override provider in memory, use separate stack
   if (options.local) {

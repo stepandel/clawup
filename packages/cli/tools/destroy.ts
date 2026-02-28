@@ -5,7 +5,7 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
-import { requireManifest, syncManifestToProject } from "../lib/config";
+import { requireResolvedManifest, syncManifestToProject } from "../lib/config";
 import { cleanupTailscaleDevices } from "../lib/tailscale";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { getConfig, verifyStackOwnership } from "../lib/tool-helpers";
@@ -39,10 +39,10 @@ export const destroyTool: ToolImplementation<DestroyOptions> = async (
   }
   const cwd = getWorkspaceDir();
 
-  // Load manifest
+  // Load manifest (resolves agent fields from identities)
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);

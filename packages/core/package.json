@@ -10,6 +10,7 @@
     "./constants": "./dist/constants.js",
     "./types": "./dist/types.js",
     "./identity": "./dist/identity.js",
+    "./resolve": "./dist/resolve.js",
     "./skills": "./dist/skills.js",
     "./deps": "./dist/deps.js",
     "./dep-registry": "./dist/dep-registry.js",
@@ -21,6 +22,7 @@
   "typesVersions": {
     "*": {
       "identity": ["dist/identity.d.ts"],
+      "resolve": ["dist/resolve.d.ts"],
       "constants": ["dist/constants.d.ts"],
       "types": ["dist/types.d.ts"],
       "skills": ["dist/skills.d.ts"],

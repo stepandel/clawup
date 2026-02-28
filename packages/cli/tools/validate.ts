@@ -7,7 +7,7 @@
 import path from "path";
 import os from "os";
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
-import { requireManifest } from "../lib/config";
+import { requireResolvedManifest } from "../lib/config";
 import { SSH_USER, tailscaleHostname, dockerContainerName, CODING_AGENT_REGISTRY, DEP_REGISTRY, resolvePlugin } from "@clawup/core";
 import type { IdentityManifest, IdentityResult } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
@@ -97,10 +97,10 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
   }
   const cwd = getWorkspaceDir();
 
-  // Load manifest
+  // Load manifest (resolves agent fields from identities)
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);

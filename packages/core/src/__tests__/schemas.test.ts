@@ -29,26 +29,22 @@ describe("AgentDefinitionSchema", () => {
     expect(result.plugins).toEqual({ "openclaw-linear": { agentId: "agent-pm" } });
   });
 
-  it("rejects empty object with descriptive errors", () => {
+  it("rejects empty object (missing identity)", () => {
     const result = AgentDefinitionSchema.safeParse({});
     expect(result.success).toBe(false);
     if (!result.success) {
       const paths = result.error.issues.map((i) => i.path[0]);
-      expect(paths).toContain("name");
-      expect(paths).toContain("displayName");
-      expect(paths).toContain("role");
       expect(paths).toContain("identity");
-      expect(paths).toContain("volumeSize");
     }
+  });
+
+  it("accepts agent with only identity (name/displayName/role/volumeSize optional)", () => {
+    const result = AgentDefinitionSchema.safeParse({ identity: "./pm" });
+    expect(result.success).toBe(true);
   });
 
   it("rejects non-positive volumeSize", () => {
     const result = AgentDefinitionSchema.safeParse({ ...validAgent, volumeSize: 0 });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects empty name", () => {
-    const result = AgentDefinitionSchema.safeParse({ ...validAgent, name: "" });
     expect(result.success).toBe(false);
   });
 });

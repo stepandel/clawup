@@ -23,23 +23,16 @@ describe("validateAgentDefinition", () => {
     ).toThrow('missing required field "identity"');
   });
 
-  it("rejects non-positive volumeSize", () => {
-    expect(() => validateAgentDefinition(makeAgent({ volumeSize: 0 }))).toThrow("positive number");
-    expect(() => validateAgentDefinition(makeAgent({ volumeSize: -5 }))).toThrow("positive number");
+  it("accepts agent with non-positive volumeSize (schema validates this)", () => {
+    // Runtime validateAgentDefinition only checks identity.
+    // Volume size validation is handled by the Zod schema (AgentDefinitionSchema).
+    expect(() => validateAgentDefinition(makeAgent({ volumeSize: 0 }))).not.toThrow();
   });
 
-  it("rejects missing required fields", () => {
+  it("accepts agent without name/displayName/role (optional, resolved from identity)", () => {
     expect(() =>
-      validateAgentDefinition({ ...makeAgent(), name: "" })
-    ).toThrow('missing required field "name"');
-
-    expect(() =>
-      validateAgentDefinition({ ...makeAgent(), displayName: "" })
-    ).toThrow('missing required field "displayName"');
-
-    expect(() =>
-      validateAgentDefinition({ ...makeAgent(), role: "" })
-    ).toThrow('missing required field "role"');
+      validateAgentDefinition({ identity: "./pm" })
+    ).not.toThrow();
   });
 
   it("accepts agent with optional instanceType override", () => {

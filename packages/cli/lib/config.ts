@@ -6,9 +6,11 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import YAML from "yaml";
-import type { ClawupManifest } from "@clawup/core";
+import type { ClawupManifest, ResolvedManifest } from "@clawup/core";
 import { MANIFEST_FILE } from "@clawup/core";
+import { resolveManifestSync } from "@clawup/core/resolve";
 import { findProjectRoot } from "./project";
 
 /**
@@ -121,4 +123,29 @@ export function saveManifest(manifest: ClawupManifest): void {
   }
   const filePath = path.join(projectRoot, MANIFEST_FILE);
   fs.writeFileSync(filePath, YAML.stringify(manifest), "utf-8");
+}
+
+/**
+ * Load the manifest from the project root and resolve all agent entries
+ * by hydrating missing fields from their identities.
+ * Returns a ResolvedManifest where every agent has name, displayName, role, volumeSize.
+ */
+export function requireResolvedManifest(): ResolvedManifest {
+  const projectRoot = findProjectRoot();
+  if (projectRoot === null) {
+    throw new Error("No clawup.yaml found. Run 'clawup init' to create one, or cd into your project directory.");
+  }
+  const filePath = path.join(projectRoot, MANIFEST_FILE);
+  if (!fs.existsSync(filePath)) {
+    throw new Error("No clawup.yaml found. Run 'clawup init' to create one, or cd into your project directory.");
+  }
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const manifest = YAML.parse(raw) as ClawupManifest;
+    const resolved = resolveIdentityPaths(manifest, projectRoot);
+    const cacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
+    return resolveManifestSync(resolved, cacheDir);
+  } catch (err) {
+    throw new Error(`Failed to load clawup.yaml: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }

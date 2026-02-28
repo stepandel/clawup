@@ -6,8 +6,8 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation } from "../adapters";
-import { requireManifest, syncManifestToProject } from "../lib/config";
-import type { ClawupManifest } from "@clawup/core";
+import { requireResolvedManifest, syncManifestToProject } from "../lib/config";
+import type { ClawupManifest, ResolvedManifest } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
 import { getConfig, setConfig, verifyStackOwnership, stampStackFingerprint } from "../lib/tool-helpers";
@@ -42,10 +42,10 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
   }
   const cwd = getWorkspaceDir();
 
-  // Load manifest
+  // Load manifest (resolves agent fields from identities)
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);
@@ -54,7 +54,7 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
   // --local: override provider in memory, use separate stack
   const isLocal = !!options.local;
   if (isLocal) {
-    manifest = { ...manifest, provider: "local" } as ClawupManifest;
+    manifest = { ...manifest, provider: "local" } as ResolvedManifest;
   }
 
   // Try to select existing stack (use org-qualified name if organization is set)

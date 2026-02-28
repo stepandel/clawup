@@ -29,7 +29,8 @@ import {
   getProviderConfigKey,
 } from "@clawup/core";
 import { fetchIdentitySync } from "@clawup/core/identity";
-import type { AgentDefinition, ClawupManifest, PluginConfigFile, IdentityResult } from "@clawup/core";
+import type { ClawupManifest, PluginConfigFile, IdentityResult, ResolvedAgent } from "@clawup/core";
+import { resolveAgentSync } from "@clawup/core/resolve";
 import * as os from "os";
 
 // -----------------------------------------------------------------------------
@@ -123,6 +124,11 @@ if (fs.existsSync(pluginConfigsDir)) {
   }
 }
 
+// Resolve agents — hydrate missing name/displayName/role/volumeSize from identities
+const resolvedAgents: ResolvedAgent[] = manifest.agents.map((entry) =>
+  resolveAgentSync(entry, identityCacheDir)
+);
+
 // Default provider to AWS for backwards compatibility with existing manifests
 const provider = manifest.provider ?? "aws";
 
@@ -155,7 +161,7 @@ if (provider === "aws") {
   // Collect all instance types we'll need
   const instanceTypes = [
     instanceType, // default from config
-    ...manifest.agents.map(a => a.instanceType).filter(Boolean) as string[]
+    ...resolvedAgents.map(a => a.instanceType).filter(Boolean) as string[]
   ];
   const uniqueInstanceTypes = [...new Set(instanceTypes)];
 
@@ -225,7 +231,7 @@ if (provider === "aws") {
 // -----------------------------------------------------------------------------
 
 function buildPluginsForAgent(
-  agent: AgentDefinition,
+  agent: ResolvedAgent,
   identityDefaults?: Record<string, Record<string, unknown>>,
   identityPlugins?: string[],
   identityResult?: IdentityResult
@@ -320,7 +326,7 @@ function envVarToConfigKey(envVar: string): string {
 
 // Collect all unique providers across all agents (primary + backup models)
 const allAgentModels: string[] = [];
-for (const agent of manifest.agents) {
+for (const agent of resolvedAgents) {
   const identity = fetchIdentitySync(agent.identity, identityCacheDir);
   const model = identity.manifest.model ?? "anthropic/claude-opus-4-6";
   allAgentModels.push(model);
@@ -352,7 +358,7 @@ const agentOutputs: Record<string, {
  * Build the base agent args shared by all providers.
  * Provider-specific fields (VPC, location, tags/labels) are added by the caller.
  */
-function buildBaseAgentArgs(agent: AgentDefinition): {
+function buildBaseAgentArgs(agent: ResolvedAgent): {
   baseArgs: BaseOpenClawAgentArgs;
   agentDisplayName: string;
   agentVolumeSize: number;
@@ -441,7 +447,7 @@ function buildBaseAgentArgs(agent: AgentDefinition): {
 
 let localPortOffset = 0;
 
-for (const agent of manifest.agents) {
+for (const agent of resolvedAgents) {
   const { baseArgs, agentVolumeSize } = buildBaseAgentArgs(agent);
 
   if (provider === "aws") {
@@ -522,7 +528,7 @@ for (const [role, outputs] of Object.entries(agentOutputs)) {
 
   // Webhook URLs for plugins that need them (derived from Tailscale Funnel public URL)
   // Generic: loop over all agents' plugins and emit webhook URLs for those with webhookSetup
-  const agentDef = manifest.agents.find((a) => a.role === role);
+  const agentDef = resolvedAgents.find((a) => a.role === role);
   if (agentDef) {
     const identityResult = fetchIdentitySync(agentDef.identity, identityCacheDir);
     const agentPluginNames = identityResult.manifest.plugins ?? [];

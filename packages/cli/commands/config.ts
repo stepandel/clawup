@@ -10,6 +10,7 @@ import * as process from "process";
 import YAML from "yaml";
 import {
   requireManifest,
+  requireResolvedManifest,
   saveManifest,
 } from "../lib/config";
 import {
@@ -20,7 +21,7 @@ import {
   HETZNER_SERVER_TYPES_US,
   hetznerServerTypes,
 } from "@clawup/core";
-import type { ClawupManifest, AgentDefinition } from "@clawup/core";
+import type { ClawupManifest } from "@clawup/core";
 import pc from "picocolors";
 
 // ---------------------------------------------------------------------------
@@ -132,9 +133,9 @@ export interface ConfigShowOptions {
 }
 
 export async function configShowCommand(opts: ConfigShowOptions): Promise<void> {
-  let manifest: ClawupManifest;
+  let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     console.error(pc.red((err as Error).message));
     process.exit(1);
@@ -197,6 +198,15 @@ export async function configSetCommand(
     process.exit(1);
   }
 
+  // Resolve agents to get name/displayName/role for lookup
+  let resolved;
+  try {
+    resolved = requireResolvedManifest();
+  } catch (err) {
+    console.error(pc.red((err as Error).message));
+    process.exit(1);
+  }
+
   if (opts.agent) {
     // Per-agent set
     if (!isSettableAgentKey(key)) {
@@ -204,14 +214,17 @@ export async function configSetCommand(
       process.exit(1);
     }
 
-    const agent = manifest.agents.find(
+    // Find agent index in resolved manifest, then apply change to raw manifest
+    const resolvedIdx = resolved.agents.findIndex(
       (a) => a.name === opts.agent || a.displayName.toLowerCase() === opts.agent!.toLowerCase() || a.role === opts.agent
     );
-    if (!agent) {
-      const names = manifest.agents.map((a) => `${a.displayName} (${a.role})`).join(", ");
+    if (resolvedIdx === -1) {
+      const names = resolved.agents.map((a) => `${a.displayName} (${a.role})`).join(", ");
       console.error(pc.red(`Agent '${opts.agent}' not found. Available: ${names}`));
       process.exit(1);
     }
+    const agent = manifest.agents[resolvedIdx];
+    const resolvedAgent = resolved.agents[resolvedIdx];
 
     const err = validateAgentValue(manifest, key, value);
     if (err) {
@@ -229,7 +242,7 @@ export async function configSetCommand(
 
     saveManifest(manifest);
     console.log(
-      pc.green(`✓ ${agent.displayName}.${key}: ${String(oldValue ?? "(unset)")} → ${value}`)
+      pc.green(`✓ ${resolvedAgent.displayName}.${key}: ${String(oldValue ?? "(unset)")} → ${value}`)
     );
   } else if (key.startsWith("templateVars.")) {
     // templateVars.KEY set

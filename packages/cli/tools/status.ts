@@ -5,7 +5,7 @@
  */
 
 import type { RuntimeAdapter, ToolImplementation, ExecAdapter } from "../adapters";
-import { requireManifest } from "../lib/config";
+import { requireResolvedManifest } from "../lib/config";
 import { SSH_USER, tailscaleHostname, dockerContainerName } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { isTailscaleRunning } from "../lib/tailscale";
@@ -111,10 +111,10 @@ export const statusTool: ToolImplementation<StatusOptions> = async (
   }
   const cwd = getWorkspaceDir();
 
-  // Load manifest
+  // Load manifest (resolves agent fields from identities)
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     ui.log.error((err as Error).message);
     process.exit(1);

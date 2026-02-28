@@ -39,29 +39,32 @@ export interface IdentityResult {
 
 /**
  * Validate an AgentDefinition for consistency.
+ * With slim manifests, only `identity` is required at the schema level.
  *
  * @throws Error with descriptive message if validation fails
  */
 export function validateAgentDefinition(agent: AgentDefinition): void {
-  if (!agent.name) {
-    throw new Error(`Agent definition missing required field "name".`);
-  }
-
-  if (!agent.displayName) {
-    throw new Error(`Agent "${agent.name}" missing required field "displayName".`);
-  }
-
-  if (!agent.role) {
-    throw new Error(`Agent "${agent.name}" missing required field "role".`);
-  }
-
   if (!agent.identity) {
-    throw new Error(`Agent "${agent.name}" missing required field "identity".`);
+    throw new Error(`Agent definition missing required field "identity".`);
   }
+}
 
-  if (typeof agent.volumeSize !== "number" || agent.volumeSize <= 0) {
-    throw new Error(`Agent "${agent.name}": "volumeSize" must be a positive number.`);
-  }
+/**
+ * An agent entry after resolving defaults from its identity.
+ * All fields that are optional in AgentDefinition become required here.
+ */
+export interface ResolvedAgent extends AgentDefinition {
+  name: string;
+  displayName: string;
+  role: string;
+  volumeSize: number;
+}
+
+/**
+ * A manifest with all agents fully resolved from their identities.
+ */
+export interface ResolvedManifest extends Omit<ClawupManifest, "agents"> {
+  agents: ResolvedAgent[];
 }
 
 /** Result of a single prerequisite check */

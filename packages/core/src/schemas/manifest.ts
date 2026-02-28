@@ -7,21 +7,21 @@ import { z } from "zod";
 
 /** Schema for a single agent in the manifest */
 export const AgentDefinitionSchema = z.object({
-  /** Resource name (e.g., "agent-pm") */
-  name: z.string().min(1, "Agent name is required"),
-  /** Display name (e.g., "Juno") */
-  displayName: z.string().min(1, "Agent displayName is required"),
-  /** Role identifier (e.g., "pm", "eng", "tester") */
-  role: z.string().min(1, "Agent role is required"),
   /**
    * Git URL or local path to an identity repo/folder.
    * Supports `repo#subfolder` syntax for mono-repos.
    */
   identity: z.string().min(1, "Agent identity is required"),
+  /** Resource name (e.g., "agent-pm"). Derived from identity if omitted. */
+  name: z.string().optional(),
+  /** Display name (e.g., "Juno"). Derived from identity if omitted. */
+  displayName: z.string().optional(),
+  /** Role identifier (e.g., "pm", "eng", "tester"). Derived from identity if omitted. */
+  role: z.string().optional(),
   /** Pin the identity to a specific Git tag or commit hash */
   identityVersion: z.string().optional(),
-  /** EBS volume size in GB */
-  volumeSize: z.number().positive("volumeSize must be a positive number"),
+  /** EBS volume size in GB. Derived from identity if omitted (default: 30). */
+  volumeSize: z.number().positive("volumeSize must be a positive number").optional(),
   /** Override instance type for this agent */
   instanceType: z.string().optional(),
   /** Additional environment variables */

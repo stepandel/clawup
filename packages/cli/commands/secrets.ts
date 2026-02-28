@@ -7,7 +7,7 @@
  */
 
 import * as process from "process";
-import { requireManifest } from "../lib/config";
+import { requireManifest, requireResolvedManifest } from "../lib/config";
 import { selectOrCreateStack, setConfig, getConfig } from "../lib/pulumi";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
 import { PLUGIN_MANIFEST_REGISTRY, buildKnownSecrets, DEP_REGISTRY } from "@clawup/core";
@@ -63,7 +63,7 @@ const KNOWN_SECRETS: Record<string, SecretMeta> = buildAllKnownSecrets();
 // ---------------------------------------------------------------------------
 
 function resolveStackAndCwd(): { stackName: string; cwd: string | undefined } {
-  const manifest = requireManifest();
+  const manifest = requireResolvedManifest();
 
   const wsResult = ensureWorkspace();
   if (!wsResult.ok) {
@@ -146,7 +146,7 @@ export interface SecretsListOptions {}
 export async function secretsListCommand(opts: SecretsListOptions): Promise<void> {
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     console.error(pc.red((err as Error).message));
     process.exit(1);

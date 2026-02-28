@@ -10,21 +10,18 @@ import * as path from "path";
 import * as os from "os";
 import * as p from "@clack/prompts";
 import YAML from "yaml";
-import type { AgentDefinition, ClawupManifest, IdentityManifest, IdentityResult } from "@clawup/core";
+import type { ClawupManifest, IdentityManifest, IdentityResult, ResolvedAgent } from "@clawup/core";
 import {
   MANIFEST_FILE,
   ClawupManifestSchema,
-  tailscaleHostname,
   resolvePlugin,
   buildValidators,
-  isSecretCoveredByPlugin,
   resolvePlugins,
   PLUGIN_MANIFEST_REGISTRY,
-  MODEL_PROVIDERS,
-  getProviderForModel,
   getRequiredProviders,
   getProviderConfigKey,
 } from "@clawup/core";
+import { resolveAgentSync } from "@clawup/core/resolve";
 import { resolvePluginSecrets, runLifecycleHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
 import { findProjectRoot } from "../lib/project";
@@ -34,11 +31,9 @@ import { showBanner, exitWithError } from "../lib/ui";
 import {
   buildEnvDict,
   buildManifestSecrets,
-  camelToScreamingSnake,
   generateEnvExample,
   loadEnvSecrets,
   VALIDATORS,
-  agentEnvVarName,
 } from "../lib/env";
 
 interface SetupOptions {
@@ -48,9 +43,9 @@ interface SetupOptions {
   skipHooks?: boolean;
 }
 
-/** Fetched identity data stored alongside the agent definition */
+/** Fetched identity data stored alongside the resolved agent */
 interface FetchedIdentity {
-  agent: AgentDefinition;
+  agent: ResolvedAgent;
   manifest: IdentityManifest;
   identityResult: IdentityResult;
 }
@@ -101,14 +96,18 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   const identityCacheDir = path.join(os.homedir(), ".clawup", "identity-cache");
   const fetchedIdentities: FetchedIdentity[] = [];
 
+  // Resolve agent entries (hydrate name/displayName/role/volumeSize from identities)
+  const resolvedAgents: ResolvedAgent[] = [];
   const identitySpinner = p.spinner();
   identitySpinner.start("Resolving agent identities...");
   for (const agent of agents) {
     try {
+      const resolved = resolveAgentSync(agent, identityCacheDir);
       const identity = await fetchIdentity(agent.identity, identityCacheDir);
-      fetchedIdentities.push({ agent, manifest: identity.manifest, identityResult: identity });
+      resolvedAgents.push(resolved);
+      fetchedIdentities.push({ agent: resolved, manifest: identity.manifest, identityResult: identity });
     } catch (err) {
-      identitySpinner.stop(`Failed to resolve identity for ${agent.name}`);
+      identitySpinner.stop(`Failed to resolve identity for ${agent.identity}`);
       exitWithError(
         `Failed to resolve identity "${agent.identity}": ${
           err instanceof Error ? err.message : String(err)
@@ -136,13 +135,6 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     for (const d of deps) allDepNames.add(d);
   }
 
-  const identityPluginDefaults: Record<string, Record<string, Record<string, unknown>>> = {};
-  for (const fi of fetchedIdentities) {
-    if (fi.manifest.pluginDefaults) {
-      identityPluginDefaults[fi.agent.name] = fi.manifest.pluginDefaults;
-    }
-  }
-
   // Collect all model strings across all agents (primary + backup)
   const allModels: string[] = [];
   for (const fi of fetchedIdentities) {
@@ -150,14 +142,6 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     allModels.push(model);
     if (fi.manifest.backupModel) {
       allModels.push(fi.manifest.backupModel);
-    }
-  }
-
-  // Collect requiredSecrets from identities
-  const agentRequiredSecrets: Record<string, string[]> = {};
-  for (const fi of fetchedIdentities) {
-    if (fi.manifest.requiredSecrets && fi.manifest.requiredSecrets.length > 0) {
-      agentRequiredSecrets[fi.agent.name] = fi.manifest.requiredSecrets;
     }
   }
 
@@ -214,7 +198,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   // requiredSecrets that may not be in the manifest yet
   const expectedSecrets = buildManifestSecrets({
     provider: manifest.provider,
-    agents: agents.map((a) => {
+    agents: resolvedAgents.map((a) => {
       const fi = fetchedIdentities.find((f) => f.agent.name === a.name);
       return {
         name: a.name,
@@ -239,24 +223,13 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   }
   const mergedGlobalSecrets = { ...existingGlobal, ...expectedSecrets.global };
 
-  // Per-agent: prune stale managed keys, then merge fresh ones
-  for (const agent of agents) {
-    const expected = expectedSecrets.perAgent[agent.name];
-    const managedKeys = expectedSecrets.managedPerAgentKeys[agent.name] ?? [];
-    const existing = { ...(agent.secrets ?? {}) };
-    for (const key of managedKeys) {
-      if (!expected?.[key]) {
-        delete existing[key];
-      }
-    }
-    if (expected) {
-      agent.secrets = { ...existing, ...expected };
-    } else if (Object.keys(existing).length > 0) {
-      agent.secrets = existing;
-    }
-  }
+  // Build per-agent secrets from identity data (not from manifest)
+  const agentsWithSecrets = resolvedAgents.map((a) => ({
+    name: a.name,
+    secrets: expectedSecrets.perAgent[a.name],
+  }));
 
-  const resolvedSecrets = loadEnvSecrets(mergedGlobalSecrets, agents, envDict);
+  const resolvedSecrets = loadEnvSecrets(mergedGlobalSecrets, agentsWithSecrets, envDict);
 
   // -------------------------------------------------------------------------
   // 6. Validate completeness
@@ -287,7 +260,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
       if (validator) {
         const warning = validator(value);
         if (warning) {
-          const agent = agents.find((a) => a.name === agentName);
+          const agent = resolvedAgents.find((a) => a.name === agentName);
           p.log.warn(`${key} (${agent?.displayName ?? agentName}): ${warning}`);
         }
       }
@@ -315,7 +288,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
     for (const m of requiredMissing) {
       const hint = getValidatorHint(m.key);
       const agentLabel = m.agent
-        ? ` — Agent: ${agents.find((a) => a.name === m.agent)?.displayName ?? m.agent}`
+        ? ` — Agent: ${resolvedAgents.find((a) => a.name === m.agent)?.displayName ?? m.agent}`
         : " — Required";
       p.log.error(`  ${m.envVar.padEnd(30)}${agentLabel}${hint ? ` (${hint})` : ""}`);
     }
@@ -409,87 +382,21 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
   }
 
   // -------------------------------------------------------------------------
-  // 8. Update manifest
+  // 8. Regenerate .env.example (no longer writes plugins/secrets back to manifest)
   // -------------------------------------------------------------------------
   const s = p.spinner();
-  s.start("Updating manifest...");
+  s.start("Updating .env.example...");
 
-  // Update manifest secrets section
-  manifest.secrets = mergedGlobalSecrets;
-
-  // Inline plugin config into each agent definition
-  for (const fi of fetchedIdentities) {
-    const rolePlugins = agentPlugins.get(fi.agent.name);
-    if (!rolePlugins || rolePlugins.size === 0) continue;
-
-    const inlinePlugins: Record<string, Record<string, unknown>> = {};
-    const defaults = identityPluginDefaults[fi.agent.name] ?? {};
-
-    for (const pluginName of rolePlugins) {
-      const pluginDefaults = defaults[pluginName] ?? {};
-      const agentConfig: Record<string, unknown> = {
-        ...pluginDefaults,
-        agentId: fi.agent.name,
-      };
-
-      // Inject auto-resolved secrets for this plugin
-      const roleAutoResolved = autoResolvedSecrets[fi.agent.role];
-      if (roleAutoResolved) {
-        const manifest = resolvePlugin(pluginName, fi.identityResult);
-        for (const [key, secret] of Object.entries(manifest.secrets)) {
-          if (secret.autoResolvable && roleAutoResolved[key]) {
-            agentConfig[key] = roleAutoResolved[key];
-          }
-        }
-      }
-
-      inlinePlugins[pluginName] = agentConfig;
-    }
-
-    if (Object.keys(inlinePlugins).length > 0) {
-      fi.agent.plugins = inlinePlugins;
-    }
-  }
-
-  // Add requiredSecrets-derived env refs to per-agent secrets in manifest
-  for (const fi of fetchedIdentities) {
-    if (!fi.manifest.requiredSecrets || fi.manifest.requiredSecrets.length === 0) continue;
-
-    const plugins = agentPlugins.get(fi.agent.name);
-    const deps = agentDeps.get(fi.agent.name);
-    const roleUpper = fi.agent.role.toUpperCase();
-
-    if (!fi.agent.secrets) fi.agent.secrets = {};
-
-    // Resolve plugins for this agent to check coverage generically
-    const agentResolvedPlugins = resolvePlugins([...(plugins ?? [])], fi.identityResult);
-
-    for (const key of fi.manifest.requiredSecrets) {
-      if (fi.agent.secrets[key]) continue;
-      // Check if this secret is already covered by a plugin's secrets definition
-      const coveredByPlugin = isSecretCoveredByPlugin(key, agentResolvedPlugins);
-      const coveredByDep = key === "githubToken" && deps?.has("gh");
-      if (coveredByPlugin || coveredByDep) continue;
-      fi.agent.secrets[key] = `\${env:${roleUpper}_${camelToScreamingSnake(key)}}`;
-    }
-  }
-
-  // Write updated manifest
-  fs.writeFileSync(manifestPath, YAML.stringify(manifest), "utf-8");
-
-  // Regenerate .env.example
-  const perAgentSecrets: Record<string, Record<string, string>> = {};
-  for (const agent of agents) {
-    if (agent.secrets) perAgentSecrets[agent.name] = agent.secrets;
-  }
+  // Build per-agent secrets for .env.example generation (from identity data)
+  const perAgentSecrets = expectedSecrets.perAgent;
   const envExampleContent = generateEnvExample({
-    globalSecrets: manifest.secrets,
-    agents: agents.map((a) => ({ name: a.name, displayName: a.displayName, role: a.role })),
+    globalSecrets: mergedGlobalSecrets,
+    agents: resolvedAgents.map((a) => ({ name: a.name, displayName: a.displayName, role: a.role })),
     perAgentSecrets,
     agentPluginNames: agentPlugins,
   });
   fs.writeFileSync(path.join(projectRoot, ".env.example"), envExampleContent, "utf-8");
-  s.stop("Manifest updated");
+  s.stop(".env.example updated");
 
   // -------------------------------------------------------------------------
   // 9. Provision Pulumi
@@ -568,7 +475,7 @@ export async function setupCommand(opts: SetupOptions = {}): Promise<void> {
 
   // Set per-agent secrets
   for (const [agentName, agentSecrets] of Object.entries(resolvedSecrets.perAgent)) {
-    const agent = agents.find((a) => a.name === agentName);
+    const agent = resolvedAgents.find((a) => a.name === agentName);
     if (!agent) continue;
     const role = agent.role;
     const fi = fetchedIdentities.find((f) => f.agent.name === agentName);

@@ -3,7 +3,7 @@
  */
 
 import * as p from "@clack/prompts";
-import { requireManifest } from "../lib/config";
+import { requireResolvedManifest } from "../lib/config";
 import { getConfig, selectOrCreateStack } from "../lib/pulumi";
 import { SSH_USER, tailscaleHostname, dockerContainerName } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
@@ -25,10 +25,10 @@ export async function sshCommand(agentNameOrAlias: string, commandArgs: string[]
   }
   const cwd = getWorkspaceDir();
 
-  // Load manifest
+  // Load manifest (resolves agent fields from identities)
   let manifest;
   try {
-    manifest = requireManifest();
+    manifest = requireResolvedManifest();
   } catch (err) {
     exitWithError((err as Error).message);
   }
