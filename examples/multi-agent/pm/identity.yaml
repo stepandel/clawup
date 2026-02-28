@@ -4,8 +4,8 @@ role: pm
 emoji: clipboard
 description: Ticket management, research, planning, team coordination
 volumeSize: 30
-model: openai/gpt-5.2
-codingAgent: codex
+model: anthropic/claude-opus-4-6
+codingAgent: claude-code
 
 deps:
   - gh

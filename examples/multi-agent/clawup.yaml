@@ -1,0 +1,113 @@
+stackName: team-a
+provider: hetzner
+region: ash
+instanceType: cpx41
+ownerName: Stepan
+timezone: PST (America/Los_Angeles)
+workingHours: 9am-6pm
+userNotes: No additional notes provided yet.
+templateVars:
+  LINEAR_TEAM: AGE
+  GITHUB_REPO: https://github.com/stepandel/clawup
+  OWNER_NAME: Stepan
+  TIMEZONE: PST (America/Los_Angeles)
+  WORKING_HOURS: 9am-6pm
+  USER_NOTES: No additional notes provided yet.
+secrets:
+  tailscaleAuthKey: ${env:TAILSCALE_AUTH_KEY}
+  tailnetDnsName: ${env:TAILNET_DNS_NAME}
+  tailscaleApiKey: ${env:TAILSCALE_API_KEY}
+  hcloudToken: ${env:HCLOUD_TOKEN}
+  braveApiKey: ${env:BRAVE_API_KEY}
+  anthropicApiKey: ${env:ANTHROPIC_API_KEY}
+agents:
+  - name: agent-pm
+    displayName: Juno
+    role: pm
+    identity: ./pm
+    volumeSize: 30
+    plugins:
+      openclaw-linear:
+        stateActions:
+          triage: remove
+          backlog: add
+          unstarted: add
+          started: remove
+          completed: remove
+          cancelled: remove
+        agentId: agent-pm
+      slack:
+        mode: socket
+        userTokenReadOnly: true
+        groupPolicy: open
+        dm:
+          enabled: true
+          policy: open
+          allowFrom:
+            - "*"
+        agentId: agent-pm
+    secrets:
+      slackBotToken: ${env:PM_SLACK_BOT_TOKEN}
+      slackAppToken: ${env:PM_SLACK_APP_TOKEN}
+      linearApiKey: ${env:PM_LINEAR_API_KEY}
+      linearWebhookSecret: ${env:PM_LINEAR_WEBHOOK_SECRET}
+      githubToken: ${env:PM_GITHUB_TOKEN}
+  - name: agent-eng
+    displayName: Titus
+    role: eng
+    identity: ./eng
+    volumeSize: 50
+    plugins:
+      openclaw-linear:
+        stateActions:
+          triage: remove
+          backlog: add
+          started: add
+          completed: remove
+          cancelled: remove
+        agentId: agent-eng
+      slack:
+        mode: socket
+        userTokenReadOnly: true
+        groupPolicy: open
+        dm:
+          enabled: true
+          policy: open
+          allowFrom:
+            - "*"
+        agentId: agent-eng
+    secrets:
+      slackBotToken: ${env:ENG_SLACK_BOT_TOKEN}
+      slackAppToken: ${env:ENG_SLACK_APP_TOKEN}
+      linearApiKey: ${env:ENG_LINEAR_API_KEY}
+      linearWebhookSecret: ${env:ENG_LINEAR_WEBHOOK_SECRET}
+      githubToken: ${env:ENG_GITHUB_TOKEN}
+  - name: agent-tester
+    displayName: Scout
+    role: tester
+    identity: ./tester
+    volumeSize: 30
+    plugins:
+      openclaw-linear:
+        stateActions:
+          triage: remove
+          started: add
+          completed: remove
+          cancelled: remove
+        agentId: agent-tester
+      slack:
+        mode: socket
+        userTokenReadOnly: true
+        groupPolicy: open
+        dm:
+          enabled: true
+          policy: open
+          allowFrom:
+            - "*"
+        agentId: agent-tester
+    secrets:
+      slackBotToken: ${env:TESTER_SLACK_BOT_TOKEN}
+      slackAppToken: ${env:TESTER_SLACK_APP_TOKEN}
+      linearApiKey: ${env:TESTER_LINEAR_API_KEY}
+      linearWebhookSecret: ${env:TESTER_LINEAR_WEBHOOK_SECRET}
+      githubToken: ${env:TESTER_GITHUB_TOKEN}
