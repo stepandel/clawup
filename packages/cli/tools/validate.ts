@@ -67,11 +67,9 @@ function runDockerCheck(
   containerName: string,
   command: string,
 ): { ok: boolean; output: string } {
-  // Run as ubuntu user (-u) to match SSH behavior (gh auth, NVM, etc.)
-  // Source NVM so Node.js-based CLIs (codex, etc.) can find `node`
-  const nvmPreamble = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; ';
-  // Escape $ so the host shell passes them through to the container's bash
-  const escaped = (nvmPreamble + command).replace(/"/g, '\\"').replace(/\$/g, '\\$');
+  // Run as openclaw user (-u) to match SSH behavior (gh auth, etc.)
+  // Node.js is on PATH via Nix — no NVM sourcing needed
+  const escaped = command.replace(/"/g, '\\"').replace(/\$/g, '\\$');
   const result = exec.capture("docker", [
     "exec", "-u", SSH_USER, containerName, "bash", "-c", `"${escaped}"`,
   ]);
@@ -195,7 +193,7 @@ export const validateTool: ToolImplementation<ValidateOptions> = async (
       // Check 2: OpenClaw gateway running
       const gatewayCmd = isLocal
         ? "pgrep -f 'openclaw' > /dev/null && echo active || echo inactive"
-        : "systemctl --user is-active openclaw-gateway";
+        : "systemctl is-active openclaw-gateway";
       const gateway = runCheck(gatewayCmd);
       const gatewayRunning = gateway.ok && (isLocal ? gateway.output.trim().includes("active") : true);
       checks.push({
