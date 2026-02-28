@@ -262,7 +262,7 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       // Assert: UI shows success message
       expect(ui.hasLog("success", "Deployment complete!")).toBe(true);
 
-      // Verify plugin secrets are embedded in the cloud-init script
+      // Verify plugin secrets are embedded in the provisioner config JSON
       const envResult = execSync(
         `docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' ${containerName}`,
         { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
@@ -273,16 +273,22 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       expect(cloudinitMatch).not.toBeNull();
       const cloudinitScript = Buffer.from(cloudinitMatch![1], "base64").toString("utf-8");
 
-      // Assert: Slack plugin secrets are in the cloud-init script
-      expect(cloudinitScript).toContain("SLACK_BOT_TOKEN=");
-      expect(cloudinitScript).toContain("SLACK_APP_TOKEN=");
+      // Extract the provisioner config JSON from the CONFIG_B64 blob inside the script
+      const configB64Match = cloudinitScript.match(/CONFIG_B64="([^"]+)"/);
+      expect(configB64Match).not.toBeNull();
+      const provisionerConfig = JSON.parse(Buffer.from(configB64Match![1], "base64").toString("utf-8"));
 
-      // Assert: Linear plugin secrets are in the cloud-init script
-      expect(cloudinitScript).toContain("LINEAR_API_KEY=");
-      expect(cloudinitScript).toContain("LINEAR_WEBHOOK_SECRET=");
+      // Assert: Slack plugin secrets are in profileEnvVars or configSetCommands
+      const configJson = JSON.stringify(provisionerConfig);
+      expect(configJson).toContain("SLACK_BOT_TOKEN");
+      expect(configJson).toContain("SLACK_APP_TOKEN");
+
+      // Assert: Linear plugin secrets are in the provisioner config
+      expect(configJson).toContain("LINEAR_API_KEY");
+      expect(configJson).toContain("LINEAR_WEBHOOK_SECRET");
       // LINEAR_USER_UUID was resolved by the test-linear hook (echo-based stub)
-      expect(cloudinitScript).toContain("LINEAR_USER_UUID=");
-      expect(cloudinitScript).toContain("test-resolved-uuid-");
+      expect(configJson).toContain("LINEAR_USER_UUID");
+      expect(configJson).toContain("test-resolved-uuid-");
     } finally {
       dispose();
     }

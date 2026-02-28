@@ -244,7 +244,7 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
       // Assert: outro with next steps
       expect(ui.outros.some((m) => m.includes("validate"))).toBe(true);
 
-      // Assert: cloud-init uses Anthropic auto-detect (default provider)
+      // Assert: cloud-init uses Anthropic provider (default)
       const envResult = execSync(
         `docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' ${containerName}`,
         { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
@@ -252,8 +252,12 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
       const cloudinitMatch = envResult.match(/CLOUDINIT_SCRIPT=(.+)/);
       expect(cloudinitMatch).not.toBeNull();
       const cloudinitScript = Buffer.from(cloudinitMatch![1], "base64").toString("utf-8");
-      expect(cloudinitScript).toContain("Auto-detect Anthropic credential type");
-      expect(cloudinitScript).toContain("ANTHROPIC_API_KEY");
+      // Extract the provisioner config JSON from the CONFIG_B64 blob inside the script
+      const configB64Match = cloudinitScript.match(/CONFIG_B64="([^"]+)"/);
+      expect(configB64Match).not.toBeNull();
+      const provisionerConfig = JSON.parse(Buffer.from(configB64Match![1], "base64").toString("utf-8"));
+      expect(provisionerConfig.profileEnvVars).toHaveProperty("ANTHROPIC_API_KEY");
+      expect(provisionerConfig.onboard.command).toContain("--anthropic-api-key");
     } finally {
       dispose();
     }
