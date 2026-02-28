@@ -253,12 +253,12 @@ describe("cloud-init pipeline — secrets in JSON config", () => {
     const provConfig = buildConfig(config);
     expect(provConfig.profileEnvVars["LINEAR_API_KEY"]).toBe("lin_api_test_key");
 
-    // Check the config set command has the actual value
-    const apiKeyCmds = provConfig.configSetCommands.filter(
-      (c) => c.key === "plugins.entries.openclaw-linear.config.apiKey",
+    // Check the atomic config object has the actual value
+    const configCmd = provConfig.configSetCommands.find(
+      (c) => c.key === "plugins.entries.openclaw-linear.config",
     );
-    expect(apiKeyCmds.length).toBe(1);
-    expect(apiKeyCmds[0].value).toBe("lin_api_test_key");
+    expect(configCmd).toBeTruthy();
+    expect((configCmd!.value as Record<string, unknown>).apiKey).toBe("lin_api_test_key");
   });
 });
 
@@ -326,9 +326,9 @@ describe("cloud-init pipeline — plugins and deps", () => {
     );
     expect(pluginCmds.length).toBeGreaterThan(0);
 
-    const teamIdCmd = pluginCmds.find((c) => c.key.includes("teamId"));
-    expect(teamIdCmd).toBeTruthy();
-    expect(teamIdCmd!.value).toBe("TEAM-456");
+    const configCmd = pluginCmds.find((c) => c.key === "plugins.entries.openclaw-linear.config");
+    expect(configCmd).toBeTruthy();
+    expect((configCmd!.value as Record<string, unknown>).teamId).toBe("TEAM-456");
   });
 
   it("postProvision hooks are base64 encoded, preStart hooks come after config", () => {
@@ -441,17 +441,22 @@ describe("cloud-init pipeline — internalKeys filtering", () => {
     const provConfig = buildConfig(config);
     const cmds = provConfig.configSetCommands;
 
+    // Atomic config object should contain valid keys and exclude internal keys
+    const configCmd = cmds.find((c) => c.key === "plugins.entries.openclaw-linear.config");
+    expect(configCmd).toBeTruthy();
+    const configValue = configCmd!.value as Record<string, unknown>;
+
     // Valid secrets should be present
-    expect(cmds.some((c) => c.key.includes("config.apiKey"))).toBe(true);
-    expect(cmds.some((c) => c.key.includes("config.webhookSecret"))).toBe(true);
+    expect(configValue.apiKey).toBe("lin_api_test");
+    expect(configValue.webhookSecret).toBe("whsec_test");
 
     // Valid config properties should be present
-    expect(cmds.some((c) => c.key.includes("config.agentMapping"))).toBe(true);
-    expect(cmds.some((c) => c.key.includes("config.stateActions"))).toBe(true);
+    expect(configValue.agentMapping).toEqual({ "uuid-1234": "default" });
+    expect(configValue.stateActions).toEqual({ started: "add" });
 
     // Internal keys should NOT appear
-    expect(cmds.some((c) => c.key.includes("config.agentId"))).toBe(false);
-    expect(cmds.some((c) => c.key.includes("config.linearUserUuid"))).toBe(false);
+    expect(configValue).not.toHaveProperty("agentId");
+    expect(configValue).not.toHaveProperty("linearUserUuid");
   });
 
   it("filters internalKeys from channels config", () => {
@@ -511,8 +516,11 @@ describe("cloud-init pipeline — internalKeys filtering", () => {
     const provConfig = buildConfig(config);
     const cmds = provConfig.configSetCommands;
 
-    expect(cmds.some((c) => c.key.includes("config.someKey"))).toBe(true);
-    expect(cmds.some((c) => c.key.includes("config.token"))).toBe(true);
+    const configCmd = cmds.find((c) => c.key === "plugins.entries.test-plugin.config");
+    expect(configCmd).toBeTruthy();
+    const configValue = configCmd!.value as Record<string, unknown>;
+    expect(configValue.someKey).toBe("someValue");
+    expect(configValue.token).toBe("tok_test");
   });
 });
 
