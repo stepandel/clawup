@@ -115,7 +115,13 @@ requiredSecrets:
 
 ### Creating Your Own Identity
 
-See the [`examples/identity/`](./examples/identity/) directory for a minimal single-agent example (a "researcher" agent), or [`examples/multi-agent/`](./examples/multi-agent/) for a production-ready 3-agent fleet (PM, Engineer, Tester) with Linear + Slack integration and cross-agent ticket workflows. The [Creating Identities](./docs/guides/creating-identities.mdx) guide covers the full authoring reference including:
+The easiest way to create a new identity is with [`army-create`](https://github.com/stepandel/army-create):
+
+```bash
+npx army-create
+```
+
+This interactively scaffolds all required files — `identity.yaml`, workspace files, and skill stubs. See the [`examples/identity/`](./examples/identity/) directory for a minimal single-agent example, or [`examples/multi-agent/`](./examples/multi-agent/) for a production-ready 3-agent fleet. The [Creating Identities](./docs/guides/creating-identities.mdx) guide covers the full authoring reference including:
 
 - Identity structure and required files
 - `identity.yaml` field reference

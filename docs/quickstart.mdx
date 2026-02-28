@@ -24,7 +24,15 @@ Make sure you have the required tools installed:
 Run `clawup validate` after deployment to verify all agents are healthy.
 </Tip>
 
-## 3. Initialize
+## 3. Create or Discover Identities
+
+If you don't have identities yet, scaffold one with [`army-create`](https://github.com/stepandel/army-create):
+
+```bash
+npx army-create
+```
+
+Then initialize your deployment:
 
 ```bash
 clawup init

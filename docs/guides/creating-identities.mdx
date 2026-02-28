@@ -6,7 +6,7 @@ description: "Step-by-step guide to building a custom identity for Clawup"
 This guide walks you through creating a custom identity from scratch. For the full `identity.yaml` field reference, see [Identity Manifest](/configuration/identity).
 
 <Tip>
-The fastest way to get started is to copy the [example identity](https://github.com/stepandel/clawup/tree/main/examples/identity) and modify it for your use case. For a complete multi-agent deployment with cross-agent workflows, see the [multi-agent example](https://github.com/stepandel/clawup/tree/main/examples/multi-agent).
+The fastest way to create a new identity is with [`army-create`](https://github.com/stepandel/army-create) — run `npx army-create` to scaffold all required files interactively. You can also copy the [example identity](https://github.com/stepandel/clawup/tree/main/examples/identity) and modify it, or see the [multi-agent example](https://github.com/stepandel/clawup/tree/main/examples/multi-agent) for a complete multi-agent deployment.
 </Tip>
 
 ## Identity Structure
@@ -343,7 +343,7 @@ See [Environment Variables](/configuration/environment#identity-requiredsecrets)
 
 ## Tips
 
-- **Start with an example.** Copy `examples/identity/` for a single agent, or `examples/multi-agent/` for a full PM + Engineer + Tester fleet.
+- **Start with `army-create`.** Run `npx army-create` to scaffold a new identity interactively ([GitHub](https://github.com/stepandel/army-create) · [npm](https://www.npmjs.com/package/army-create)). Or copy `examples/identity/` for a single agent, or `examples/multi-agent/` for a full PM + Engineer + Tester fleet.
 - **Keep SOUL.md focused.** 30-50 lines is plenty. Agents work better with clear, concise personality guidance.
 - **Test locally first.** Use a local path identity during development, switch to Git URL for production.
 - **One skill per workflow.** Each skill should handle one complete workflow. If a skill is doing too much, split it.
