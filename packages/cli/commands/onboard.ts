@@ -114,9 +114,12 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
 
   // 5. Resolve secrets
   const agentDeps = new Map<string, Set<string>>();
+  const allModels: string[] = [];
   for (const fi of fetchedIdentities) {
     const identityManifest = fi.identityResult.manifest;
     agentDeps.set(fi.agent.name, new Set(identityManifest.deps ?? []));
+    allModels.push(identityManifest.model ?? "anthropic/claude-opus-4-6");
+    if (identityManifest.backupModel) allModels.push(identityManifest.backupModel);
   }
 
   const expectedSecrets = buildManifestSecrets({
@@ -134,6 +137,7 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
     allDepNames,
     agentPlugins,
     agentDeps,
+    allModels,
   });
 
   const mergedGlobalSecrets = { ...(manifest.secrets ?? {}), ...expectedSecrets.global };
