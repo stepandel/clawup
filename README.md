@@ -115,7 +115,7 @@ requiredSecrets:
 
 ### Creating Your Own Identity
 
-See the [`examples/identity/`](./examples/identity/) directory for a complete, minimal example (a "researcher" agent), and the [Creating Identities](./docs/guides/creating-identities.mdx) guide for the full authoring reference covering:
+See the [`examples/identity/`](./examples/identity/) directory for a minimal single-agent example (a "researcher" agent), or [`examples/multi-agent/`](./examples/multi-agent/) for a production-ready 3-agent fleet (PM, Engineer, Tester) with Linear + Slack integration and cross-agent ticket workflows. The [Creating Identities](./docs/guides/creating-identities.mdx) guide covers the full authoring reference including:
 
 - Identity structure and required files
 - `identity.yaml` field reference
@@ -433,7 +433,8 @@ clawup/
 │   │       └── index.ts    # Main Pulumi stack program
 │   └── web/                # Next.js dashboard (clawup-web)
 ├── examples/               # Example identities for reference
-│   └── identity/           # Complete "researcher" identity example
+│   ├── identity/           # Minimal single-agent "researcher" example
+│   └── multi-agent/        # Production 3-agent fleet (PM, Engineer, Tester)
 ├── docs/                   # Documentation (Mintlify site + guides)
 ├── esc/                    # Pulumi ESC secret templates
 ├── scripts/                # Shell script helpers

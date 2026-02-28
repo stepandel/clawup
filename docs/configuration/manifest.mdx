@@ -51,7 +51,7 @@ agents:
   - name: agent-pm
     displayName: Juno
     role: pm
-    identity: "https://github.com/stepandel/army-identities#pm"
+    identity: ./pm           # Local identity directory
     volumeSize: 30
     plugins:
       openclaw-linear:
@@ -61,7 +61,7 @@ agents:
   - name: agent-eng
     displayName: Titus
     role: eng
-    identity: "https://github.com/stepandel/army-identities#eng"
+    identity: ./eng
     volumeSize: 50
   - name: agent-researcher
     displayName: Atlas
@@ -69,6 +69,10 @@ agents:
     identity: "./my-identities/researcher"
     volumeSize: 20
 ```
+
+<Tip>
+See [`examples/multi-agent/`](https://github.com/stepandel/clawup/tree/main/examples/multi-agent) for a complete, deployable manifest with three agents (PM, Engineer, Tester), full plugin configuration, and cross-agent ticket workflows.
+</Tip>
 
 ## Fields
 
