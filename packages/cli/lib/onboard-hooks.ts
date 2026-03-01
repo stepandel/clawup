@@ -81,7 +81,7 @@ export async function runOnboardHooks(args: RunOnboardHooksArgs): Promise<void> 
         console.log();
       }
     } else {
-      p.log.error(`Swarm onboard hook failed: ${result.error}`);
+      p.log.error(`Swarm onboard hook failed: ${redactSecretsFromString(result.error)}`);
       exitWithError(
         "Swarm onboard hook failed. Fix the issue and run `clawup setup --onboard` again, or run `clawup onboard` separately."
       );
@@ -107,7 +107,7 @@ export async function runOnboardHooks(args: RunOnboardHooksArgs): Promise<void> 
           console.log();
         }
       } else {
-        p.log.error(`Identity onboard hook for ${fi.agent.displayName} failed: ${result.error}`);
+        p.log.error(`Identity onboard hook for ${fi.agent.displayName} failed: ${redactSecretsFromString(result.error)}`);
         exitWithError(
           "Identity onboard hook failed. Fix the issue and run `clawup setup --onboard` again, or run `clawup onboard` separately."
         );

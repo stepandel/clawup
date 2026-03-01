@@ -23,6 +23,7 @@ import {
 import { resolveAgentSync } from "@clawup/core/resolve";
 import { resolvePluginSecrets, runOnboardHook, runResolveHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
+import { redactSecretsFromString } from "./redact.js";
 import { findProjectRoot } from "./project";
 import { selectOrCreateStack, setConfig, qualifiedStackName } from "./pulumi";
 import { ensureWorkspace, getWorkspaceDir } from "./workspace";
@@ -438,7 +439,7 @@ export async function runSetup(progress: SetupProgress, options?: SetupOptions):
         s.stop(`Resolved ${envVar} (${label})`);
       } else {
         s.stop(`Failed to resolve ${envVar} (${label})`);
-        progress.log.warn(`Non-plugin resolve hook failed for ${envVar}: ${result.error}`);
+        progress.log.warn(`Non-plugin resolve hook failed for ${envVar}: ${redactSecretsFromString(result.error)}`);
       }
     }
   }
