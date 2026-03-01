@@ -365,7 +365,7 @@ describe("cloud-init pipeline — plugins and deps", () => {
     expect(hooksPreIdx).toBeGreaterThan(configIdx);
   });
 
-  it("dep install + post-install scripts are base64 encoded; Brave search in config", () => {
+  it("dep install + post-install scripts are merged into postProvisionHooks with runAs", () => {
     const config: CloudInitConfig = {
       ...ANTHROPIC_CLOUD,
       deps: [
@@ -377,29 +377,85 @@ describe("cloud-init pipeline — plugins and deps", () => {
         },
       ],
       depSecrets: {
-        BRAVE_API_KEY: "brave-key-test",
         GITHUB_TOKEN: "ghp_test",
         ANTHROPIC_API_KEY: "sk-ant-api03-test-key",
       },
     };
     const provConfig = buildConfig(config);
 
-    // Root-level install script encoded
-    expect(provConfig.depsRoot.length).toBe(1);
-    const installDecoded = Buffer.from(provConfig.depsRoot[0].script, "base64").toString();
+    // Install script in postProvisionHooks with runAs: root
+    const installHook = provConfig.postProvisionHooks.find((h) => h.name === "dep:gh:install");
+    expect(installHook).toBeTruthy();
+    expect(installHook!.runAs).toBe("root");
+    const installDecoded = Buffer.from(installHook!.script, "base64").toString();
     expect(installDecoded).toContain("MARKER_GH_INSTALL");
 
-    // Post-install script encoded
-    expect(provConfig.depsPostInstall.length).toBe(1);
-    const postDecoded = Buffer.from(provConfig.depsPostInstall[0].script, "base64").toString();
+    // Post-install script in postProvisionHooks with runAs: ubuntu
+    const postHook = provConfig.postProvisionHooks.find((h) => h.name === "dep:gh:post");
+    expect(postHook).toBeTruthy();
+    expect(postHook!.runAs).toBe("ubuntu");
+    const postDecoded = Buffer.from(postHook!.script, "base64").toString();
     expect(postDecoded).toContain("MARKER_GH_POST_INSTALL");
+  });
 
-    // Brave search in config set commands
+  it("brave-search is NOT in configSetCommands (handled by dep postInstallScript)", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      depSecrets: {
+        BRAVE_API_KEY: "brave-key-test",
+        ANTHROPIC_API_KEY: "sk-ant-api03-test-key",
+      },
+    };
+    const provConfig = buildConfig(config);
     const braveCmds = provConfig.configSetCommands.filter(
       (c) => c.key === "tools.web.search",
     );
-    expect(braveCmds.length).toBe(1);
-    expect(braveCmds[0].value).toEqual({ provider: "brave", apiKey: "brave-key-test" });
+    expect(braveCmds.length).toBe(0);
+  });
+
+  it("dep hooks come before extraHooks and plugin hooks in postProvisionHooks", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      deps: [
+        {
+          name: "gh",
+          installScript: 'apt-get install -y gh',
+          postInstallScript: 'gh auth login',
+          secrets: { GithubToken: { envVar: "GITHUB_TOKEN" } },
+        },
+      ],
+      extraHooks: {
+        postProvision: [{ label: "swarm", script: 'echo "SWARM"' }],
+      },
+      plugins: [
+        {
+          name: "test-plugin",
+          installable: true,
+          config: {},
+          hooks: { postProvision: 'echo "PLUGIN"' },
+        },
+      ],
+      depSecrets: { GITHUB_TOKEN: "ghp_test", ANTHROPIC_API_KEY: "sk-ant-api03-test-key" },
+    };
+    const provConfig = buildConfig(config);
+    const names = provConfig.postProvisionHooks.map((h) => h.name);
+    expect(names).toEqual([
+      "dep:gh:install",
+      "dep:gh:post",
+      "swarm",
+      "plugin:test-plugin",
+    ]);
+  });
+
+  it("non-dep hooks default runAs to undefined (template defaults to ubuntu)", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        postProvision: [{ label: "swarm", script: 'echo "SWARM"' }],
+      },
+    };
+    const provConfig = buildConfig(config);
+    expect(provConfig.postProvisionHooks[0].runAs).toBeUndefined();
   });
 });
 

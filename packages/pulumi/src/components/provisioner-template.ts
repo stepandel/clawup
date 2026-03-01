@@ -109,16 +109,6 @@ phase_tailscale() {
   tailscale up $ts_args || echo "WARNING: Tailscale setup failed. Run 'sudo tailscale up' manually."
 }
 
-# ===== PHASE: Deps (root install) =====
-phase_deps_root() {
-  local count=$(cfg_len '.depsRoot')
-  for i in $(seq 0 $((count - 1))); do
-    local name=$(cfg ".depsRoot[$i].name")
-    echo "Installing dep: $name..."
-    run_encoded_script "$(cfg ".depsRoot[$i].script")" root
-  done
-}
-
 # ===== PHASE: NVM + Node.js + OpenClaw =====
 phase_nvm_node() {
   local node_version=$(cfg '.nodeVersion')
@@ -188,16 +178,6 @@ phase_env_vars() {
   fi
 }
 
-# ===== PHASE: Deps post-install (as ubuntu) =====
-phase_deps_post() {
-  local count=$(cfg_len '.depsPostInstall')
-  for i in $(seq 0 $((count - 1))); do
-    local name=$(cfg ".depsPostInstall[$i].name")
-    echo "Post-install: $name..."
-    run_encoded_script "$(cfg ".depsPostInstall[$i].script")" ubuntu
-  done
-}
-
 # ===== PHASE: Systemd =====
 phase_systemd() {
   echo "Enabling systemd linger for ubuntu user..."
@@ -217,8 +197,9 @@ phase_hooks_post_provision() {
   local count=$(cfg_len '.postProvisionHooks')
   for i in $(seq 0 $((count - 1))); do
     local name=$(cfg ".postProvisionHooks[$i].name")
-    echo "Running postProvision hook for $name..."
-    run_encoded_script "$(cfg ".postProvisionHooks[$i].script")" ubuntu
+    local run_as=$(cfg ".postProvisionHooks[$i].runAs // \\"ubuntu\\"")
+    echo "Running postProvision hook for $name (as $run_as)..."
+    run_encoded_script "$(cfg ".postProvisionHooks[$i].script")" "$run_as"
     echo "postProvision hook for $name complete"
   done
 }
@@ -309,8 +290,9 @@ phase_hooks_pre_start() {
   local count=$(cfg_len '.preStartHooks')
   for i in $(seq 0 $((count - 1))); do
     local name=$(cfg ".preStartHooks[$i].name")
-    echo "Running preStart hook for $name..."
-    run_encoded_script "$(cfg ".preStartHooks[$i].script")" ubuntu
+    local run_as=$(cfg ".preStartHooks[$i].runAs // \\"ubuntu\\"")
+    echo "Running preStart hook for $name (as $run_as)..."
+    run_encoded_script "$(cfg ".preStartHooks[$i].script")" "$run_as"
     echo "preStart hook for $name complete"
   done
 }
@@ -409,11 +391,9 @@ phase_system
 
 [ "$(cfg '.tailscale.skip')" != "true" ] && phase_tailscale
 
-phase_deps_root
 phase_nvm_node
 phase_coding_agent
 phase_env_vars
-phase_deps_post
 
 [ "$(cfg '.foregroundMode')" != "true" ] && phase_systemd
 

@@ -77,13 +77,9 @@ export interface ProvisionerConfig {
   // Workspace files (gzip+base64 encoded content)
   workspaceFiles: Array<{ path: string; gzipBase64: string }>;
 
-  // Deps (base64-encoded bash scripts)
-  depsRoot: Array<{ name: string; script: string }>;
-  depsPostInstall: Array<{ name: string; script: string }>;
-
   // Hooks (base64-encoded bash scripts)
-  postProvisionHooks: Array<{ name: string; script: string }>;
-  preStartHooks: Array<{ name: string; script: string }>;
+  postProvisionHooks: Array<{ name: string; script: string; runAs?: "root" | "ubuntu" }>;
+  preStartHooks: Array<{ name: string; script: string; runAs?: "root" | "ubuntu" }>;
 
   // Daemon / gateway
   foregroundMode: boolean;
@@ -395,16 +391,6 @@ function buildConfigSetCommands(config: CloudInitConfig): ConfigSetCommand[] {
     });
   }
 
-  // 15. Brave search
-  const braveApiKey = allSecrets["BRAVE_API_KEY"];
-  if (braveApiKey) {
-    cmds.push({
-      key: "tools.web.search",
-      value: { provider: "brave", apiKey: braveApiKey },
-      comment: "Brave Search API",
-    });
-  }
-
   return cmds;
 }
 
@@ -556,17 +542,18 @@ export function buildProvisionerConfig(
     },
   );
 
-  // --- Deps ---
-  const depsRoot = (config.deps ?? [])
+  // --- Hooks (deps merged into postProvisionHooks) ---
+  const depInstallHooks = (config.deps ?? [])
     .filter((d) => d.installScript)
-    .map((d) => ({ name: d.name, script: b64(d.installScript) }));
+    .map((d) => ({ name: `dep:${d.name}:install`, script: b64(d.installScript), runAs: "root" as const }));
 
-  const depsPostInstall = (config.deps ?? [])
+  const depPostHooks = (config.deps ?? [])
     .filter((d) => d.postInstallScript)
-    .map((d) => ({ name: d.name, script: b64(d.postInstallScript) }));
+    .map((d) => ({ name: `dep:${d.name}:post`, script: b64(d.postInstallScript), runAs: "ubuntu" as const }));
 
-  // --- Hooks ---
   const postProvisionHooks = [
+    ...depInstallHooks,
+    ...depPostHooks,
     ...(config.extraHooks?.postProvision ?? [])
       .map((h) => ({ name: h.label, script: b64(h.script) })),
     ...(config.plugins ?? [])
@@ -620,8 +607,6 @@ export function buildProvisionerConfig(
     clawhubSkills: config.clawhubSkills ?? [],
 
     workspaceFiles,
-    depsRoot,
-    depsPostInstall,
     postProvisionHooks,
     preStartHooks,
 

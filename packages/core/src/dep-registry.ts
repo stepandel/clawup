@@ -65,7 +65,15 @@ export GITHUB_TOKEN="\$_GH_TOKEN"
   "brave-search": {
     displayName: "Brave Search",
     installScript: "",      // config-only, no binary to install
-    postInstallScript: "",  // config patching stays in config-generator.ts
+    postInstallScript: `
+# Configure Brave Search in OpenClaw
+if [ -n "\${BRAVE_API_KEY}" ]; then
+  openclaw config set tools.web.search '{"provider":"brave","apiKey":"'"\${BRAVE_API_KEY}"'"}'
+  echo "Brave Search configured successfully"
+else
+  echo "WARNING: BRAVE_API_KEY not set, skipping Brave Search config"
+fi
+`,
     secrets: {
       BraveApiKey: {
         envVar: "BRAVE_API_KEY",
