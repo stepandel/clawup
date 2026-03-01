@@ -404,7 +404,196 @@ describe("cloud-init pipeline — plugins and deps", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Plugin internalKeys filtering
+// 6. Multi-level hooks (extraHooks merging)
+// ---------------------------------------------------------------------------
+
+describe("cloud-init pipeline — multi-level hooks (extraHooks)", () => {
+  it("extraHooks only (no plugin hooks): swarm and identity hooks are included", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        postProvision: [
+          { label: "swarm", script: 'echo "SWARM_POST"' },
+          { label: "identity:juno", script: 'echo "IDENTITY_POST"' },
+        ],
+        preStart: [
+          { label: "swarm", script: 'echo "SWARM_PRE"' },
+          { label: "identity:juno", script: 'echo "IDENTITY_PRE"' },
+        ],
+      },
+    };
+    const provConfig = buildConfig(config);
+
+    expect(provConfig.postProvisionHooks).toHaveLength(2);
+    expect(provConfig.postProvisionHooks[0].name).toBe("swarm");
+    expect(provConfig.postProvisionHooks[1].name).toBe("identity:juno");
+
+    expect(provConfig.preStartHooks).toHaveLength(2);
+    expect(provConfig.preStartHooks[0].name).toBe("swarm");
+    expect(provConfig.preStartHooks[1].name).toBe("identity:juno");
+
+    // Verify base64 encoding
+    const swarmPostDecoded = Buffer.from(provConfig.postProvisionHooks[0].script, "base64").toString();
+    expect(swarmPostDecoded).toContain("SWARM_POST");
+    const identityPreDecoded = Buffer.from(provConfig.preStartHooks[1].script, "base64").toString();
+    expect(identityPreDecoded).toContain("IDENTITY_PRE");
+  });
+
+  it("extraHooks + plugin hooks: order is swarm → identity → plugin", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        postProvision: [
+          { label: "swarm", script: 'echo "SWARM"' },
+          { label: "identity:titus", script: 'echo "IDENTITY"' },
+        ],
+        preStart: [
+          { label: "swarm", script: 'echo "SWARM_PRE"' },
+        ],
+      },
+      plugins: [
+        {
+          name: "test-plugin",
+          installable: true,
+          config: {},
+          hooks: {
+            postProvision: 'echo "PLUGIN_POST"',
+            preStart: 'echo "PLUGIN_PRE"',
+          },
+        },
+      ],
+    };
+    const provConfig = buildConfig(config);
+
+    // postProvision: swarm, identity, plugin
+    expect(provConfig.postProvisionHooks).toHaveLength(3);
+    expect(provConfig.postProvisionHooks[0].name).toBe("swarm");
+    expect(provConfig.postProvisionHooks[1].name).toBe("identity:titus");
+    expect(provConfig.postProvisionHooks[2].name).toBe("plugin:test-plugin");
+
+    // preStart: swarm, plugin (no identity preStart in this case)
+    expect(provConfig.preStartHooks).toHaveLength(2);
+    expect(provConfig.preStartHooks[0].name).toBe("swarm");
+    expect(provConfig.preStartHooks[1].name).toBe("plugin:test-plugin");
+  });
+
+  it("no hooks at any level: arrays are empty", () => {
+    const provConfig = buildConfig(ANTHROPIC_CLOUD);
+    expect(provConfig.postProvisionHooks).toHaveLength(0);
+    expect(provConfig.preStartHooks).toHaveLength(0);
+  });
+
+  it("extraHooks with only postProvision: preStart is empty", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        postProvision: [{ label: "swarm", script: 'echo "ONLY_POST"' }],
+      },
+    };
+    const provConfig = buildConfig(config);
+    expect(provConfig.postProvisionHooks).toHaveLength(1);
+    expect(provConfig.preStartHooks).toHaveLength(0);
+  });
+
+  it("extraHooks with only preStart: postProvision is empty", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        preStart: [{ label: "identity:juno", script: 'echo "ONLY_PRE"' }],
+      },
+    };
+    const provConfig = buildConfig(config);
+    expect(provConfig.postProvisionHooks).toHaveLength(0);
+    expect(provConfig.preStartHooks).toHaveLength(1);
+    expect(provConfig.preStartHooks[0].name).toBe("identity:juno");
+  });
+
+  it("multiple plugins with hooks: all appended after extraHooks", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        postProvision: [{ label: "swarm", script: 'echo "SWARM"' }],
+      },
+      plugins: [
+        {
+          name: "plugin-a",
+          installable: true,
+          config: {},
+          hooks: { postProvision: 'echo "A"' },
+        },
+        {
+          name: "plugin-b",
+          installable: true,
+          config: {},
+          hooks: { postProvision: 'echo "B"', preStart: 'echo "B_PRE"' },
+        },
+      ],
+    };
+    const provConfig = buildConfig(config);
+
+    expect(provConfig.postProvisionHooks).toHaveLength(3);
+    expect(provConfig.postProvisionHooks.map((h) => h.name)).toEqual([
+      "swarm",
+      "plugin:plugin-a",
+      "plugin:plugin-b",
+    ]);
+
+    // preStart: no extra, just plugin-b
+    expect(provConfig.preStartHooks).toHaveLength(1);
+    expect(provConfig.preStartHooks[0].name).toBe("plugin:plugin-b");
+  });
+
+  it("plugin with no hooks does not appear in hook arrays", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        postProvision: [{ label: "swarm", script: 'echo "SWARM"' }],
+      },
+      plugins: [
+        { name: "no-hooks-plugin", installable: true, config: {} },
+        {
+          name: "has-hooks",
+          installable: true,
+          config: {},
+          hooks: { postProvision: 'echo "HAS"' },
+        },
+      ],
+    };
+    const provConfig = buildConfig(config);
+    expect(provConfig.postProvisionHooks).toHaveLength(2);
+    expect(provConfig.postProvisionHooks.map((h) => h.name)).toEqual([
+      "swarm",
+      "plugin:has-hooks",
+    ]);
+  });
+
+  it("all three levels in generated script maintain phase ordering", () => {
+    const config: CloudInitConfig = {
+      ...ANTHROPIC_CLOUD,
+      extraHooks: {
+        postProvision: [{ label: "swarm", script: 'echo "S"' }],
+        preStart: [{ label: "identity:juno", script: 'echo "I"' }],
+      },
+      plugins: [
+        {
+          name: "test-plugin",
+          installable: true,
+          config: {},
+          hooks: { postProvision: 'echo "P"', preStart: 'echo "P_PRE"' },
+        },
+      ],
+    };
+    const script = generateScript(config);
+    const hooksPostIdx = script.indexOf("phase_hooks_post_provision");
+    const configIdx = script.indexOf("phase_config");
+    const hooksPreIdx = script.indexOf("phase_hooks_pre_start");
+    expect(hooksPostIdx).toBeLessThan(configIdx);
+    expect(hooksPreIdx).toBeGreaterThan(configIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Plugin internalKeys filtering
 // ---------------------------------------------------------------------------
 
 describe("cloud-init pipeline — internalKeys filtering", () => {
