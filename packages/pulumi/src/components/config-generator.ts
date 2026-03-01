@@ -55,8 +55,6 @@ export interface OpenClawConfigOptions {
   customConfig?: Record<string, unknown>;
   /** Dynamic plugin configurations */
   plugins?: PluginEntry[];
-  /** Brave Search API key for web search */
-  braveApiKey?: string;
 }
 
 export interface OpenClawConfig {
@@ -77,14 +75,6 @@ export interface OpenClawConfig {
     port: number;
   };
   model?: string;
-  tools?: {
-    web: {
-      search: {
-        provider: string;
-        apiKey: string;
-      };
-    };
-  };
   [key: string]: unknown;
 }
 
@@ -112,10 +102,6 @@ export function generateOpenClawConfig(options: OpenClawConfigOptions): OpenClaw
     config.browser = {
       port: options.browserPort,
     };
-  }
-
-  if (options.braveApiKey) {
-    config.tools = { web: { search: { provider: "brave", apiKey: options.braveApiKey } } };
   }
 
   // Merge custom config
