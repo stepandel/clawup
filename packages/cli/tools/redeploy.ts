@@ -1,6 +1,9 @@
 /**
  * Redeploy Tool — Update agents in-place with pulumi up --refresh
  *
+ * For non-local redeploys, automatically runs setup (secret validation,
+ * Pulumi provisioning) before redeploying — no separate `clawup setup` needed.
+ *
  * Platform-agnostic implementation using RuntimeAdapter.
  * Unlike destroy+deploy, this reuses existing infrastructure (including Tailscale devices).
  */
@@ -9,6 +12,7 @@ import type { RuntimeAdapter, ToolImplementation } from "../adapters";
 import { requireResolvedManifest, syncManifestToProject } from "../lib/config";
 import type { ClawupManifest, ResolvedManifest } from "@clawup/core";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
+import { runSetup, type SetupProgress } from "../lib/setup";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
 import { getConfig, setConfig, verifyStackOwnership, stampStackFingerprint } from "../lib/tool-helpers";
 import { formatAgentList } from "../lib/ui";
@@ -21,6 +25,26 @@ export interface RedeployOptions {
   yes?: boolean;
   /** Run in local Docker containers */
   local?: boolean;
+  /** Path to .env file (defaults to .env in project root) */
+  envFile?: string;
+  /** Skip plugin lifecycle hook execution */
+  skipHooks?: boolean;
+}
+
+/** Build a SetupProgress adapter from RuntimeAdapter.ui */
+function uiToSetupProgress(ui: RuntimeAdapter["ui"]): SetupProgress {
+  return {
+    spinner: (msg: string) => {
+      const s = ui.spinner(msg);
+      return { start: (_msg: string) => {/* already started by ui.spinner() */}, stop: (msg: string) => s.stop(msg) };
+    },
+    log: {
+      info: (msg: string) => ui.log.info(msg),
+      warn: (msg: string) => ui.log.warn(msg),
+      error: (msg: string) => ui.log.error(msg),
+      success: (msg: string) => ui.log.success(msg),
+    },
+  };
 }
 
 /**
@@ -40,6 +64,19 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     ui.log.error(wsResult.error ?? "Failed to set up workspace.");
     process.exit(1);
   }
+
+  // For non-local redeploys, run setup automatically (validate .env, configure Pulumi)
+  if (!options.local) {
+    const setupResult = await runSetup(uiToSetupProgress(ui), {
+      envFile: options.envFile,
+      skipHooks: options.skipHooks,
+    });
+    if (!setupResult.ok) {
+      ui.log.error(setupResult.error!);
+      process.exit(1);
+    }
+  }
+
   const cwd = getWorkspaceDir();
 
   // Load manifest (resolves agent fields from identities)
@@ -74,7 +111,8 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
       process.exit(1);
     }
     stampStackFingerprint(exec, projectRoot, cwd);
-  } else {
+  } else if (isLocal) {
+    // Only verify ownership for local stacks (non-local already verified by runSetup)
     const collisionError = verifyStackOwnership(exec, projectRoot, cwd);
     if (collisionError) {
       ui.log.error(collisionError);
@@ -115,15 +153,15 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
   // Sync manifest to project root so the Pulumi program can read it
   syncManifestToProject(cwd, isLocal ? { provider: "local" as const } : undefined);
 
-  // Sync instanceType from manifest to Pulumi config
-  const configSetResult = exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType], cwd);
-  if (configSetResult.exitCode !== 0) {
-    ui.log.error(`Failed to set Pulumi config: ${configSetResult.stderr || "unknown error"}`);
-    process.exit(1);
-  }
-
   // --local: auto-configure by copying all config from the cloud stack
   if (isLocal) {
+    // Sync instanceType from manifest to Pulumi config
+    const configSetResult = exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType], cwd);
+    if (configSetResult.exitCode !== 0) {
+      ui.log.error(`Failed to set Pulumi config: ${configSetResult.stderr || "unknown error"}`);
+      process.exit(1);
+    }
+
     const cloudStack = qualifiedStackName(manifest.stackName, manifest.organization);
     const configResult = exec.capture("pulumi", ["config", "--json", "--show-secrets", "--stack", cloudStack], cwd);
 
@@ -150,7 +188,7 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
       if (anthropicKey) {
         setConfig(exec, "anthropicApiKey", anthropicKey, cwd, true);
       } else {
-        ui.log.warn("No cloud stack found and ANTHROPIC_API_KEY not set. Run `clawup setup` first.");
+        ui.log.warn("No cloud stack found and ANTHROPIC_API_KEY not set.");
       }
     }
 
@@ -195,15 +233,17 @@ export const redeployTool: ToolImplementation<RedeployOptions> = async (
     }
 
     // Ensure Tailscale Funnel prerequisites if any agent uses Linear
-    const hasLinearAgents = manifest.agents.some(
-      (a) => !!getConfig(exec, `${a.role}LinearApiKey`, cwd)
-    );
-    if (hasLinearAgents && tailscaleApiKey) {
-      const spinner = ui.spinner("Ensuring Tailscale Funnel prerequisites...");
-      const funnel = ensureTailscaleFunnel(tailscaleApiKey);
-      const changes: string[] = [];
-      if (funnel.funnelAcl) changes.push("Funnel ACL enabled");
-      spinner.stop(changes.length > 0 ? changes.join(", ") : "Funnel prerequisites OK");
+    if (tailscaleApiKey) {
+      const hasLinearAgents = manifest.agents.some(
+        (a) => !!getConfig(exec, `${a.role}LinearApiKey`, cwd)
+      );
+      if (hasLinearAgents) {
+        const spinner = ui.spinner("Ensuring Tailscale Funnel prerequisites...");
+        const funnel = ensureTailscaleFunnel(tailscaleApiKey);
+        const changes: string[] = [];
+        if (funnel.funnelAcl) changes.push("Funnel ACL enabled");
+        spinner.stop(changes.length > 0 ? changes.join(", ") : "Funnel prerequisites OK");
+      }
     }
   }
 

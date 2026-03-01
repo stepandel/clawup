@@ -433,7 +433,7 @@ export function generateEnvExample(opts: EnvExampleOpts): string {
       }
 
       if (isAutoResolvable) {
-        lines.push(`# ${varName}=  # auto-resolved by \`clawup setup\``);
+        lines.push(`# ${varName}=  # auto-resolved by \`clawup deploy\``);
       } else {
         lines.push(`${varName}=`);
       }

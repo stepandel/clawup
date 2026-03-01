@@ -80,7 +80,7 @@ export async function updateCommand(_opts: UpdateOptions): Promise<void> {
       `  See ${pc.dim("https://github.com/stepandel/clawup/releases")} for details.\n` +
       `  Key changes in v${latMajor}.x:\n` +
       `  • \`clawup init\` is now non-interactive (generates scaffold, edit YAML by hand)\n` +
-      `  • New \`clawup setup\` command required between init and deploy\n` +
+      `  • \`clawup deploy\` now handles setup automatically (no separate setup step)\n` +
       `  • Run \`clawup init\` on existing projects to refresh your manifest`
     );
     console.log();

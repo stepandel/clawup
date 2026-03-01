@@ -28,30 +28,16 @@ Generates a `clawup.yaml` manifest and `.env.example` in the current directory. 
 clawup init              # Generate scaffold (or refresh if clawup.yaml exists)
 ```
 
-### `clawup setup`
-
-Non-interactive command that validates secrets from `.env` and configures the Pulumi stack.
-
-1. Reads `clawup.yaml` and `.env`
-2. Validates all required secrets are present (exits with a list of missing ones if not)
-3. Auto-fetches Linear user UUIDs via the API
-4. Configures Pulumi with all resolved secrets
-
-```bash
-clawup setup                            # Standard setup
-clawup setup --env-file /path/to/.env   # Custom .env location
-clawup setup --deploy                   # Setup + immediate deploy
-clawup setup --deploy -y                # Setup + deploy without confirmation
-```
-
 ### `clawup deploy`
 
-Deploy your agents with `pulumi up`. Runs prerequisite checks before deploying.
+Validates secrets from `.env`, configures Pulumi, and deploys your agents with `pulumi up`. Handles everything that `clawup setup` used to do, plus the actual deployment.
 
 ```bash
-clawup deploy             # Deploy with confirmation prompt
-clawup deploy -y          # Skip confirmation
-clawup deploy --local     # Deploy to local Docker containers
+clawup deploy                            # Deploy with confirmation prompt
+clawup deploy -y                         # Skip confirmation
+clawup deploy --local                    # Deploy to local Docker containers
+clawup deploy --env-file /path/to/.env   # Custom .env location
+clawup deploy --skip-hooks               # Skip plugin lifecycle hooks
 ```
 
 ### `clawup status`
@@ -220,7 +206,7 @@ The `secrets` section uses `${env:VAR}` references — actual values come from a
 
 ### Pulumi Config
 
-Secrets and stack configuration are stored in Pulumi config (encrypted). The `setup` command sets these automatically:
+Secrets and stack configuration are stored in Pulumi config (encrypted). The `deploy` command sets these automatically:
 
 - `anthropicApiKey` (secret)
 - `tailscaleAuthKey` (secret)

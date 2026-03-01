@@ -1,6 +1,9 @@
 /**
  * Deploy Tool — Deploy agents with pulumi up
  *
+ * For non-local deploys, automatically runs setup (secret validation,
+ * Pulumi provisioning) before deploying — no separate `clawup setup` needed.
+ *
  * Platform-agnostic implementation using RuntimeAdapter.
  */
 
@@ -12,6 +15,7 @@ import { fetchIdentitySync } from "@clawup/core/identity";
 import * as path from "path";
 import * as os from "os";
 import { ensureWorkspace, getWorkspaceDir } from "../lib/workspace";
+import { runSetup, type SetupProgress } from "../lib/setup";
 import { isTailscaleInstalled, isTailscaleRunning, cleanupTailscaleDevices, ensureMagicDns, ensureTailscaleFunnel } from "../lib/tailscale";
 import { getConfig, setConfig, verifyStackOwnership, stampStackFingerprint } from "../lib/tool-helpers";
 import { formatAgentList, formatCost } from "../lib/ui";
@@ -24,6 +28,26 @@ export interface DeployOptions {
   yes?: boolean;
   /** Run in local Docker containers (for testing) */
   local?: boolean;
+  /** Path to .env file (defaults to .env in project root) */
+  envFile?: string;
+  /** Skip plugin lifecycle hook execution */
+  skipHooks?: boolean;
+}
+
+/** Build a SetupProgress adapter from RuntimeAdapter.ui */
+function uiToSetupProgress(ui: RuntimeAdapter["ui"]): SetupProgress {
+  return {
+    spinner: (msg: string) => {
+      const s = ui.spinner(msg);
+      return { start: (_msg: string) => {/* already started by ui.spinner() */}, stop: (msg: string) => s.stop(msg) };
+    },
+    log: {
+      info: (msg: string) => ui.log.info(msg),
+      warn: (msg: string) => ui.log.warn(msg),
+      error: (msg: string) => ui.log.error(msg),
+      success: (msg: string) => ui.log.success(msg),
+    },
+  };
 }
 
 /**
@@ -43,6 +67,19 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
     ui.log.error(wsResult.error ?? "Failed to set up workspace.");
     process.exit(1);
   }
+
+  // For non-local deploys, run setup automatically (validate .env, configure Pulumi)
+  if (!options.local) {
+    const setupResult = await runSetup(uiToSetupProgress(ui), {
+      envFile: options.envFile,
+      skipHooks: options.skipHooks,
+    });
+    if (!setupResult.ok) {
+      ui.log.error(setupResult.error!);
+      process.exit(1);
+    }
+  }
+
   const cwd = getWorkspaceDir();
 
   // Load manifest (resolves agent fields from identities)
@@ -63,6 +100,10 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
   const stackName = options.local ? `${manifest.stackName}-local` : manifest.stackName;
   const pulumiStack = qualifiedStackName(stackName, manifest.organization);
   const projectRoot = getProjectRoot();
+
+  // For local deploys, we still need to select/create the stack ourselves.
+  // For non-local, runSetup already selected/created the stack, but we
+  // re-select here to ensure the deploy tool's exec adapter is in sync.
   const selectResult = exec.capture("pulumi", ["stack", "select", pulumiStack], cwd);
   if (selectResult.exitCode !== 0) {
     const initResult = exec.capture("pulumi", ["stack", "init", pulumiStack], cwd);
@@ -72,7 +113,8 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
       process.exit(1);
     }
     stampStackFingerprint(exec, projectRoot, cwd);
-  } else {
+  } else if (options.local) {
+    // Only verify ownership for local stacks (non-local already verified by runSetup)
     const collisionError = verifyStackOwnership(exec, projectRoot, cwd);
     if (collisionError) {
       ui.log.error(collisionError);
@@ -114,9 +156,6 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
   // Sync manifest to project root so the Pulumi program can read it
   syncManifestToProject(cwd, options.local ? { provider: "local" as const } : undefined);
 
-  // Sync instanceType from manifest to Pulumi config
-  exec.capture("pulumi", ["config", "set", "instanceType", manifest.instanceType], cwd);
-
   // --local: auto-configure by copying all config from the cloud stack
   if (options.local) {
     const cloudStack = qualifiedStackName(manifest.stackName, manifest.organization);
@@ -145,7 +184,7 @@ export const deployTool: ToolImplementation<DeployOptions> = async (
       if (anthropicKey) {
         setConfig(exec, "anthropicApiKey", anthropicKey, cwd, true);
       } else {
-        ui.log.warn("No cloud stack found and ANTHROPIC_API_KEY not set. Run `clawup setup` first.");
+        ui.log.warn("No cloud stack found and ANTHROPIC_API_KEY not set.");
       }
     }
 

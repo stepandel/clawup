@@ -153,21 +153,15 @@ cp .env.example .env
 # Edit .env and fill in your API keys
 ```
 
-### 4. Validate & Configure
-
-```bash
-clawup setup
-```
-
-Validates all secrets from `.env`, fetches Linear user UUIDs, and configures Pulumi. If any secrets are missing, it prints exactly what's needed.
-
-### 5. Deploy
+### 4. Deploy
 
 ```bash
 clawup deploy
 ```
 
-### 6. Validate
+Validates all secrets from `.env`, configures Pulumi, and deploys your agents. If any secrets are missing, it prints exactly what's needed.
+
+### 5. Validate
 
 Wait 3-5 minutes for cloud-init to complete, then:
 
@@ -175,7 +169,7 @@ Wait 3-5 minutes for cloud-init to complete, then:
 clawup validate
 ```
 
-### 7. Access Your Agents
+### 6. Access Your Agents
 
 ```bash
 clawup ssh <agent-name>    # SSH by name, role, or alias
@@ -188,8 +182,7 @@ Run `clawup --help` for the full list.
 | Command | Description |
 |---------|-------------|
 | `clawup init` | Generate clawup.yaml scaffold (or refresh from identity changes) |
-| `clawup setup` | Validate secrets from `.env` and configure Pulumi |
-| `clawup deploy` | Deploy agents (`pulumi up` under the hood) |
+| `clawup deploy` | Validate secrets, configure Pulumi, and deploy agents |
 | `clawup deploy --local` | Deploy to local Docker containers |
 | `clawup status` | Show agent statuses and outputs |
 | `clawup status --local` | Show local Docker container status |
@@ -395,7 +388,7 @@ The `secrets` section uses `${env:VAR}` references — actual values are loaded 
 
 ### Pulumi Config
 
-Secrets are stored encrypted in Pulumi config, set automatically by `clawup setup`. You can also manage them directly:
+Secrets are stored encrypted in Pulumi config, set automatically by `clawup deploy`. You can also manage them directly:
 
 ```bash
 pulumi config set --secret anthropicApiKey sk-ant-xxxxx

@@ -142,8 +142,7 @@ export async function initCommand(): Promise<void> {
     [
       "1. Edit clawup.yaml — set your provider, region, owner info, and agents",
       "2. Copy .env.example to .env and fill in your secrets",
-      "3. Run `clawup setup` to validate and configure Pulumi",
-      "4. Run `clawup deploy` to deploy your agents",
+      "3. Run `clawup deploy` to validate secrets, configure Pulumi, and deploy",
     ].join("\n"),
     "Next steps"
   );
@@ -283,7 +282,7 @@ async function repairMode(projectRoot: string): Promise<void> {
   writeManifest(manifest, fetchedIdentities, projectRoot);
 
   p.log.success(`${MANIFEST_FILE} and .env.example updated`);
-  p.outro("Run `clawup setup` to validate secrets and configure Pulumi.");
+  p.outro("Run `clawup deploy` to validate secrets, configure Pulumi, and deploy.");
 }
 
 // ---------------------------------------------------------------------------

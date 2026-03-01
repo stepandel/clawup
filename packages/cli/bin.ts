@@ -49,8 +49,8 @@ program
   });
 
 program
-  .command("setup")
-  .description("Validate secrets from .env and configure Pulumi (non-interactive)")
+  .command("setup", { hidden: true })
+  .description("(Deprecated) Validate secrets from .env and configure Pulumi — use `clawup deploy` instead")
   .option("--env-file <path>", "Path to .env file (defaults to .env in project root)")
   .option("--deploy", "Deploy immediately after setup")
   .option("-y, --yes", "Skip confirmation prompt (for deploy)")
@@ -64,6 +64,8 @@ program
   .description("Deploy agents with pulumi up")
   .option("-y, --yes", "Skip confirmation prompt")
   .option("--local", "Run in local Docker containers (for testing)")
+  .option("--env-file <path>", "Path to .env file (defaults to .env in project root)")
+  .option("--skip-hooks", "Skip plugin lifecycle hook execution")
   .action(async (opts) => {
     await deployCommand(opts);
   });
@@ -123,6 +125,8 @@ program
   .description("Update agents in-place without destroying infrastructure")
   .option("-y, --yes", "Skip confirmation prompt")
   .option("-l, --local", "Redeploy local Docker containers")
+  .option("--env-file <path>", "Path to .env file (defaults to .env in project root)")
+  .option("--skip-hooks", "Skip plugin lifecycle hook execution")
   .action(async (opts) => {
     await redeployCommand(opts);
   });
