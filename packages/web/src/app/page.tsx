@@ -44,7 +44,7 @@ export default function Home() {
             Clawup
           </h1>
           <p className="text-lg text-muted-foreground mb-6 max-w-xl">
-            Deploy fleets of specialized{" "}
+            The secure golden path for deploying{" "}
             <a
               href="https://openclaw.ai"
               target="_blank"
@@ -53,7 +53,7 @@ export default function Home() {
             >
               OpenClaw
             </a>{" "}
-            agents to your cloud. Define identities in YAML, provision with one command, track changes in git.
+            agent swarms — identity-driven, infrastructure-as-code, zero public ports.
           </p>
 
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-background border border-border font-mono text-sm w-fit mb-6">

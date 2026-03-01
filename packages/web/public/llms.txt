@@ -1,8 +1,8 @@
 # Clawup
 
-> Deploy fleets of specialized OpenClaw agents to your cloud infrastructure.
+> The secure golden path for deploying OpenClaw agent swarms — identity-driven, infrastructure-as-code, zero public ports.
 
-Clawup is an open-source CLI tool that deploys, orchestrates, and monitors AI agent teams. Define agent identities in YAML, provision infrastructure with one command, and track changes in git.
+Clawup is an open-source CLI tool that securely deploys, orchestrates, and monitors AI agent swarms. Define agent identities in YAML, provision infrastructure with one command, and track changes in git.
 
 ## Key Features
 

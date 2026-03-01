@@ -7,11 +7,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://clawup.sh"),
   title: {
-    default: "Clawup — Deploy OpenClaw Agents to Your Cloud",
+    default: "Clawup — The Secure Golden Path for OpenClaw Agent Swarms",
     template: "%s | Clawup",
   },
   description:
-    "Deploy fleets of specialized OpenClaw agents to your cloud. Define agent identities in YAML, provision infrastructure with one command, and track changes in git. Built on Pulumi and Tailscale.",
+    "The secure golden path for deploying OpenClaw agent swarms. Identity-driven, infrastructure-as-code, zero public ports. Built on Pulumi and Tailscale.",
   keywords: [
     "clawup",
     "openclaw",
@@ -27,9 +27,9 @@ export const metadata: Metadata = {
     "developer tools",
   ],
   openGraph: {
-    title: "Clawup — Deploy OpenClaw Agents to Your Cloud",
+    title: "Clawup — The Secure Golden Path for OpenClaw Agent Swarms",
     description:
-      "Deploy fleets of specialized OpenClaw agents to your cloud. Define identities in YAML, provision with one command, track changes in git.",
+      "The secure golden path for deploying OpenClaw agent swarms. Identity-driven, infrastructure-as-code, zero public ports.",
     type: "website",
     url: "https://clawup.sh",
     siteName: "Clawup",
@@ -38,15 +38,15 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Clawup — Deploy OpenClaw agents to your cloud",
+        alt: "Clawup — The secure golden path for OpenClaw agent swarms",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clawup — Deploy OpenClaw Agents to Your Cloud",
+    title: "Clawup — The Secure Golden Path for OpenClaw Agent Swarms",
     description:
-      "Deploy fleets of specialized OpenClaw agents to your cloud. Define identities in YAML, provision with one command, track changes in git.",
+      "The secure golden path for deploying OpenClaw agent swarms. Identity-driven, infrastructure-as-code, zero public ports.",
     images: ["/og-image.png"],
   },
 };
@@ -56,7 +56,7 @@ const jsonLd = {
   "@type": "SoftwareApplication",
   name: "Clawup",
   description:
-    "Deploy fleets of specialized OpenClaw agents to your cloud. Define agent identities in YAML, provision infrastructure with one command, and track changes in git.",
+    "The secure golden path for deploying OpenClaw agent swarms. Identity-driven, infrastructure-as-code, zero public ports. Built on Pulumi and Tailscale.",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "Linux, macOS",
   offers: {
