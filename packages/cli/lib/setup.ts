@@ -21,7 +21,7 @@ import {
   getProviderConfigKey,
 } from "@clawup/core";
 import { resolveAgentSync } from "@clawup/core/resolve";
-import { resolvePluginSecrets } from "@clawup/core/manifest-hooks";
+import { resolvePluginSecrets, runOnboardHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
 import { findProjectRoot } from "./project";
 import { selectOrCreateStack, setConfig, qualifiedStackName } from "./pulumi";
@@ -33,6 +33,7 @@ import {
   loadEnvSecrets,
   VALIDATORS,
 } from "./env";
+import { runOnboardHooks } from "./onboard-hooks";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -47,11 +48,17 @@ export interface SetupProgress {
     error: (msg: string) => void;
     success: (msg: string) => void;
   };
+  /** Prompt for text input (needed for onboard hooks) */
+  text?: (opts: { message: string; validate?: (val: string) => string | undefined }) => Promise<string | symbol>;
+  /** Check if a prompt result was cancelled */
+  isCancel?: (val: unknown) => boolean;
 }
 
 export interface SetupOptions {
   envFile?: string;
   skipHooks?: boolean;
+  /** Run plugin onboard hooks during setup */
+  onboard?: boolean;
 }
 
 export interface SetupResult {
@@ -394,6 +401,38 @@ export async function runSetup(progress: SetupProgress, options?: SetupOptions):
 
   if (options?.skipHooks) {
     progress.log.warn("Hooks skipped (--skip-hooks)");
+  }
+
+  // -------------------------------------------------------------------------
+  // 7b. Run onboard hooks (interactive first-time plugin setup)
+  // -------------------------------------------------------------------------
+  if (progress.text && progress.isCancel) {
+    let onboardError: string | undefined;
+    await runOnboardHooks({
+      fetchedIdentities,
+      agentPlugins,
+      resolvePlugin,
+      autoResolvedSecrets,
+      envDict,
+      resolvedSecrets,
+      p: {
+        log: progress.log,
+        spinner: () => {
+          const s = progress.spinner("");
+          return { start: (msg: string) => s.start(msg), stop: (msg?: string) => s.stop(msg ?? "") };
+        },
+        text: progress.text,
+        isCancel: progress.isCancel,
+      },
+      runOnboardHook,
+      exitWithError: (msg: string) => { onboardError = msg; throw new Error(msg); },
+      skipOnboard: !options?.onboard,
+    }).catch(() => {});
+    if (onboardError) {
+      return { ok: false, error: onboardError };
+    }
+  } else if (options?.onboard) {
+    progress.log.warn("Onboard hooks require interactive prompts — skipping in this context.");
   }
 
   // -------------------------------------------------------------------------

@@ -15,6 +15,7 @@ interface SetupCommandOptions {
   deploy?: boolean;
   yes?: boolean;
   skipHooks?: boolean;
+  onboard?: boolean;
 }
 
 /** Build a SetupProgress adapter backed by @clack/prompts */
@@ -30,6 +31,8 @@ function clackProgress(): SetupProgress {
       error: (msg: string) => p.log.error(msg),
       success: (msg: string) => p.log.success(msg),
     },
+    text: (opts) => p.text({ message: opts.message, validate: opts.validate }) as Promise<string | symbol>,
+    isCancel: (val) => p.isCancel(val),
   };
 }
 
@@ -44,6 +47,7 @@ export async function setupCommand(opts: SetupCommandOptions = {}): Promise<void
   const result = await runSetup(clackProgress(), {
     envFile: opts.envFile,
     skipHooks: opts.skipHooks,
+    onboard: opts.onboard,
   });
 
   if (!result.ok) {

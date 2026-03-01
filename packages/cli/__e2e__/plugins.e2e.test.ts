@@ -201,6 +201,7 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
         "PLUGINTESTER_SLACK_APP_TOKEN=xapp-fake-app-token-for-e2e",
         "PLUGINTESTER_LINEAR_API_KEY=lin_api_fake_key_for_e2e",
         "PLUGINTESTER_LINEAR_WEBHOOK_SECRET=fake-webhook-secret-for-e2e",
+        "PLUGINTESTER_TEST_LINEAR_CONFIG_TOKEN=tlct-fake-token-for-e2e",
         // LINEAR_USER_UUID intentionally omitted — resolved by test-linear hook
       ],
     });

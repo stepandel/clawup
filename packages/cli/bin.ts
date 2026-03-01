@@ -25,6 +25,7 @@ import { updateCommand } from "./commands/update";
 import { configShowCommand, configSetCommand } from "./commands/config";
 import { secretsSetCommand, secretsListCommand } from "./commands/secrets";
 import { redeployCommand } from "./commands/redeploy";
+import { onboardCommand } from "./commands/onboard";
 import { webhooksSetupCommand } from "./commands/webhooks";
 import { checkForUpdates } from "./lib/update-check";
 
@@ -55,8 +56,17 @@ program
   .option("--deploy", "Deploy immediately after setup")
   .option("-y, --yes", "Skip confirmation prompt (for deploy)")
   .option("--skip-hooks", "Skip plugin lifecycle hook execution")
+  .option("--onboard", "Run plugin onboard hooks during setup")
   .action(async (opts) => {
     await setupCommand(opts);
+  });
+
+program
+  .command("onboard")
+  .description("Run plugin onboard hooks for interactive first-time setup")
+  .option("--env-file <path>", "Path to .env file")
+  .action(async (opts) => {
+    await onboardCommand(opts);
   });
 
 program

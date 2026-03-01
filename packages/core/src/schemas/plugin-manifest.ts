@@ -58,6 +58,34 @@ export const ConfigTransformSchema = z.object({
 });
 
 /**
+ * A single input for an onboard hook (e.g., a config token the user must provide).
+ */
+export const OnboardHookInputSchema = z.object({
+  /** Environment variable name to pass to the script */
+  envVar: z.string(),
+  /** Prompt text shown to the user */
+  prompt: z.string(),
+  /** Human-readable instructions for obtaining this value */
+  instructions: z.string().optional(),
+  /** Optional prefix validator (e.g., "xoxe-") */
+  validator: z.string().optional(),
+});
+
+/**
+ * An onboard hook — runs once during first setup to create external resources.
+ */
+export const OnboardHookSchema = z.object({
+  /** Human-readable description of what this hook does */
+  description: z.string(),
+  /** Input values the user must provide before the script runs */
+  inputs: z.record(OnboardHookInputSchema).default({}),
+  /** Shell script to execute (stdout displayed as follow-up instructions) */
+  script: z.string().min(1, "Onboard hook script cannot be empty"),
+  /** If true, skip when all required secrets are already configured */
+  runOnce: z.boolean().default(false),
+});
+
+/**
  * Lifecycle hooks for plugin provisioning and setup.
  */
 export const PluginHooksSchema = z.object({
@@ -67,6 +95,8 @@ export const PluginHooksSchema = z.object({
   postProvision: z.string().min(1, "postProvision hook script cannot be empty").optional(),
   /** Script to run after workspace files are in place, before gateway start */
   preStart: z.string().min(1, "preStart hook script cannot be empty").optional(),
+  /** Onboard hook — runs once during first setup for interactive plugin configuration */
+  onboard: OnboardHookSchema.optional(),
 });
 
 /**
