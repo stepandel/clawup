@@ -71,6 +71,7 @@ Options:
 | Flag | Description |
 |------|-------------|
 | `-u, --user <user>` | SSH user (default: `ubuntu`) |
+| `--local` | Connect to local Docker container |
 
 ### `clawup validate`
 
@@ -97,9 +98,50 @@ clawup destroy --local     # Destroy local Docker containers only
 Update agents in-place without destroying infrastructure. Runs `pulumi up --refresh` to sync cloud state and apply changes. If the stack doesn't exist, falls back to a fresh deploy.
 
 ```bash
-clawup redeploy             # With confirmation prompt
-clawup redeploy -y          # Skip confirmation
-clawup redeploy --local     # Redeploy local Docker containers
+clawup redeploy                          # With confirmation prompt
+clawup redeploy -y                       # Skip confirmation
+clawup redeploy --local                  # Redeploy local Docker containers
+clawup redeploy --env-file /path/to/.env # Custom .env location
+clawup redeploy --skip-hooks             # Skip plugin lifecycle hooks
+```
+
+### `clawup push`
+
+Push workspace files, skills, and config to running agents without a full redeploy.
+
+```bash
+clawup push --workspace              # Sync workspace files from identity
+clawup push --skills                 # Sync skills to remote workspace
+clawup push --openclaw               # Upgrade openclaw to latest + restart gateway
+clawup push --config-push            # Copy local openclaw.json to remote + restart gateway
+clawup push --memory-reset           # Remove remote memory/ dir and MEMORY.md
+clawup push -a eng                   # Target a single agent
+clawup push --local                  # Push to local Docker containers
+```
+
+### `clawup onboard`
+
+Run plugin onboard hooks for interactive first-time setup (e.g., registering webhooks, configuring external services).
+
+```bash
+clawup onboard                       # Run onboard hooks
+clawup onboard --env-file /path/.env # Custom .env location
+```
+
+### `clawup webhooks setup`
+
+Configure webhooks for deployed agents.
+
+```bash
+clawup webhooks setup
+```
+
+### `clawup update`
+
+Update the clawup CLI to the latest version.
+
+```bash
+clawup update
 ```
 
 ### `clawup config show`

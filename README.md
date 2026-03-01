@@ -231,6 +231,7 @@ Run `clawup --help` for the full list.
 | `clawup secrets set <key> <value>` | Set a Pulumi secret (e.g. API keys) |
 | `clawup secrets list` | Show which secrets are configured (redacted) |
 | `clawup push` | Push workspace files, skills, and config to running agents |
+| `clawup onboard` | Run plugin onboard hooks for interactive first-time setup |
 | `clawup webhooks setup` | Configure Linear webhooks for deployed agents |
 | `clawup update` | Update clawup CLI to the latest version |
 
