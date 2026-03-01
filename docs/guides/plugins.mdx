@@ -1,0 +1,572 @@
+---
+title: "Plugins"
+description: "Install, configure, and create custom OpenClaw plugins for your agents"
+---
+
+Plugins extend OpenClaw with integrations like Linear, Slack, and custom services. Clawup manages plugin installation, configuration, and secret injection across your fleet — so you declare what plugins an agent needs and Clawup handles the rest.
+
+## Built-In Plugins
+
+Clawup ships with curated manifests for two plugins. No extra setup is needed beyond listing them in `identity.yaml`.
+
+| Plugin | Key | Description |
+|--------|-----|-------------|
+| [Linear](/integrations/linear) | `openclaw-linear` | Webhook-driven issue tracking — ticket queuing, per-agent routing, state management |
+| [Slack](/integrations/slack) | `slack` | Socket Mode bot — DMs, group chats, emoji reactions |
+
+These built-in manifests live in the [plugin registry](https://github.com/stepandel/clawup/blob/main/packages/core/src/plugin-registry.ts) and include full secret definitions, validators, and lifecycle hooks. See the integration guides linked above for per-plugin setup details.
+
+## Using a Plugin
+
+The happy path for any plugin — built-in or custom:
+
+### 1. Declare in `identity.yaml`
+
+```yaml
+# identity.yaml
+plugins:
+  - openclaw-linear
+  - slack
+
+pluginDefaults:
+  slack:
+    mode: socket
+    dm:
+      enabled: true
+      policy: open
+```
+
+### 2. Override per-agent in `clawup.yaml` (optional)
+
+```yaml
+# clawup.yaml
+agents:
+  - name: agent-eng
+    identity: ./eng
+    volumeSize: 50
+    plugins:
+      openclaw-linear:
+        stateActions:
+          backlog: add
+          started: add
+      slack:
+        mode: socket
+        groupPolicy: open
+```
+
+### 3. Scaffold and deploy
+
+```bash
+clawup init       # Discovers plugin secrets, updates .env.example
+# Fill in .env with your API keys
+clawup deploy
+```
+
+During `clawup init`, Clawup resolves each plugin's manifest, discovers its required secrets, and adds them to `.env.example`. Fill in the values, then deploy.
+
+## Configuration Hierarchy
+
+Plugin configuration merges from three levels. Later levels override earlier ones:
+
+```
+┌─────────────────────────────────────────────┐
+│ 3. Per-agent config (clawup.yaml)           │  ← highest priority
+├─────────────────────────────────────────────┤
+│ 2. Identity defaults (identity.yaml)        │
+├─────────────────────────────────────────────┤
+│ 1. Plugin manifest defaultConfig            │  ← lowest priority
+└─────────────────────────────────────────────┘
+```
+
+### Example: All Three Levels
+
+```yaml
+# Plugin manifest (defaultConfig)
+defaultConfig:
+  stateActions:
+    triage: remove
+    backlog: add
+    started: add
+    completed: remove
+```
+
+```yaml
+# identity.yaml (pluginDefaults)
+pluginDefaults:
+  openclaw-linear:
+    stateActions:
+      triage: remove
+      backlog: add
+      started: add
+      completed: remove
+      cancelled: remove      # added by identity
+```
+
+```yaml
+# clawup.yaml (per-agent plugins)
+agents:
+  - name: agent-eng
+    plugins:
+      openclaw-linear:
+        stateActions:
+          backlog: remove     # overridden for this agent
+```
+
+This hierarchy lets you customize per-deployment without forking the identity or the plugin manifest.
+
+## Creating a Custom Plugin Manifest
+
+### When You Need One
+
+- A third-party OpenClaw plugin not in the built-in registry
+- You want to override a built-in plugin's metadata (add hooks, change defaults)
+- You're developing a plugin and need to test the manifest locally
+
+### Where to Place It
+
+Plugin manifests go in a `plugins/` directory inside the identity:
+
+```
+my-identity/
+├── identity.yaml
+├── SOUL.md
+├── plugins/
+│   └── my-analytics.yaml      # Custom plugin manifest
+└── skills/
+    └── ...
+```
+
+The file name doesn't matter — Clawup reads the `name` field inside the YAML. Files must end with `.yaml` or `.yml`.
+
+### Walkthrough: `my-analytics.yaml`
+
+Here's a step-by-step breakdown of writing a manifest for a hypothetical analytics plugin.
+
+#### Required Fields
+
+```yaml
+name: my-analytics                # Plugin package name
+displayName: Analytics Dashboard  # Human-readable name
+installable: true                 # Run `openclaw plugins install` during cloud-init
+configPath: plugins.entries       # Where config lives in openclaw.json
+```
+
+- **`name`** — Must match the OpenClaw plugin package name.
+- **`displayName`** — Shown in CLI output and prompts.
+- **`installable`** — Set `true` if the plugin needs `openclaw plugins install`. Set `false` for config-only plugins like Slack (which is built into OpenClaw).
+- **`configPath`** — Either `"plugins.entries"` (most plugins) or `"channels"` (communication plugins like Slack).
+
+#### `needsFunnel`
+
+```yaml
+needsFunnel: true   # Requires Tailscale Funnel for public HTTPS (webhooks)
+```
+
+Set `true` if the plugin receives incoming webhooks. Clawup will enable [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) to expose a public HTTPS endpoint.
+
+#### `secrets`
+
+Each key in `secrets` is a config key passed to the plugin. The value describes how to collect and validate it.
+
+```yaml
+secrets:
+  apiKey:
+    envVar: ANALYTICS_API_KEY     # Environment variable name
+    scope: agent                   # "agent" (per-agent) or "global" (shared)
+    isSecret: true                 # Encrypt in Pulumi config
+    required: true                 # Deploy fails if missing
+    autoResolvable: false          # Can a resolve hook derive this?
+    validator: "ak_"              # Prefix validation
+    instructions:                  # Shown during `clawup secrets set`
+      title: Analytics API Key
+      steps:
+        - "1. Go to https://analytics.example.com/settings/api"
+        - "2. Click 'Generate New Key'"
+        - "3. Copy the key (starts with ak_)"
+  projectId:
+    envVar: ANALYTICS_PROJECT_ID
+    scope: agent
+    isSecret: false                # Not sensitive — stored unencrypted
+    required: false
+    autoResolvable: true           # Derived from apiKey via resolve hook
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `envVar` | string | — | Environment variable name (e.g., `ANALYTICS_API_KEY`) |
+| `scope` | `"agent"` \| `"global"` | — | Per-agent or shared across the fleet |
+| `isSecret` | boolean | — | Whether to store encrypted in Pulumi config |
+| `required` | boolean | `true` | Deploy fails if missing |
+| `autoResolvable` | boolean | `false` | Can be derived by a resolve hook |
+| `validator` | string | — | Required prefix for validation (e.g., `"ak_"`) |
+| `instructions` | object | — | `{ title, steps[] }` — setup instructions shown to the user |
+
+#### `internalKeys`
+
+```yaml
+internalKeys:
+  - agentId
+  - projectId
+```
+
+Keys listed here are used by Clawup for routing and metadata but are **not** written to the OpenClaw config file. Use this for values that the plugin doesn't need at runtime.
+
+#### `configTransforms`
+
+Transforms restructure config keys before writing to OpenClaw. The Slack plugin uses this to flatten nested DM config:
+
+```yaml
+configTransforms:
+  - sourceKey: dm                 # Read from this key
+    targetKeys:                   # Write to these keys
+      policy: dmPolicy
+      allowFrom: allowFrom
+    removeSource: true            # Delete the source key after transform
+```
+
+Given input `{ dm: { policy: "open", allowFrom: ["*"] } }`, the transform produces `{ dmPolicy: "open", allowFrom: ["*"] }`.
+
+#### `webhookSetup`
+
+For plugins that receive incoming webhooks:
+
+```yaml
+webhookSetup:
+  urlPath: /hooks/analytics              # URL path suffix
+  secretKey: webhookSecret               # Must reference a key in secrets
+  instructions:                          # Shown during webhook setup
+    - "1. Go to Analytics Settings → Webhooks"
+    - "2. Paste the URL shown above"
+    - "3. Copy the signing secret"
+  configJsonPath: plugins.entries.my-analytics.config.webhookSecret
+```
+
+#### `hooks`
+
+Plugin-level lifecycle hooks. See the [Lifecycle Hooks guide](/guides/hooks) for the full reference.
+
+```yaml
+hooks:
+  resolve:
+    projectId: |
+      curl -s https://api.analytics.example.com/v1/me \
+        -H "Authorization: Bearer $ANALYTICS_API_KEY" \
+        | jq -r ".defaultProjectId"
+  postProvision: |
+    curl -sSL https://get.analytics.example.com/cli | sh
+```
+
+Resolve hook keys at the plugin level must match a secret marked `autoResolvable: true`.
+
+#### `defaultConfig`
+
+Lowest-priority configuration defaults:
+
+```yaml
+defaultConfig:
+  dashboardUrl: https://analytics.example.com
+  eventTypes:
+    - deploy
+    - error
+```
+
+## Plugin Manifest Schema Reference
+
+The Zod schema in [`packages/core/src/schemas/plugin-manifest.ts`](https://github.com/stepandel/clawup/blob/main/packages/core/src/schemas/plugin-manifest.ts) is the source of truth. The TypeScript interface below is derived from it.
+
+```typescript
+interface PluginManifest {
+  name: string;
+  displayName: string;
+  installable: boolean;
+  needsFunnel: boolean;              // default: false
+  configPath: "plugins.entries" | "channels";
+  secrets: Record<string, PluginSecret>;
+  internalKeys: string[];            // default: []
+  defaultConfig?: Record<string, unknown>;
+  configTransforms: ConfigTransform[]; // default: []
+  webhookSetup?: WebhookSetup;
+  hooks?: Hooks;
+}
+
+interface PluginSecret {
+  envVar: string;
+  scope: "agent" | "global";
+  isSecret: boolean;
+  required: boolean;                 // default: true
+  autoResolvable: boolean;           // default: false
+  validator?: string;
+  instructions?: {
+    title: string;
+    steps: string[];
+  };
+}
+
+interface WebhookSetup {
+  urlPath: string;
+  secretKey: string;                 // must reference a key in secrets
+  instructions: string[];
+  configJsonPath: string;
+}
+
+interface ConfigTransform {
+  sourceKey: string;
+  targetKeys: Record<string, string>;
+  removeSource: boolean;             // default: true
+}
+```
+
+### `PluginManifest` Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `name` | string | Yes | — | Plugin package name (e.g., `"openclaw-linear"`) |
+| `displayName` | string | Yes | — | Human-readable name |
+| `installable` | boolean | Yes | — | Run `openclaw plugins install` during provisioning |
+| `needsFunnel` | boolean | No | `false` | Requires Tailscale Funnel for public HTTPS |
+| `configPath` | enum | Yes | — | `"plugins.entries"` or `"channels"` |
+| `secrets` | object | Yes | — | Secret definitions keyed by config key |
+| `internalKeys` | string[] | No | `[]` | Keys excluded from OpenClaw config |
+| `defaultConfig` | object | No | — | Lowest-priority configuration defaults |
+| `configTransforms` | array | No | `[]` | Config key transformations |
+| `webhookSetup` | object | No | — | Webhook endpoint configuration |
+| `hooks` | object | No | — | Lifecycle hooks (resolve, onboard, postProvision, preStart) |
+
+### `PluginSecret` Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `envVar` | string | Yes | — | Environment variable name |
+| `scope` | enum | Yes | — | `"agent"` (per-agent) or `"global"` (shared) |
+| `isSecret` | boolean | Yes | — | Store encrypted in Pulumi config |
+| `required` | boolean | No | `true` | Deploy fails if missing |
+| `autoResolvable` | boolean | No | `false` | Can be derived by a resolve hook |
+| `validator` | string | No | — | Required prefix for validation |
+| `instructions` | object | No | — | `{ title, steps[] }` setup instructions |
+
+### `WebhookSetup` Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `urlPath` | string | Yes | URL path suffix (e.g., `"/hooks/linear"`) |
+| `secretKey` | string | Yes | Must reference a key in `secrets` |
+| `instructions` | string[] | Yes | Setup steps shown to the user |
+| `configJsonPath` | string | Yes | JSON path in `openclaw.json` for the webhook secret |
+
+### `ConfigTransform` Fields
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `sourceKey` | string | Yes | — | Key to read from raw config |
+| `targetKeys` | object | Yes | — | Mapping of source sub-keys to target keys |
+| `removeSource` | boolean | No | `true` | Delete source key after transform |
+
+## Plugin Resolution
+
+Clawup resolves plugin metadata through a three-tier chain. The first match wins.
+
+### 1. Identity-Bundled (Highest Priority)
+
+Manifests placed in `plugins/<name>.yaml` inside the identity directory. Use this to:
+- Add manifests for third-party plugins
+- Override built-in manifests (e.g., add hooks or change defaults)
+
+### 2. Built-In Registry
+
+The `PLUGIN_MANIFEST_REGISTRY` in `packages/core/src/plugin-registry.ts`. Contains curated, tested manifests for `openclaw-linear` and `slack`.
+
+### 3. Generic Fallback
+
+For any plugin not found in the first two tiers, Clawup generates a minimal stub:
+
+```yaml
+name: <plugin-name>
+displayName: <plugin-name>
+installable: true
+needsFunnel: false
+configPath: plugins.entries
+secrets: {}
+internalKeys: []
+configTransforms: []
+```
+
+The generic fallback means **any OpenClaw plugin works with zero manifest** — Clawup will install it and pass through any config you set in `pluginDefaults` or per-agent `plugins`. You only need a custom manifest when you want secret management, hooks, or webhook setup.
+
+## Secrets
+
+### Discovery
+
+During `clawup init`, Clawup resolves each plugin's manifest, collects all `secrets` entries, and generates the appropriate `.env.example` entries. Each secret's `envVar` is used as the environment variable name.
+
+### Scope
+
+| Scope | Behavior | Example |
+|-------|----------|---------|
+| `agent` | Each agent gets its own value. Env var is prefixed with the agent role (e.g., `ENG_LINEAR_API_KEY`). | API keys, bot tokens |
+| `global` | Shared across all agents. Single env var. | Shared webhooks, team-wide tokens |
+
+### Auto-Resolution
+
+Secrets marked `autoResolvable: true` can be derived at deploy time by a resolve hook. The hook script runs on your machine during `clawup deploy`, with all other secrets available as environment variables. The script's stdout becomes the secret's value.
+
+```yaml
+secrets:
+  linearUserUuid:
+    autoResolvable: true
+
+hooks:
+  resolve:
+    linearUserUuid: |
+      curl -s -X POST https://api.linear.app/graphql \
+        -H "Authorization: $LINEAR_API_KEY" \
+        | jq -r ".data.viewer.id"
+```
+
+### Validation
+
+The `validator` field specifies a required prefix. During `clawup secrets set` and deploy, values are checked against this prefix:
+
+```yaml
+secrets:
+  apiKey:
+    validator: "lin_api_"    # Rejects values that don't start with lin_api_
+```
+
+### Setup Instructions
+
+The `instructions` field provides step-by-step guidance shown during `clawup secrets set`:
+
+```yaml
+secrets:
+  apiKey:
+    instructions:
+      title: Linear API Key
+      steps:
+        - "1. Go to Linear Settings → API"
+        - "2. Create a new API key"
+        - "3. Copy the key (starts with lin_api_)"
+```
+
+### Secret Flow
+
+```
+.env file → clawup deploy → Pulumi config (encrypted) → cloud-init env vars → agent
+```
+
+## Complete Examples
+
+### Minimal Manifest
+
+The smallest valid plugin manifest — just name, installable flag, and config path:
+
+```yaml
+name: my-simple-plugin
+displayName: Simple Plugin
+installable: true
+configPath: plugins.entries
+secrets: {}
+```
+
+### Full-Featured Manifest
+
+All fields, with hooks, webhook setup, and config transforms:
+
+```yaml
+name: my-analytics
+displayName: Analytics Dashboard
+installable: true
+needsFunnel: true
+configPath: plugins.entries
+
+secrets:
+  apiKey:
+    envVar: ANALYTICS_API_KEY
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "ak_"
+    instructions:
+      title: Analytics API Key
+      steps:
+        - "1. Go to https://analytics.example.com/settings/api"
+        - "2. Click 'Generate New Key'"
+        - "3. Copy the key (starts with ak_)"
+  webhookSecret:
+    envVar: ANALYTICS_WEBHOOK_SECRET
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+  projectId:
+    envVar: ANALYTICS_PROJECT_ID
+    scope: agent
+    isSecret: false
+    required: false
+    autoResolvable: true
+
+internalKeys:
+  - agentId
+  - projectId
+
+defaultConfig:
+  dashboardUrl: https://analytics.example.com
+  eventTypes:
+    - deploy
+    - error
+
+configTransforms:
+  - sourceKey: notifications
+    targetKeys:
+      email: notifyEmail
+      slack: notifySlack
+    removeSource: true
+
+webhookSetup:
+  urlPath: /hooks/analytics
+  secretKey: webhookSecret
+  instructions:
+    - "1. Go to Analytics Settings → Integrations → Webhooks"
+    - "2. Paste the URL shown above"
+    - "3. Select events: deploy, error"
+    - "4. Copy the signing secret"
+  configJsonPath: plugins.entries.my-analytics.config.webhookSecret
+
+hooks:
+  resolve:
+    projectId: |
+      curl -s https://api.analytics.example.com/v1/me \
+        -H "Authorization: Bearer $ANALYTICS_API_KEY" \
+        | jq -r ".defaultProjectId"
+  onboard:
+    description: "Register analytics event webhook"
+    inputs:
+      adminToken:
+        envVar: ANALYTICS_ADMIN_TOKEN
+        prompt: "Enter your admin token"
+        validator: "adm_"
+    script: |
+      WEBHOOK_URL="https://$(hostname).tail1234.ts.net/hooks/analytics"
+      curl -s -X POST https://api.analytics.example.com/v1/webhooks \
+        -H "Authorization: Bearer $ANALYTICS_ADMIN_TOKEN" \
+        -d "{\"url\": \"$WEBHOOK_URL\", \"events\": [\"deploy\", \"error\"]}"
+      echo "Analytics webhook registered at $WEBHOOK_URL"
+    runOnce: true
+  postProvision: |
+    curl -sSL https://get.analytics.example.com/cli | sh
+    analytics-cli --version
+  preStart: |
+    analytics-cli validate --config /home/ubuntu/.openclaw/config.json
+    analytics-cli cache warm --project $ANALYTICS_PROJECT_ID
+```
+
+See the [`examples/plugin-manifests/`](https://github.com/stepandel/clawup/tree/main/examples/plugin-manifests) directory for the built-in Linear and Slack manifests as YAML references.
+
+## Tips
+
+- **Test config locally** — run `clawup config show --json` to inspect the resolved plugin configuration before deploying.
+- **Override built-in manifests** — place a same-named file in `plugins/` (e.g., `plugins/openclaw-linear.yaml`) to override the built-in manifest with your own hooks or defaults.
+- **Version control manifests** — keep plugin manifests in the identity repo alongside `identity.yaml` so they're versioned together.
+- **Use `internalKeys`** for routing metadata (like `agentId`) that Clawup needs but the OpenClaw plugin doesn't.
+- **Start without a manifest** — the generic fallback means any plugin works immediately. Add a manifest later when you need secrets, hooks, or webhook setup.
+- **Check the Zod schema** — [`packages/core/src/schemas/plugin-manifest.ts`](https://github.com/stepandel/clawup/blob/main/packages/core/src/schemas/plugin-manifest.ts) is the source of truth. If the docs and schema disagree, the schema wins.

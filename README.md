@@ -155,6 +155,10 @@ hooks:
 
 Lifecycle hooks execute in order: swarm → identity → plugin. Resolve hooks use most-specific-wins on key conflicts. See the [Lifecycle Hooks guide](./docs/guides/hooks.mdx) for the full reference.
 
+## Plugins
+
+Agents use OpenClaw plugins for integrations with external services. Built-in plugins (Linear, Slack) have curated manifests in the plugin registry and work out of the box — just list them in `identity.yaml`. For third-party or custom plugins, bundle a manifest in `plugins/<name>.yaml` inside the identity directory to define secrets, hooks, and configuration. See the [Plugins guide](./docs/guides/plugins.mdx) for installation, authoring, and the full manifest reference.
+
 ## Quick Start
 
 ### 1. Install
