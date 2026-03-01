@@ -1,0 +1,379 @@
+---
+title: "Plugin Hooks"
+description: "Use lifecycle hooks to resolve secrets, run interactive setup, and customize server provisioning"
+---
+
+Plugins can define **hooks** — shell scripts that run at specific points during deployment and provisioning. Hooks let you automate secret resolution, server setup, and pre-launch configuration without modifying the core deployment pipeline.
+
+## Hook Types
+
+Clawup supports four hook types, each running at a different stage:
+
+| Hook | When | Where | Use Case |
+|------|------|-------|----------|
+| `resolve` | During `clawup deploy` | Your machine (CLI) | Auto-resolve derived secrets via API calls |
+| `onboard` | During `clawup onboard` | Your machine (CLI) | Interactive first-time setup |
+| `postProvision` | During cloud-init | Agent server | Install tools after base provisioning |
+| `preStart` | During cloud-init | Agent server | Final config before gateway starts |
+
+## Execution Timeline
+
+The following shows where each hook type fires during the deployment lifecycle:
+
+```
+clawup deploy (your machine)
+│
+├─ Load clawup.yaml + .env
+├─ ▶ resolve hooks ◀──────── Auto-resolve derived secrets
+├─ Run Pulumi (provision infrastructure)
+│
+└─ Cloud-init (agent server)
+   │
+   ├─ Install system packages, Node.js, Docker
+   ├─ Install coding agent (Claude Code)
+   ├─ Write environment variables
+   ├─ Run dep post-install scripts
+   ├─ ▶ postProvision hooks ◀── Server setup after base provisioning
+   ├─ Inject workspace files (SOUL.md, etc.)
+   ├─ Install plugins, configure OpenClaw
+   ├─ ▶ preStart hooks ◀────── Final config before gateway starts
+   ├─ Start Tailscale proxy
+   └─ Start OpenClaw gateway
+```
+
+## Resolve Hooks
+
+Resolve hooks auto-derive secret values from other secrets. They run on your machine during `clawup deploy`, before infrastructure is provisioned.
+
+**When:** During deploy, after `.env` is loaded
+
+**Input:** Environment variables (including other secrets already in `.env`)
+
+**Output:** stdout is captured as the resolved value (must be non-empty)
+
+**Timeout:** 30 seconds
+
+### How It Works
+
+Each resolve hook is a shell script keyed by a secret name. The secret must be marked `autoResolvable: true` in the plugin manifest. During deploy, Clawup runs the script and stores stdout as the secret's value.
+
+### Example: Resolving a Linear User UUID
+
+The built-in `openclaw-linear` plugin resolves the Linear user UUID from the API key:
+
+```yaml
+secrets:
+  apiKey:
+    envVar: LINEAR_API_KEY
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+  linearUserUuid:
+    envVar: LINEAR_USER_UUID
+    scope: agent
+    isSecret: false
+    required: false
+    autoResolvable: true
+
+hooks:
+  resolve:
+    linearUserUuid: |
+      curl -s -X POST https://api.linear.app/graphql \
+        -H "Authorization: $LINEAR_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"{ viewer { id } }"}' \
+        | jq -r ".data.viewer.id"
+```
+
+When the agent is deployed, Clawup runs the `linearUserUuid` script with `$LINEAR_API_KEY` available in the environment. The GraphQL response is piped through `jq` to extract the UUID, which is stored as `LINEAR_USER_UUID`.
+
+### Example: Fetching a Notion Workspace ID
+
+A custom plugin that resolves a workspace ID from an API key:
+
+```yaml
+secrets:
+  apiKey:
+    envVar: NOTION_API_KEY
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+  workspaceId:
+    envVar: NOTION_WORKSPACE_ID
+    scope: agent
+    isSecret: false
+    required: false
+    autoResolvable: true
+
+hooks:
+  resolve:
+    workspaceId: |
+      curl -s https://api.notion.com/v1/users/me \
+        -H "Authorization: Bearer $NOTION_API_KEY" \
+        -H "Notion-Version: 2022-06-28" \
+        | jq -r ".bot.workspace_name"
+```
+
+### Rules
+
+- The resolve hook key (e.g., `linearUserUuid`) must match a secret key in the manifest
+- That secret must have `autoResolvable: true`
+- The script must print exactly one value to stdout (trailing whitespace is trimmed)
+- If the script exits non-zero or prints nothing, the deploy fails with an error
+- All environment variables from `.env` are available in the script
+
+## Onboard Hooks
+
+<Warning>
+Onboard hooks are **experimental** and subject to change. The API may evolve in future releases.
+</Warning>
+
+Onboard hooks run interactive first-time setup for plugins that need it — like registering webhook URLs or configuring external services that require post-deploy information.
+
+**When:** During `clawup onboard` or `clawup deploy --onboard`
+
+**Input:** User-provided values (prompted interactively) + existing secrets
+
+**Output:** stdout is displayed as follow-up instructions
+
+**Timeout:** 120 seconds
+
+### How It Works
+
+1. Clawup checks each plugin for an `onboard` hook definition
+2. For each input defined in `inputs`, the user is prompted (or the value is read from `.env`)
+3. The hook script runs with all inputs and existing secrets as environment variables
+4. stdout is displayed as follow-up instructions to the user
+
+### Example: Webhook Registration
+
+```yaml
+hooks:
+  onboard:
+    description: "Register webhook endpoint with external service"
+    inputs:
+      configToken:
+        envVar: MY_CONFIG_TOKEN
+        prompt: "Enter your configuration token"
+        instructions: "Generate a token at https://example.com/settings/tokens"
+        validator: "tok_"
+    script: |
+      WEBHOOK_URL="https://$(hostname).tail1234.ts.net/hooks/my-plugin"
+      curl -s -X POST https://api.example.com/webhooks \
+        -H "Authorization: Bearer $MY_CONFIG_TOKEN" \
+        -d "{\"url\": \"$WEBHOOK_URL\"}"
+      echo "Webhook registered at $WEBHOOK_URL"
+    runOnce: true
+```
+
+### Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `description` | string | — | Human-readable description shown before the hook runs |
+| `inputs` | object | `{}` | Input values the user must provide (see below) |
+| `script` | string | — | Shell script to execute |
+| `runOnce` | boolean | `false` | Skip when all required secrets are already configured |
+
+Each input in `inputs` supports:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `envVar` | string | — | Environment variable name passed to the script |
+| `prompt` | string | — | Prompt text shown to the user |
+| `instructions` | string | — | How to obtain this value |
+| `validator` | string | — | Required prefix (e.g., `"tok_"`) |
+
+For more on running onboard hooks, see the [`clawup onboard` CLI reference](/cli/onboard).
+
+## PostProvision Hooks
+
+PostProvision hooks run on the agent server during cloud-init, after base packages (Node.js, Docker, coding agent) are installed but **before** workspace files are injected.
+
+**When:** Cloud-init, after Node.js/Docker/coding agent installation and dep post-install scripts
+
+**Where:** Agent server, as the `ubuntu` user
+
+**Output:** Streamed to cloud-init log (`/var/log/cloud-init-output.log`)
+
+### Use Cases
+
+- Installing custom system tools or CLI utilities
+- Downloading ML models or large data files
+- Setting up database clients or drivers
+- Configuring system-level settings
+
+### Example: Installing a Custom CLI
+
+```yaml
+hooks:
+  postProvision: |
+    echo "Installing custom analysis tools..."
+    curl -sSL https://get.example.com/cli | sh
+    echo "Analysis CLI installed successfully"
+```
+
+### Example: Downloading Model Weights
+
+```yaml
+hooks:
+  postProvision: |
+    echo "Downloading model weights..."
+    mkdir -p /home/ubuntu/.models
+    curl -sSL https://models.example.com/v2/weights.bin \
+      -o /home/ubuntu/.models/weights.bin
+    echo "Model weights ready"
+```
+
+### Environment
+
+PostProvision hooks have access to:
+- Environment variables from `.profile` (API keys, tokens)
+- System tools installed in earlier phases (Node.js, npm, Docker)
+- Network access (Tailscale is connected at this point)
+
+## PreStart Hooks
+
+PreStart hooks run on the agent server during cloud-init, after workspace files are injected and OpenClaw is configured, but **before** the gateway starts.
+
+**When:** Cloud-init, after workspace files + `openclaw config set` commands
+
+**Where:** Agent server, as the `ubuntu` user
+
+**Output:** Streamed to cloud-init log (`/var/log/cloud-init-output.log`)
+
+### Use Cases
+
+- Reading workspace config to generate derived files
+- Running database migrations
+- Pre-warming caches or indexes
+- Validating the full configuration before launch
+
+### Example: Generating a Config File from Workspace Data
+
+```yaml
+hooks:
+  preStart: |
+    echo "Generating derived config from workspace files..."
+    TEAM=$(grep -oP 'team:\s*\K.*' /home/ubuntu/.openclaw/workspace/IDENTITY.md)
+    echo "{\"team\": \"$TEAM\"}" > /home/ubuntu/.config/my-plugin/config.json
+    echo "Config generated for team: $TEAM"
+```
+
+### Example: Pre-warming a Search Index
+
+```yaml
+hooks:
+  preStart: |
+    echo "Building search index..."
+    cd /home/ubuntu/.openclaw
+    node -e "require('./build-index.js').run()" 2>&1
+    echo "Search index ready"
+```
+
+### Environment
+
+PreStart hooks have access to everything postProvision hooks have, plus:
+- Workspace files in `/home/ubuntu/.openclaw/workspace/`
+- OpenClaw configuration (set via `openclaw config set`)
+- Installed plugins
+
+## Complete Plugin Manifest Example
+
+Here's a full plugin manifest using all four hook types:
+
+```yaml
+name: my-analytics
+displayName: Analytics Dashboard
+installable: true
+needsFunnel: false
+configPath: plugins.entries
+
+secrets:
+  apiKey:
+    envVar: ANALYTICS_API_KEY
+    scope: agent
+    isSecret: true
+    required: true
+    autoResolvable: false
+    validator: "ak_"
+    instructions:
+      title: "Analytics API Key"
+      steps:
+        - "1. Go to https://analytics.example.com/settings/api"
+        - "2. Click 'Generate New Key'"
+        - "3. Copy the key (starts with ak_)"
+  projectId:
+    envVar: ANALYTICS_PROJECT_ID
+    scope: agent
+    isSecret: false
+    required: false
+    autoResolvable: true
+
+hooks:
+  # Resolve: derive project ID from API key
+  resolve:
+    projectId: |
+      curl -s https://api.analytics.example.com/v1/me \
+        -H "Authorization: Bearer $ANALYTICS_API_KEY" \
+        | jq -r ".defaultProjectId"
+
+  # Onboard: register webhook (runs once)
+  onboard:
+    description: "Register analytics event webhook"
+    inputs:
+      adminToken:
+        envVar: ANALYTICS_ADMIN_TOKEN
+        prompt: "Enter your admin token"
+        validator: "adm_"
+    script: |
+      curl -s -X POST https://api.analytics.example.com/v1/webhooks \
+        -H "Authorization: Bearer $ANALYTICS_ADMIN_TOKEN" \
+        -d '{"events": ["deploy", "error"]}'
+      echo "Analytics webhook registered"
+    runOnce: true
+
+  # PostProvision: install the analytics CLI
+  postProvision: |
+    curl -sSL https://get.analytics.example.com/cli | sh
+    analytics-cli --version
+
+  # PreStart: validate config and warm cache
+  preStart: |
+    analytics-cli validate --config /home/ubuntu/.openclaw/config.json
+    analytics-cli cache warm --project $ANALYTICS_PROJECT_ID
+```
+
+## Tips and Best Practices
+
+**Make hooks idempotent.** Deploys can be retried. Write hooks so that running them twice produces the same result — use `mkdir -p` instead of `mkdir`, check if files exist before downloading, etc.
+
+**Handle errors gracefully.** If a hook script exits with a non-zero code, the deploy fails. Use explicit error checks and helpful error messages:
+
+```bash
+curl -sSf https://example.com/install.sh | sh || {
+  echo "ERROR: Failed to install tool. Check network connectivity." >&2
+  exit 1
+}
+```
+
+**Keep hooks focused.** Each hook should do one thing well. If you need complex setup, consider splitting across `postProvision` (system setup) and `preStart` (app config).
+
+**Test locally.** You can test hook scripts locally before deploying:
+
+```bash
+# Test a resolve hook
+LINEAR_API_KEY="lin_api_xxx" sh -c 'curl -s ...'
+
+# Test a postProvision/preStart hook
+sh -c '$(cat my-hook-script.sh)'
+```
+
+**Use stderr for progress, stdout for values.** In resolve and onboard hooks, stdout is captured as the result. Use `>&2` to print progress messages that won't interfere with the captured value:
+
+```bash
+echo "Fetching project ID..." >&2
+curl -s https://api.example.com/me | jq -r ".projectId"
+```

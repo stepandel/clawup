@@ -3,7 +3,13 @@ title: "onboard"
 description: "Run plugin onboard hooks for interactive first-time setup"
 ---
 
+<Warning>
+Onboard hooks are **experimental** and subject to change. The API may evolve in future releases.
+</Warning>
+
 Runs plugin onboard hooks interactively. Onboard hooks are plugin-defined scripts that handle first-time setup tasks like creating webhook endpoints, generating signing secrets, or configuring external services.
+
+For a comprehensive guide to all hook types, see [Plugin Hooks](/guides/plugin-hooks).
 
 ## Usage
 
@@ -22,13 +28,38 @@ clawup onboard [options]
 1. Loads `clawup.yaml` and resolves agent identities
 2. Loads `.env` and resolves secrets
 3. Runs each plugin's `onboard` hook (if defined) with the resolved context
-4. Hooks can prompt for input, call external APIs, and write results back to config
+4. Hooks can prompt for input, call external APIs, and display follow-up instructions
 
 ## When to Use
 
 Run `clawup onboard` after your first `clawup deploy` if any plugins have onboard hooks that need interactive setup. For example, a plugin might need to register webhook URLs that are only available after deployment.
 
-You can also pass `--onboard` to `clawup setup` to run onboard hooks during the setup phase.
+You can also pass `--onboard` to `clawup deploy` to run onboard hooks during the deploy phase.
+
+## Plugin Manifest Example
+
+Onboard hooks are defined in a plugin's manifest file. Here's a minimal example:
+
+```yaml
+hooks:
+  onboard:
+    description: "Register webhook with external service"
+    inputs:
+      configToken:
+        envVar: MY_CONFIG_TOKEN
+        prompt: "Enter your config token"
+        instructions: "Generate at https://example.com/settings/tokens"
+        validator: "tok_"
+    script: |
+      WEBHOOK_URL="https://$(hostname).tail1234.ts.net/hooks/my-plugin"
+      curl -s -X POST https://api.example.com/webhooks \
+        -H "Authorization: Bearer $MY_CONFIG_TOKEN" \
+        -d "{\"url\": \"$WEBHOOK_URL\"}"
+      echo "Webhook registered at $WEBHOOK_URL"
+    runOnce: true
+```
+
+When `runOnce` is `true`, the hook is skipped if all required secrets for the plugin are already configured.
 
 ## Examples
 
@@ -41,5 +72,5 @@ clawup onboard --env-file /path/to/.env
 ```
 
 <Note>
-Onboard hooks are defined by plugin authors in the plugin manifest. Not all plugins have onboard hooks — only those that require interactive first-time configuration.
+Onboard hooks are defined by plugin authors in the plugin manifest. Not all plugins have onboard hooks — only those that require interactive first-time configuration. See the [Plugin Hooks guide](/guides/plugin-hooks#onboard-hooks) for details on writing onboard hooks.
 </Note>

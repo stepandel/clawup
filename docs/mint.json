@@ -94,7 +94,8 @@
     {
       "group": "Guides",
       "pages": [
-        "guides/creating-identities"
+        "guides/creating-identities",
+        "guides/plugin-hooks"
       ]
     },
     {
