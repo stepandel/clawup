@@ -10,13 +10,14 @@ import * as path from "path";
 import * as os from "os";
 import * as p from "@clack/prompts";
 import YAML from "yaml";
-import type { IdentityResult } from "@clawup/core";
+import type { IdentityResult, ResolvedAgent } from "@clawup/core";
 import {
   MANIFEST_FILE,
   ClawupManifestSchema,
   resolvePlugin,
   resolvePlugins,
 } from "@clawup/core";
+import { resolveAgentSync } from "@clawup/core/resolve";
 import { runOnboardHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
 import { findProjectRoot } from "../lib/project";
@@ -59,7 +60,7 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
     return;
   }
   const manifest = validation.data;
-  const agents = manifest.agents;
+  const rawAgents = manifest.agents;
 
   p.log.info(`Project: ${manifestPath}`);
 
@@ -72,12 +73,15 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
 
   const identitySpinner = p.spinner();
   identitySpinner.start("Resolving agent identities...");
-  for (const agent of agents) {
+  const resolvedAgents: ResolvedAgent[] = [];
+  for (const agent of rawAgents) {
     try {
       const identity = await fetchIdentity(agent.identity, identityCacheDir);
-      fetchedIdentities.push({ agent, identityResult: identity });
+      const resolved = resolveAgentSync(agent, identityCacheDir);
+      resolvedAgents.push(resolved);
+      fetchedIdentities.push({ agent: resolved, identityResult: identity });
     } catch (err) {
-      identitySpinner.stop(`Failed to resolve identity for ${agent.name}`);
+      identitySpinner.stop(`Failed to resolve identity for ${agent.name ?? agent.identity}`);
       exitWithError(
         `Failed to resolve identity "${agent.identity}": ${
           err instanceof Error ? err.message : String(err)
@@ -124,7 +128,7 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
 
   const expectedSecrets = buildManifestSecrets({
     provider: manifest.provider,
-    agents: agents.map((a) => {
+    agents: resolvedAgents.map((a) => {
       const fi = fetchedIdentities.find((f) => f.agent.name === a.name);
       return {
         name: a.name,
@@ -141,14 +145,14 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
   });
 
   const mergedGlobalSecrets = { ...(manifest.secrets ?? {}), ...expectedSecrets.global };
-  for (const agent of agents) {
+  for (const agent of resolvedAgents) {
     const expected = expectedSecrets.perAgent[agent.name];
     if (expected) {
       agent.secrets = { ...(agent.secrets ?? {}), ...expected };
     }
   }
 
-  const resolvedSecrets = loadEnvSecrets(mergedGlobalSecrets, agents, envDict);
+  const resolvedSecrets = loadEnvSecrets(mergedGlobalSecrets, resolvedAgents, envDict);
 
   // 7. Build auto-resolved secrets
   const autoResolvedSecrets: Record<string, Record<string, string>> = {};
@@ -163,7 +167,7 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
         if (!secret.autoResolvable) continue;
 
         const roleUpper = fi.agent.role.toUpperCase();
-        const agent = agents.find((a) => a.name === fi.agent.name);
+        const agent = resolvedAgents.find((a) => a.name === fi.agent.name);
 
         // Check if already in manifest plugin config
         const existingPluginConfig = agent?.plugins?.[pluginName] as Record<string, unknown> | undefined;
