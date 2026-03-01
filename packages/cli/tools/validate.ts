@@ -48,8 +48,10 @@ function runSshCheck(
   command: string,
   timeout: number
 ): { ok: boolean; output: string } {
+  // Source NVM so Node.js-based CLIs (openclaw, codex, etc.) are in PATH
+  const nvmPreamble = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; ';
   // Escape $ so the host shell passes them through to the remote shell
-  const escaped = command.replace(/"/g, '\\"').replace(/\$/g, '\\$');
+  const escaped = (nvmPreamble + command).replace(/"/g, '\\"').replace(/\$/g, '\\$');
   const result = exec.capture("ssh", [
     "-o", `ConnectTimeout=${timeout}`,
     ...SSH_OPTS,
