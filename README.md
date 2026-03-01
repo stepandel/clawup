@@ -1,5 +1,13 @@
 # Clawup
 
+```
+   ____ _        ___        ___   _ ____
+  / ___| |      / \ \      / / | | |  _ \
+ | |   | |     / _ \ \ /\ / /| | | | |_) |
+ | |___| |___ / ___ \ V  V / | |_| |  __/
+  \____|_____/_/   \_\_/\_/   \___/|_|
+```
+
 [![npm](https://img.shields.io/npm/v/clawup)](https://www.npmjs.com/package/clawup)
 [![license](https://img.shields.io/npm/l/clawup)](./LICENSE)
 

@@ -1,5 +1,13 @@
 # Clawup CLI
 
+```
+   ____ _        ___        ___   _ ____     ____ _     ___
+  / ___| |      / \ \      / / | | |  _ \   / ___| |   |_ _|
+ | |   | |     / _ \ \ /\ / /| | | | |_) | | |   | |    | |
+ | |___| |___ / ___ \ V  V / | |_| |  __/  | |___| |___ | |
+  \____|_____/_/   \_\_/\_/   \___/|_|       \____|_____|___|
+```
+
 [![npm](https://img.shields.io/npm/v/clawup)](https://www.npmjs.com/package/clawup)
 
 Command-line tool for deploying and managing your fleet of [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud**.
