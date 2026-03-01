@@ -1,4 +1,5 @@
-import type { PluginManifest, IdentityResult } from "@clawup/core";
+import type { PluginManifest, IdentityResult, Hooks } from "@clawup/core";
+import type { OnboardHookResult } from "@clawup/core/manifest-hooks";
 import { redactSecretsFromString } from "./redact.js";
 
 // NOTE: This helper intentionally takes a broad set of dependencies.
@@ -37,11 +38,10 @@ interface RunOnboardHooksArgs {
   autoResolvedSecrets: Record<string, Record<string, string>>;
   envDict: Record<string, string>;
   resolvedSecrets: { perAgent: Record<string, Record<string, string>> };
+  /** Swarm-level onboard hook (from clawup.yaml hooks.onboard) */
+  swarmOnboard?: Hooks["onboard"];
   p: PromptLike;
-  runOnboardHook: (opts: { script: string; env: Record<string, string> }) => Promise<
-    | { ok: true; instructions?: string }
-    | { ok: false; error: string }
-  >;
+  runOnboardHook: (opts: { script: string; env: Record<string, string> }) => Promise<OnboardHookResult>;
   exitWithError: (message: string) => never;
   skipOnboard: boolean;
 }
@@ -54,6 +54,7 @@ export async function runOnboardHooks(args: RunOnboardHooksArgs): Promise<void> 
     autoResolvedSecrets,
     envDict,
     resolvedSecrets,
+    swarmOnboard,
     p,
     runOnboardHook,
     exitWithError,
@@ -65,7 +66,55 @@ export async function runOnboardHooks(args: RunOnboardHooksArgs): Promise<void> 
     return;
   }
 
+  // --- Swarm-level onboard hook (runs once, before per-agent hooks) ---
+  if (swarmOnboard) {
+    p.log.info(`Running swarm onboard hook: ${swarmOnboard.description}`);
+
+    const hookEnv: Record<string, string> = { ...envDict };
+    const result = await runOnboardHook({ script: swarmOnboard.script, env: hookEnv });
+    if (result.ok) {
+      if (result.instructions) {
+        const redacted = redactSecretsFromString(result.instructions);
+        console.log();
+        p.log.info("Follow-up instructions (swarm onboard):");
+        console.log(redacted);
+        console.log();
+      }
+    } else {
+      p.log.error(`Swarm onboard hook failed: ${redactSecretsFromString(result.error)}`);
+      exitWithError(
+        "Swarm onboard hook failed. Fix the issue and run `clawup setup --onboard` again, or run `clawup onboard` separately."
+      );
+    }
+  }
+
   for (const fi of fetchedIdentities) {
+    // --- Identity-level onboard hook (before plugin hooks) ---
+    const identityOnboard = fi.identityResult.manifest.hooks?.onboard;
+    if (identityOnboard) {
+      p.log.info(
+        `Running identity onboard hook for ${fi.agent.displayName}: ${identityOnboard.description}`
+      );
+
+      const hookEnv: Record<string, string> = { ...envDict };
+      const result = await runOnboardHook({ script: identityOnboard.script, env: hookEnv });
+      if (result.ok) {
+        if (result.instructions) {
+          const redacted = redactSecretsFromString(result.instructions);
+          console.log();
+          p.log.info(`Follow-up instructions (identity:${fi.identityResult.manifest.name}):`);
+          console.log(redacted);
+          console.log();
+        }
+      } else {
+        p.log.error(`Identity onboard hook for ${fi.agent.displayName} failed: ${redactSecretsFromString(result.error)}`);
+        exitWithError(
+          "Identity onboard hook failed. Fix the issue and run `clawup setup --onboard` again, or run `clawup onboard` separately."
+        );
+      }
+    }
+
+    // --- Plugin-level onboard hooks ---
     const plugins = agentPlugins.get(fi.agent.name);
     if (!plugins) continue;
 

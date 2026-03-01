@@ -13,6 +13,7 @@ export {
 } from "./identity";
 
 export {
+  HooksSchema,
   PluginManifestSchema,
   PluginSecretSchema,
   WebhookSetupSchema,

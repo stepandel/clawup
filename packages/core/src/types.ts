@@ -10,6 +10,7 @@ import type {
   PluginConfigFileSchema,
   IdentityManifestSchema,
   PluginManifestSchema,
+  HooksSchema,
 } from "./schemas";
 
 /** Definition of a single agent in the manifest */
@@ -23,6 +24,9 @@ export type ClawupManifest = z.infer<typeof ClawupManifestSchema>;
 
 /** Manifest schema for an agent identity (identity.yaml) */
 export type IdentityManifest = z.infer<typeof IdentityManifestSchema>;
+
+/** Lifecycle hooks shape (shared across swarm, identity, and plugin levels) */
+export type Hooks = z.infer<typeof HooksSchema>;
 
 /**
  * Result returned by fetchIdentity().

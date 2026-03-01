@@ -149,6 +149,7 @@ export function buildCloudInitUserData(
             skipDocker: defaults?.skipDocker,
             foregroundMode: defaults?.foregroundMode,
             plugins: args.plugins,
+            extraHooks: args.extraHooks,
             enableFunnel: args.enableFunnel,
             clawhubSkills: args.clawhubSkills,
             deps: args.deps,

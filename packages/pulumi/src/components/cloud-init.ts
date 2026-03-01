@@ -102,6 +102,11 @@ export interface CloudInitConfig {
   enableFunnel?: boolean;
   /** Public skill slugs to install via `clawhub install` */
   clawhubSkills?: string[];
+  /** Swarm/identity-level lifecycle hooks (prepended before plugin hooks) */
+  extraHooks?: {
+    postProvision?: Array<{ label: string; script: string }>;
+    preStart?: Array<{ label: string; script: string }>;
+  };
 }
 
 /**
