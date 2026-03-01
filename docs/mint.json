@@ -66,9 +66,10 @@
       "pages": [
         "cli/overview",
         "cli/init",
-        "cli/setup",
         "cli/deploy",
         "cli/redeploy",
+        "cli/onboard",
+        "cli/setup",
         "cli/status",
         "cli/ssh",
         "cli/validate",

@@ -5,6 +5,8 @@ description: "Update agents in-place without destroying infrastructure"
 
 Updates agents in-place using `pulumi up --refresh` to sync cloud state and apply changes. Preserves existing infrastructure and Tailscale devices. If the stack doesn't exist yet, falls back to a fresh deploy.
 
+Like `deploy`, this command automatically validates secrets and configures Pulumi before redeploying.
+
 ## Usage
 
 ```bash
@@ -17,14 +19,17 @@ clawup redeploy [options]
 |--------|-------------|
 | `-y, --yes` | Skip confirmation prompt |
 | `-l, --local` | Redeploy local Docker containers |
+| `--env-file <path>` | Path to `.env` file (defaults to `.env` in project root) |
+| `--skip-hooks` | Skip plugin lifecycle hook execution |
 
 ## What It Does
 
-1. Selects the existing Pulumi stack (or creates one if missing)
-2. Syncs manifest and config to the Pulumi project
-3. Cleans up stale Tailscale devices (cloud only)
-4. Runs `pulumi up --refresh` to read actual cloud state and apply changes
-5. Displays updated agent details (IPs, Tailscale URLs)
+1. Validates secrets and configures Pulumi (cloud deploys only)
+2. Selects the existing Pulumi stack (or creates one if missing)
+3. Syncs manifest and config to the Pulumi project
+4. Cleans up stale Tailscale devices (cloud only)
+5. Runs `pulumi up --refresh` to read actual cloud state and apply changes
+6. Displays updated agent details (IPs, Tailscale URLs)
 
 ## Local Docker Mode
 

@@ -1,9 +1,13 @@
 ---
 title: "setup"
-description: "Validate secrets and configure Pulumi (non-interactive)"
+description: "Validate secrets and configure Pulumi (deprecated)"
 ---
 
-Non-interactive command that reads `clawup.yaml` and your `.env` file, validates all required secrets are present, fetches Linear user UUIDs, and configures the Pulumi stack. Run this after [`clawup init`](/cli/init).
+<Warning>
+**Deprecated.** `clawup deploy` now handles setup automatically. This command is kept for backward compatibility (CI scripts, etc.) and will be removed in a future version.
+</Warning>
+
+Reads `clawup.yaml` and your `.env` file, validates all required secrets are present, fetches Linear user UUIDs, and configures the Pulumi stack.
 
 ## Usage
 
@@ -19,48 +23,29 @@ clawup setup [options]
 | `--deploy` | Deploy immediately after setup completes |
 | `-y, --yes` | Skip confirmation prompt (used with `--deploy`) |
 | `--skip-hooks` | Skip plugin lifecycle hook execution |
+| `--onboard` | Run plugin onboard hooks during setup |
 
-## What It Does
+## Migration
 
-1. **Loads manifest** — Finds and validates `clawup.yaml`. Exits if not found.
-2. **Fetches identities** — Resolves agent identities from Git repos or local paths.
-3. **Checks template vars** — Verifies all identity template variables are present in the manifest.
-4. **Loads `.env`** — Reads secrets from `.env` (or path specified by `--env-file`). Exits if the file doesn't exist.
-5. **Resolves secrets** — Matches `${env:VAR}` references against the env dict. Validates format of well-known secrets.
-6. **Reports missing secrets** — If any secrets are unresolved, prints the full list with hints and exits:
-   ```
-   Missing secrets in .env:
-     ANTHROPIC_API_KEY           — Required (must start with sk-ant-)
-     PM_LINEAR_API_KEY           — Agent: Juno (must start with lin_api_)
+Replace any usage of `clawup setup` with `clawup deploy`:
 
-   Fill these in your .env file, then run `clawup setup` again.
-   ```
-7. **Fetches Linear UUIDs** — For agents with the `openclaw-linear` plugin, auto-fetches the Linear user UUID via the API. Can be overridden by setting `<ROLE>_LINEAR_USER_UUID` in `.env`.
-8. **Updates manifest** — Adds any new secret references and plugin config to `clawup.yaml`. Regenerates `.env.example`.
-9. **Provisions Pulumi** — Creates workspace, selects/creates the Pulumi stack, sets all config values.
+```bash
+# Before
+clawup setup
+clawup deploy
+
+# After
+clawup deploy
+```
+
+If you used `clawup setup --deploy`, just use `clawup deploy` instead.
 
 ## Examples
 
 ```bash
-# Standard setup
+# Still works, but shows deprecation warning
 clawup setup
 
-# Setup with custom .env location
-clawup setup --env-file /path/to/.env
-
-# Setup and deploy immediately
-clawup setup --deploy
-
-# Setup, deploy, skip confirmation
+# Setup and deploy in one step (equivalent to `clawup deploy`)
 clawup setup --deploy -y
 ```
-
-## Linear User UUID
-
-The setup command auto-fetches Linear user UUIDs using the Linear API key. If the API call fails (e.g., network issues), you can set the UUID manually in `.env`:
-
-```bash
-PM_LINEAR_USER_UUID=a1b2c3d4-e5f6-7890-abcd-ef1234567890
-```
-
-This is also available as a commented line in `.env.example` for reference.

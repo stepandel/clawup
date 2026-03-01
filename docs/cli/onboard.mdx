@@ -1,0 +1,45 @@
+---
+title: "onboard"
+description: "Run plugin onboard hooks for interactive first-time setup"
+---
+
+Runs plugin onboard hooks interactively. Onboard hooks are plugin-defined scripts that handle first-time setup tasks like creating webhook endpoints, generating signing secrets, or configuring external services.
+
+## Usage
+
+```bash
+clawup onboard [options]
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--env-file <path>` | Path to `.env` file (defaults to `.env` in project root) |
+
+## What It Does
+
+1. Loads `clawup.yaml` and resolves agent identities
+2. Loads `.env` and resolves secrets
+3. Runs each plugin's `onboard` hook (if defined) with the resolved context
+4. Hooks can prompt for input, call external APIs, and write results back to config
+
+## When to Use
+
+Run `clawup onboard` after your first `clawup deploy` if any plugins have onboard hooks that need interactive setup. For example, a plugin might need to register webhook URLs that are only available after deployment.
+
+You can also pass `--onboard` to `clawup setup` to run onboard hooks during the setup phase.
+
+## Examples
+
+```bash
+# Run onboard hooks
+clawup onboard
+
+# Run with custom .env location
+clawup onboard --env-file /path/to/.env
+```
+
+<Note>
+Onboard hooks are defined by plugin authors in the plugin manifest. Not all plugins have onboard hooks — only those that require interactive first-time configuration.
+</Note>

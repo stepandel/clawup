@@ -1,9 +1,9 @@
 ---
 title: "deploy"
-description: "Deploy your agent team with Pulumi"
+description: "Validate secrets, configure Pulumi, and deploy your agent team"
 ---
 
-Provisions infrastructure and deploys your agent team using Pulumi.
+Validates your `.env` secrets, configures the Pulumi stack, and provisions infrastructure for your agent team — all in a single command.
 
 ## Usage
 
@@ -17,14 +17,22 @@ clawup deploy [options]
 |--------|-------------|
 | `-y, --yes` | Skip confirmation prompt |
 | `--local` | Deploy to local Docker containers instead of cloud |
+| `--env-file <path>` | Path to `.env` file (defaults to `.env` in project root) |
+| `--skip-hooks` | Skip plugin lifecycle hook execution |
 
 ## What It Does
 
-1. Reads your `clawup.yaml` manifest from the project root
-2. Runs `pulumi up` to provision/update infrastructure
-3. Creates servers, volumes, networking, and security groups
-4. Bootstraps each agent with OpenClaw and configured tools
-5. Connects agents to your Tailscale network
+1. **Validates secrets** — Loads `.env`, resolves `${env:VAR}` references, validates formats, and reports any missing secrets
+2. **Fetches identities** — Resolves agent identities from Git repos or local paths
+3. **Auto-resolves secrets** — Fetches Linear user UUIDs and other auto-resolvable values
+4. **Configures Pulumi** — Creates/selects the stack and sets all config values
+5. **Provisions infrastructure** — Runs `pulumi up` to create servers, volumes, networking, and security groups
+6. **Bootstraps agents** — Installs OpenClaw, tools, and configured integrations on each agent
+7. **Connects to Tailscale** — Joins agents to your Tailscale network
+
+<Note>
+In previous versions, steps 1-4 were handled by a separate `clawup setup` command. As of v2.6.0, `deploy` handles everything automatically.
+</Note>
 
 ## Local Docker Mode
 
@@ -44,6 +52,9 @@ clawup deploy
 
 # Deploy without confirmation
 clawup deploy --yes
+
+# Deploy with custom .env location
+clawup deploy --env-file /path/to/.env
 
 # Deploy to local Docker containers
 clawup deploy --local --yes

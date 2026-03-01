@@ -1,6 +1,6 @@
 ---
 title: "Quick Start"
-description: "Deploy your agents in 5 minutes"
+description: "Deploy your agents in minutes"
 ---
 
 Get AI agents running on your own cloud infrastructure in minutes.
@@ -58,27 +58,19 @@ cp .env.example .env
 
 Open `.env` and fill in your API keys (Anthropic, Tailscale, etc.).
 
-## 6. Setup
-
-```bash
-clawup setup
-```
-
-Validates all secrets are present, fetches Linear user UUIDs (if needed), and configures the Pulumi stack. If any secrets are missing, it prints exactly what's needed.
-
-## 7. Deploy
+## 6. Deploy
 
 ```bash
 clawup deploy
 ```
 
-Pulumi provisions your agents: dedicated servers, persistent storage, networking, and bootstrap with all integrations.
+Validates all secrets, configures Pulumi, and provisions your agents — dedicated servers, persistent storage, networking, and bootstrap with all integrations. If any secrets are missing, it prints exactly what's needed.
 
 <Note>
 First deployment takes 3-5 minutes. Subsequent deployments are incremental.
 </Note>
 
-## 8. Connect
+## 7. Connect
 
 ```bash
 # Check status

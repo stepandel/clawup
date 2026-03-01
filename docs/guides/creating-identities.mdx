@@ -335,7 +335,7 @@ requiredSecrets:
   - customWebhookUrl   # → <ROLE>_CUSTOM_WEBHOOK_URL
 ```
 
-Each camelCase key is converted to `SCREAMING_SNAKE_CASE` and prefixed with the agent's role for the env var name. Add the values to your `.env` file — `clawup setup` validates that all required secrets are present and reports any that are missing.
+Each camelCase key is converted to `SCREAMING_SNAKE_CASE` and prefixed with the agent's role for the env var name. Add the values to your `.env` file — `clawup deploy` validates that all required secrets are present and reports any that are missing.
 
 This is additive — plugin/dep-implied secrets are always included. If a key appears in both `requiredSecrets` and is already implied by a plugin, it won't be duplicated.
 
