@@ -6,6 +6,7 @@
 export type {
   AgentDefinition,
   ClawupManifest,
+  Hooks,
   IdentityManifest,
   IdentityResult,
   PluginConfigFile,
@@ -89,6 +90,7 @@ export { CLAWHUB_PREFIX, parseSkill, classifySkills } from "./skills";
 export {
   AgentDefinitionSchema,
   ClawupManifestSchema,
+  HooksSchema,
   PluginConfigFileSchema,
   IdentityManifestSchema,
   PluginManifestSchema,

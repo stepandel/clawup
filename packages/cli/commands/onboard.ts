@@ -196,6 +196,7 @@ export async function onboardCommand(opts: OnboardOptions = {}): Promise<void> {
     autoResolvedSecrets,
     envDict,
     resolvedSecrets,
+    swarmOnboard: manifest.hooks?.onboard,
     p,
     runOnboardHook,
     exitWithError,

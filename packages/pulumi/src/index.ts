@@ -418,6 +418,27 @@ function buildBaseAgentArgs(agent: ResolvedAgent): {
     }
   }
 
+  // Collect swarm + identity lifecycle hooks (broadest → most specific)
+  const extraHooks: {
+    postProvision: Array<{ label: string; script: string }>;
+    preStart: Array<{ label: string; script: string }>;
+  } = { postProvision: [], preStart: [] };
+
+  if (manifest.hooks?.postProvision) {
+    extraHooks.postProvision.push({ label: "swarm", script: manifest.hooks.postProvision });
+  }
+  if (identity.manifest.hooks?.postProvision) {
+    extraHooks.postProvision.push({ label: `identity:${identity.manifest.name}`, script: identity.manifest.hooks.postProvision });
+  }
+  if (manifest.hooks?.preStart) {
+    extraHooks.preStart.push({ label: "swarm", script: manifest.hooks.preStart });
+  }
+  if (identity.manifest.hooks?.preStart) {
+    extraHooks.preStart.push({ label: `identity:${identity.manifest.name}`, script: identity.manifest.hooks.preStart });
+  }
+
+  const hasExtraHooks = extraHooks.postProvision.length > 0 || extraHooks.preStart.length > 0;
+
   return {
     baseArgs: {
       providerApiKeys,
@@ -439,6 +460,7 @@ function buildBaseAgentArgs(agent: ResolvedAgent): {
       clawhubSkills: clawhubSkillSlugs,
       deps: depEntries,
       depSecrets,
+      ...(hasExtraHooks ? { extraHooks } : {}),
     },
     agentDisplayName,
     agentVolumeSize,

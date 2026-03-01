@@ -21,7 +21,7 @@ import {
   getProviderConfigKey,
 } from "@clawup/core";
 import { resolveAgentSync } from "@clawup/core/resolve";
-import { resolvePluginSecrets, runOnboardHook } from "@clawup/core/manifest-hooks";
+import { resolvePluginSecrets, runOnboardHook, runResolveHook } from "@clawup/core/manifest-hooks";
 import { fetchIdentity } from "@clawup/core/identity";
 import { findProjectRoot } from "./project";
 import { selectOrCreateStack, setConfig, qualifiedStackName } from "./pulumi";
@@ -404,6 +404,46 @@ export async function runSetup(progress: SetupProgress, options?: SetupOptions):
   }
 
   // -------------------------------------------------------------------------
+  // 7a. Resolve swarm + identity level resolve hooks
+  // -------------------------------------------------------------------------
+  if (!options?.skipHooks) {
+    // Collect resolve scripts: most-specific-wins on key conflicts (identity > swarm)
+    const nonPluginResolve: Record<string, { script: string; label: string }> = {};
+
+    // Swarm-level resolve hooks (lowest priority)
+    if (manifest.hooks?.resolve) {
+      for (const [envVar, script] of Object.entries(manifest.hooks.resolve)) {
+        nonPluginResolve[envVar] = { script, label: "swarm" };
+      }
+    }
+
+    // Identity-level resolve hooks (override swarm for same key)
+    for (const fi of fetchedIdentities) {
+      if (fi.manifest.hooks?.resolve) {
+        for (const [envVar, script] of Object.entries(fi.manifest.hooks.resolve)) {
+          nonPluginResolve[envVar] = { script, label: `identity:${fi.manifest.name}` };
+        }
+      }
+    }
+
+    for (const [envVar, { script, label }] of Object.entries(nonPluginResolve)) {
+      // Skip if already resolved via .env
+      if (envDict[envVar]) continue;
+
+      const s = progress.spinner(`Resolving ${envVar} (${label})...`);
+      s.start(`Resolving ${envVar} (${label})...`);
+      const result = await runResolveHook({ script, env: envDict });
+      if (result.ok) {
+        envDict[envVar] = result.value;
+        s.stop(`Resolved ${envVar} (${label})`);
+      } else {
+        s.stop(`Failed to resolve ${envVar} (${label})`);
+        progress.log.warn(`Non-plugin resolve hook failed for ${envVar}: ${result.error}`);
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // 7b. Run onboard hooks (interactive first-time plugin setup)
   // -------------------------------------------------------------------------
   if (progress.text && progress.isCancel) {
@@ -415,6 +455,7 @@ export async function runSetup(progress: SetupProgress, options?: SetupOptions):
       autoResolvedSecrets,
       envDict,
       resolvedSecrets,
+      swarmOnboard: manifest.hooks?.onboard,
       p: {
         log: progress.log,
         spinner: () => {

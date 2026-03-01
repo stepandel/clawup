@@ -86,18 +86,23 @@ export const OnboardHookSchema = z.object({
 });
 
 /**
- * Lifecycle hooks for plugin provisioning and setup.
+ * Lifecycle hooks — reusable shape for swarm, identity, and plugin levels.
  */
-export const PluginHooksSchema = z.object({
-  /** Per-secret resolution scripts: secretKey -> shell script that outputs the resolved value */
+export const HooksSchema = z.object({
+  /** Resolution scripts: key -> shell script that outputs the resolved value */
   resolve: z.record(z.string().min(1, "Resolve hook script cannot be empty")).optional(),
   /** Script to run after base provisioning, before workspace injection */
   postProvision: z.string().min(1, "postProvision hook script cannot be empty").optional(),
   /** Script to run after workspace files are in place, before gateway start */
   preStart: z.string().min(1, "preStart hook script cannot be empty").optional(),
-  /** Onboard hook — runs once during first setup for interactive plugin configuration */
+  /** Onboard hook — runs once during first setup for interactive configuration */
   onboard: OnboardHookSchema.optional(),
 });
+
+/**
+ * Backward-compatible alias — plugin hooks use the same shape.
+ */
+export const PluginHooksSchema = HooksSchema;
 
 /**
  * The enriched plugin manifest — consolidates ALL plugin metadata.

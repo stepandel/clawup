@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { HooksSchema } from "./plugin-manifest";
 
 /** Schema for an agent identity manifest (identity.yaml) */
 export const IdentityManifestSchema = z.object({
@@ -51,4 +52,6 @@ export const IdentityManifestSchema = z.object({
     z.string().min(1, "each requiredSecrets entry must be a non-empty string"),
     { invalid_type_error: '"requiredSecrets" must be an array of strings' },
   ).optional(),
+  /** Identity-level lifecycle hooks (run for agents using this identity) */
+  hooks: HooksSchema.optional(),
 });

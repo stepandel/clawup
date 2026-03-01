@@ -566,13 +566,21 @@ export function buildProvisionerConfig(
     .map((d) => ({ name: d.name, script: b64(d.postInstallScript) }));
 
   // --- Hooks ---
-  const postProvisionHooks = (config.plugins ?? [])
-    .filter((p) => p.hooks?.postProvision)
-    .map((p) => ({ name: p.name, script: b64(p.hooks!.postProvision!) }));
+  const postProvisionHooks = [
+    ...(config.extraHooks?.postProvision ?? [])
+      .map((h) => ({ name: h.label, script: b64(h.script) })),
+    ...(config.plugins ?? [])
+      .filter((p) => p.hooks?.postProvision)
+      .map((p) => ({ name: `plugin:${p.name}`, script: b64(p.hooks!.postProvision!) })),
+  ];
 
-  const preStartHooks = (config.plugins ?? [])
-    .filter((p) => p.hooks?.preStart)
-    .map((p) => ({ name: p.name, script: b64(p.hooks!.preStart!) }));
+  const preStartHooks = [
+    ...(config.extraHooks?.preStart ?? [])
+      .map((h) => ({ name: h.label, script: b64(h.script) })),
+    ...(config.plugins ?? [])
+      .filter((p) => p.hooks?.preStart)
+      .map((p) => ({ name: `plugin:${p.name}`, script: b64(p.hooks!.preStart!) })),
+  ];
 
   // --- Plugins ---
   const installablePlugins = (config.plugins ?? [])

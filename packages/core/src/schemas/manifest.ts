@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { HooksSchema } from "./plugin-manifest";
 
 /** Schema for a single agent in the manifest */
 export const AgentDefinitionSchema = z.object({
@@ -60,5 +61,7 @@ export const ClawupManifestSchema = z.object({
   templateVars: z.record(z.string(), z.string()).optional(),
   /** Global secret references (e.g., `${env:ANTHROPIC_API_KEY}`) */
   secrets: z.record(z.string(), z.string()).optional(),
+  /** Swarm-level lifecycle hooks (run for all agents) */
+  hooks: HooksSchema.optional(),
   agents: z.array(AgentDefinitionSchema).min(1, "At least one agent is required"),
 });

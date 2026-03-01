@@ -348,7 +348,7 @@ describe("cloud-init pipeline — plugins and deps", () => {
     const provConfig = buildConfig(config);
 
     expect(provConfig.postProvisionHooks.length).toBe(1);
-    expect(provConfig.postProvisionHooks[0].name).toBe("test-plugin");
+    expect(provConfig.postProvisionHooks[0].name).toBe("plugin:test-plugin");
     const decoded = Buffer.from(provConfig.postProvisionHooks[0].script, "base64").toString();
     expect(decoded).toContain("POST_PROVISION_MARKER");
 
