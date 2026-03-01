@@ -162,14 +162,17 @@ clawup deploy (your machine)
    ├─ Install system packages, Node.js, Docker
    ├─ Install coding agent (Claude Code)
    ├─ Write environment variables
-   ├─ Run dep post-install scripts
-   ├─ ▶ postProvision hooks ◀── swarm → identity → plugin
+   ├─ ▶ postProvision hooks ◀── deps (root → ubuntu) → swarm → identity → plugin
    ├─ Inject workspace files (SOUL.md, etc.)
    ├─ Install plugins, configure OpenClaw
    ├─ ▶ preStart hooks ◀────── swarm → identity → plugin
    ├─ Start Tailscale proxy
    └─ Start OpenClaw gateway
 ```
+
+<Note>
+**Deps run as postProvision hooks.** When an identity declares `deps` (e.g., `gh`, `brave-search`), their install and post-install scripts are prepended to the postProvision hooks array. Install scripts run as `root` (for `apt-get`, etc.), post-install scripts run as `ubuntu` (for auth/config). They execute before swarm, identity, and plugin hooks.
+</Note>
 
 ## Hook Types
 
@@ -333,9 +336,9 @@ For more on running onboard hooks, see the [`clawup onboard` CLI reference](/cli
 
 PostProvision hooks run on the agent server during cloud-init, after base packages (Node.js, Docker, coding agent) are installed but **before** workspace files are injected.
 
-**When:** Cloud-init, after Node.js/Docker/coding agent installation and dep post-install scripts
+**When:** Cloud-init, after Node.js/Docker/coding agent installation
 
-**Where:** Agent server, as the `ubuntu` user
+**Where:** Agent server, as the `ubuntu` user (dep install scripts run as `root`)
 
 **Output:** Streamed to cloud-init log (`/var/log/cloud-init-output.log`)
 
@@ -378,12 +381,45 @@ hooks:
     curl -sSL https://get.analytics.example.com/cli | sh
 ```
 
+### How Deps Integrate with PostProvision
+
+When an identity declares `deps` (e.g., `gh`, `brave-search`), those deps are automatically converted into postProvision hooks that run **before** swarm, identity, and plugin hooks. Each dep can produce up to two hooks:
+
+1. **Install hook** (`dep:<name>:install`) — runs as `root` for system-level installation (e.g., `apt-get`)
+2. **Post-install hook** (`dep:<name>:post`) — runs as `ubuntu` for authentication and configuration
+
+For example, an identity with `deps: [gh, brave-search]` and a swarm-level postProvision hook produces this execution order:
+
+```
+postProvision hooks (in order):
+  1. dep:gh:install          (as root)    ← apt-get install gh
+  2. dep:gh:post             (as ubuntu)  ← gh auth login
+  3. dep:brave-search:post   (as ubuntu)  ← openclaw config set tools.web.search
+  4. swarm hook              (as ubuntu)  ← your clawup.yaml postProvision
+  5. identity hook           (as ubuntu)  ← your identity.yaml postProvision
+  6. plugin hooks            (as ubuntu)  ← plugin manifest postProvision
+```
+
+This means identity and plugin hooks can safely depend on deps being installed. For example, an identity preStart hook can use `gh`:
+
+```yaml
+# identity.yaml
+deps:
+  - gh
+
+hooks:
+  preStart: |
+    echo "Cloning working repo..."
+    cd /home/ubuntu && gh repo clone $GITHUB_REPO workspace-repo
+```
+
 ### Environment
 
 PostProvision hooks have access to:
 - Environment variables from `.profile` (API keys, tokens)
 - System tools installed in earlier phases (Node.js, npm, Docker)
 - Network access (Tailscale is connected at this point)
+- Deps installed earlier in the postProvision phase (e.g., `gh` CLI)
 
 ## PreStart Hooks
 
