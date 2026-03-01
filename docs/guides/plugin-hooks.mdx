@@ -3,6 +3,10 @@ title: "Plugin Hooks"
 description: "Use lifecycle hooks to resolve secrets, run interactive setup, and customize server provisioning"
 ---
 
+<Warning>
+Plugin hooks are **experimental** and subject to change. The API may evolve in future releases.
+</Warning>
+
 Plugins can define **hooks** — shell scripts that run at specific points during deployment and provisioning. Hooks let you automate secret resolution, server setup, and pre-launch configuration without modifying the core deployment pipeline.
 
 ## Hook Types
@@ -125,10 +129,6 @@ hooks:
 - All environment variables from `.env` are available in the script
 
 ## Onboard Hooks
-
-<Warning>
-Onboard hooks are **experimental** and subject to change. The API may evolve in future releases.
-</Warning>
 
 Onboard hooks run interactive first-time setup for plugins that need it — like registering webhook URLs or configuring external services that require post-deploy information.
 
