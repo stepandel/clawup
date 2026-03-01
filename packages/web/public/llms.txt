@@ -2,16 +2,22 @@
 
 > The secure golden path for deploying OpenClaw agent swarms — identity-driven, infrastructure-as-code, zero public ports.
 
-Clawup is an open-source CLI tool that securely deploys, orchestrates, and monitors AI agent swarms. Define agent identities in YAML, provision infrastructure with one command, and track changes in git.
+Clawup is an open-source CLI tool that securely deploys, orchestrates, and monitors AI agent swarms on AWS or Hetzner Cloud. Define agent identities in YAML, provision infrastructure with one command, and track changes in git.
+
+## Security
+
+- Zero public ports — all agent ports bind to localhost, accessible only via Tailscale
+- Encrypted secrets via Pulumi config (AES-256-GCM)
+- Tailscale mesh VPN — encrypted peer-to-peer networking, no port exposure
+- Docker isolation — each agent runs in a sandboxed container
+- Token-based gateway authentication
 
 ## Key Features
 
 - One-command deployment of OpenClaw agents to AWS or Hetzner Cloud
-- Identity system: composable YAML definitions for agent personality, skills, model, and tools
-- Composable identity system for agent personality, skills, and configuration
+- Composable identity system: YAML definitions for agent personality, skills, model, and tools
 - Built-in integrations with Linear, GitHub, and Slack
 - Secure infrastructure via Pulumi (VPC, EC2, networking)
-- Encrypted mesh networking via Tailscale (no public ports)
 - Real-time agent monitoring and SSH access
 - Cost estimation and resource management
 

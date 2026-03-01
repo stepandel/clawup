@@ -1,0 +1,100 @@
+# Clawup — Full Context
+
+> The secure golden path for deploying OpenClaw agent swarms — identity-driven, infrastructure-as-code, zero public ports.
+
+Clawup is an open-source CLI tool that securely deploys, orchestrates, and monitors AI agent swarms on AWS or Hetzner Cloud. Define agent identities in YAML, provision infrastructure with one command, and track changes in git. Built on Pulumi and Tailscale.
+
+## Security (Secure by Default)
+
+Clawup enforces security at every layer without requiring manual configuration:
+
+- **Zero public ports** — all agent ports bind to 127.0.0.1, accessible only via Tailscale mesh VPN
+- **Encrypted secrets** — API keys and tokens stored via Pulumi encrypted config
+- **Mesh VPN** — agents communicate over Tailscale's encrypted peer-to-peer network (WireGuard-based)
+- **Docker isolation** — each agent runs in a sandboxed container
+- **Token-based auth** — OpenClaw gateway access requires authentication
+- **No SSH exposure** — SSH access routed through Tailscale, not public internet
+
+## How It Works
+
+1. **Configure** — Run `clawup init` to discover local identities and scaffold a `clawup.yaml` manifest
+2. **Deploy** — Run `clawup deploy` to provision agents on dedicated cloud servers
+3. **Assign work** — Move tickets through Linear and agents pick them up automatically
+4. **Monitor** — Use `clawup status`, `ssh`, and `validate` to check on agents
+
+## Identity System
+
+Agents are defined by composable identities — self-contained packages that include:
+
+- `identity.yaml` — Manifest: model, plugins, deps, skills, template vars
+- `SOUL.md` — Personality, role, approach, communication style
+- `IDENTITY.md` — Name, role, emoji
+- `HEARTBEAT.md` — Periodic tasks and state machine logic
+- `TOOLS.md` — Tool reference (integrations, local env)
+- `AGENTS.md` — Multi-agent coordination instructions
+- `skills/` — Bundled skills
+
+Identities can live in Git repos, monorepo subdirectories, or local paths.
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `clawup init` | Generate clawup.yaml scaffold (or refresh from identity changes) |
+| `clawup deploy` | Validate secrets, configure Pulumi, and deploy agents |
+| `clawup deploy --local` | Deploy to local Docker containers |
+| `clawup status` | Show agent statuses and outputs |
+| `clawup ssh <agent>` | SSH to an agent by name, role, or alias |
+| `clawup validate` | Health check all agents via Tailscale |
+| `clawup redeploy` | Update agents in-place (pulumi up --refresh) |
+| `clawup destroy` | Tear down all resources (with confirmation) |
+| `clawup push` | Push workspace files, skills, and config to running agents |
+| `clawup onboard` | Run plugin onboard hooks for interactive first-time setup |
+| `clawup config show` | Display current config |
+| `clawup config set` | Update a config value |
+| `clawup secrets set` | Set a Pulumi secret |
+| `clawup secrets list` | Show which secrets are configured |
+| `clawup update` | Update clawup CLI to latest version |
+
+## Cloud Providers
+
+| Feature | AWS | Hetzner Cloud |
+|---------|-----|---------------|
+| 3x Agents (monthly) | ~$99 | ~$18-22 |
+| Instance Type | t3.medium (2 vCPU, 4GB) | CX22 (2 vCPU, 4GB) |
+| Regions | Global (25+) | EU & US (5 locations) |
+| Setup Complexity | Moderate (VPC, IAM) | Simple (API token) |
+
+## What Gets Provisioned Per Agent
+
+- Cloud instance (EC2 or Hetzner server) with Ubuntu 24.04 LTS
+- Docker (for OpenClaw sandbox)
+- Node.js v22, OpenClaw CLI, coding agent CLI (e.g., Claude Code)
+- Tailscale VPN (encrypted mesh, no public ports)
+- Workspace files and skills injected from its identity
+- AI model configured per-identity (with fallback support)
+- Plugins and deps installed per-identity
+
+## Plugins
+
+Built-in plugins: Linear, Slack, GitHub. Custom plugins supported via manifest files bundled in the identity directory.
+
+## Lifecycle Hooks
+
+Hooks run at three levels — swarm (clawup.yaml), identity (identity.yaml), and plugin (plugin manifest). They auto-resolve derived secrets, install server-side tools, and perform pre-launch configuration.
+
+## Installation
+
+```bash
+npm install -g clawup
+```
+
+## Links
+
+- Website: https://clawup.sh
+- Documentation: https://docs.clawup.sh
+- Quickstart: https://docs.clawup.sh/quickstart
+- GitHub: https://github.com/stepandel/clawup
+- CLI Reference: https://docs.clawup.sh/cli/overview
+- Architecture: https://docs.clawup.sh/architecture/overview
+- OpenClaw: https://openclaw.ai

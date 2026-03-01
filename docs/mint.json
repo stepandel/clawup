@@ -108,6 +108,7 @@
   ],
   "metadata": {
     "og:site_name": "Clawup Docs",
+    "og:description": "Documentation for Clawup — the secure golden path for deploying OpenClaw agent swarms. Identity-driven, infrastructure-as-code, zero public ports.",
     "twitter:site": "@stepanarsent"
   },
   "footerSocials": {

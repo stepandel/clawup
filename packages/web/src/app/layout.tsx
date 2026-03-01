@@ -17,15 +17,23 @@ export const metadata: Metadata = {
     "openclaw",
     "AI agents",
     "AI agent deployment",
+    "secure AI agent deployment",
     "autonomous coding agents",
     "AI dev team",
     "cloud infrastructure",
     "agent orchestration",
+    "zero public ports",
+    "secure by default",
+    "Tailscale mesh VPN",
     "Pulumi",
     "Tailscale",
     "CLI",
     "developer tools",
+    "infrastructure as code",
   ],
+  alternates: {
+    canonical: "https://clawup.sh",
+  },
   openGraph: {
     title: "Clawup — The Secure Golden Path for OpenClaw Agent Swarms",
     description:
@@ -35,7 +43,7 @@ export const metadata: Metadata = {
     siteName: "Clawup",
     images: [
       {
-        url: "/og-image.png",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
         alt: "Clawup — The secure golden path for OpenClaw agent swarms",
@@ -47,7 +55,7 @@ export const metadata: Metadata = {
     title: "Clawup — The Secure Golden Path for OpenClaw Agent Swarms",
     description:
       "The secure golden path for deploying OpenClaw agent swarms. Identity-driven, infrastructure-as-code, zero public ports.",
-    images: ["/og-image.png"],
+    images: ["/opengraph-image"],
   },
 };
 
