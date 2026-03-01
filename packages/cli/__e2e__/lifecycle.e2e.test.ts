@@ -253,7 +253,7 @@ describe("Lifecycle: init → setup → deploy → validate → destroy", () => 
       expect(cloudinitMatch).not.toBeNull();
       const cloudinitScript = Buffer.from(cloudinitMatch![1], "base64").toString("utf-8");
       // Extract the provisioner config JSON from the heredoc inside the script
-      const configMatch = cloudinitScript.match(/__CLAWUP_CONFIG__\n([\s\S]*?)\n__CLAWUP_CONFIG__/);
+      const configMatch = cloudinitScript.match(/'__CLAWUP_CONFIG__'\n([\s\S]*?)\n__CLAWUP_CONFIG__/);
       expect(configMatch).not.toBeNull();
       const provisionerConfig = JSON.parse(configMatch![1]);
       expect(provisionerConfig.profileEnvVars).toHaveProperty("ANTHROPIC_API_KEY");
