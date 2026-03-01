@@ -273,10 +273,10 @@ describe("Plugin Lifecycle: deploy → validate → destroy (Slack + Linear)", (
       expect(cloudinitMatch).not.toBeNull();
       const cloudinitScript = Buffer.from(cloudinitMatch![1], "base64").toString("utf-8");
 
-      // Extract the provisioner config JSON from the CONFIG_B64 blob inside the script
-      const configB64Match = cloudinitScript.match(/CONFIG_B64="([^"]+)"/);
-      expect(configB64Match).not.toBeNull();
-      const provisionerConfig = JSON.parse(Buffer.from(configB64Match![1], "base64").toString("utf-8"));
+      // Extract the provisioner config JSON from the heredoc inside the script
+      const configMatch = cloudinitScript.match(/__CLAWUP_CONFIG__\n([\s\S]*?)\n__CLAWUP_CONFIG__/);
+      expect(configMatch).not.toBeNull();
+      const provisionerConfig = JSON.parse(configMatch![1]);
 
       // Assert: Slack plugin secrets are in configSetCommands (as channel config keys)
       const configCmds = provisionerConfig.configSetCommands.map((c: { key: string }) => c.key);
