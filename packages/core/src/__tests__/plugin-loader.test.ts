@@ -42,7 +42,7 @@ describe("resolvePlugin", () => {
     expect(Object.keys(manifest.secrets)).toHaveLength(0);
   });
 
-  it("prefers built-in registry over identity-bundled manifests", () => {
+  it("prefers identity-bundled manifests over built-in registry", () => {
     const identityBundled: PluginManifest = {
       name: "openclaw-linear",
       displayName: "Custom Linear",
@@ -60,9 +60,9 @@ describe("resolvePlugin", () => {
     };
 
     const manifest = resolvePlugin("openclaw-linear", identityResult);
-    // Should use built-in, not the identity-bundled one
-    expect(manifest.displayName).toBe("Linear");
-    expect(manifest.configPath).toBe("plugins.entries");
+    // Identity-bundled override should win over built-in
+    expect(manifest.displayName).toBe("Custom Linear");
+    expect(manifest.configPath).toBe("channels");
   });
 
   it("uses identity-bundled manifest for unknown plugins", () => {

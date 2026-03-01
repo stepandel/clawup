@@ -1,7 +1,8 @@
 /**
  * Plugin loader — resolution chain and utility functions.
  *
- * Three-tier resolution: built-in registry > generic fallback.
+ * Three-tier resolution: identity-bundled > built-in registry > generic fallback.
+ * Identity-bundled manifests take precedence so users can override built-in defaults.
  * Unknown plugins work with zero manifest via the generic fallback.
  */
 
@@ -12,18 +13,21 @@ import type { IdentityResult } from "./types";
  * Resolve a single plugin by name.
  *
  * Three-tier resolution chain:
- *   1. Built-in PLUGIN_MANIFEST_REGISTRY (maintained, tested)
- *   2. Identity-bundled manifests (from identity repo plugins/ directory)
+ *   1. Identity-bundled manifests (from identity repo plugins/ directory)
+ *   2. Built-in PLUGIN_MANIFEST_REGISTRY (maintained, tested)
  *   3. Generic fallback stub (unknown plugins still work)
+ *
+ * Identity-bundled manifests take precedence so that users can override
+ * built-in defaults (e.g. adding hooks or changing config).
  */
 export function resolvePlugin(name: string, identityResult?: IdentityResult): PluginManifest {
-  // 1. Check built-in registry
-  const builtin = PLUGIN_MANIFEST_REGISTRY[name];
-  if (builtin) return builtin;
-
-  // 2. Check identity-bundled manifests
+  // 1. Check identity-bundled manifests (user overrides win)
   const identityBundled = identityResult?.pluginManifests?.[name];
   if (identityBundled) return identityBundled;
+
+  // 2. Check built-in registry
+  const builtin = PLUGIN_MANIFEST_REGISTRY[name];
+  if (builtin) return builtin;
 
   // 3. Generic fallback — unknown plugins work with manual config
   return {
