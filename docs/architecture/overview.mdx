@@ -35,9 +35,10 @@ clawup.yaml         identity.yaml
 2. **Fetch identities** — For each agent with an `identity` field, the CLI fetches the identity from the Git repo or local path, validates `identity.yaml`, and collects all workspace files and skills.
 3. **Select Pulumi stack** — Creates or selects a stack matching your config name.
 4. **Sync config** — Copies the manifest to the project root and sets provider-specific Pulumi config.
-5. **Provision resources** — Pulumi creates infrastructure for each agent: server, firewall, SSH key, and injects a cloud-init bootstrap script as user data.
-6. **Cloud-init runs** — On first boot, each server executes the bootstrap sequence (see below) to install tools, configure OpenClaw, and join the Tailscale mesh.
-7. **Show outputs** — The CLI displays each agent's Tailscale URL, public IP, and instance ID.
+5. **Run resolve hooks** — Swarm, identity, and plugin resolve hooks run on your machine to auto-derive secrets. Most-specific-wins on key conflicts (plugin > identity > swarm).
+6. **Provision resources** — Pulumi creates infrastructure for each agent: server, firewall, SSH key, and injects a cloud-init bootstrap script as user data.
+7. **Cloud-init runs** — On first boot, each server executes the bootstrap sequence (see below) to install tools, configure OpenClaw, and join the Tailscale mesh. Lifecycle hooks (postProvision, preStart) execute in order: swarm → identity → plugin.
+8. **Show outputs** — The CLI displays each agent's Tailscale URL, public IP, and instance ID.
 
 ## Cloud-Init Bootstrap Sequence
 
@@ -94,7 +95,14 @@ The coding agent registry (`packages/core/src/coding-agent-registry.ts`) maps ea
 - Enable systemd linger for the `ubuntu` user
 - Run `openclaw onboard --non-interactive --accept-risk` (local mode, gateway on loopback)
 
-### 9. Identity File Injection
+### 9. PostProvision Hooks
+
+- Run swarm-level `postProvision` hook (from `clawup.yaml`)
+- Run identity-level `postProvision` hook (from `identity.yaml`)
+- Run plugin-level `postProvision` hooks (from plugin manifests)
+- Hooks execute sequentially: swarm → identity → plugin. See [Lifecycle Hooks](/guides/hooks) for details.
+
+### 10. Identity File Injection
 
 - Fetch workspace files from the agent's identity (Git repo or local path)
 - Inject files into `~/.openclaw/workspace/` (SOUL.md, IDENTITY.md, HEARTBEAT.md, TOOLS.md, USER.md, AGENTS.md, BOOTSTRAP.md)
@@ -102,7 +110,7 @@ The coding agent registry (`packages/core/src/coding-agent-registry.ts`) maps ea
 - Substitute template variables (`{{OWNER_NAME}}`, `{{TIMEZONE}}`, etc.) with values from the manifest
 - Files are gzipped and base64-encoded in the cloud-init script for efficiency
 
-### 10. OpenClaw Configuration & Plugins
+### 11. OpenClaw Configuration & Plugins
 
 - Patch `openclaw.json` with gateway, heartbeat, sandbox, and integration settings (see below)
 - Configure the AI model and backup model from the identity's `model` and `backupModel` fields
@@ -110,12 +118,19 @@ The coding agent registry (`packages/core/src/coding-agent-registry.ts`) maps ea
 - Install plugins declared in the identity's `plugins` field (e.g., openclaw-linear, slack)
 - Install the OpenClaw daemon service
 
-### 11. Tailscale Serve
+### 12. PreStart Hooks
+
+- Run swarm-level `preStart` hook (from `clawup.yaml`)
+- Run identity-level `preStart` hook (from `identity.yaml`)
+- Run plugin-level `preStart` hooks (from plugin manifests)
+- Hooks execute sequentially: swarm → identity → plugin. See [Lifecycle Hooks](/guides/hooks) for details.
+
+### 13. Tailscale Serve
 
 - Proxy the gateway port over HTTPS: `tailscale serve --bg 18789`
 - Creates a public URL on your tailnet for the OpenClaw web UI
 
-### 12. Post-Setup Commands
+### 14. Post-Setup Commands
 
 - Run any custom commands from `postSetupCommands` in the manifest
 

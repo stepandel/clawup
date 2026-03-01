@@ -130,6 +130,31 @@ This interactively scaffolds all required files — `identity.yaml`, workspace f
 - Template variable substitution
 - Available registries (deps, plugins, coding agents)
 
+## Lifecycle Hooks
+
+Hooks are shell scripts that run at specific points during deployment and provisioning. They're available at three levels — **swarm** (`clawup.yaml`), **identity** (`identity.yaml`), and **plugin** (plugin manifest) — letting you scope automation from fleet-wide concerns down to individual plugin setup. Hooks can auto-resolve derived secrets, install server-side tools, run interactive onboarding, and perform pre-launch configuration.
+
+```yaml
+# clawup.yaml — swarm-level hooks (run for all agents)
+hooks:
+  postProvision: |
+    echo "Installing fleet monitoring..."
+    curl -sSL https://get.datadoghq.com/agent | sh
+```
+
+```yaml
+# identity.yaml — identity-level hooks (run for agents using this identity)
+hooks:
+  postProvision: |
+    echo "Installing engineering tools..."
+    npm install -g turbo prettier
+  preStart: |
+    echo "Verifying repo access..."
+    gh auth status
+```
+
+Lifecycle hooks execute in order: swarm → identity → plugin. Resolve hooks use most-specific-wins on key conflicts. See the [Lifecycle Hooks guide](./docs/guides/hooks.mdx) for the full reference.
+
 ## Quick Start
 
 ### 1. Install

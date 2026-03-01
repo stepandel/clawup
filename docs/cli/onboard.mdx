@@ -7,9 +7,9 @@ description: "Run plugin onboard hooks for interactive first-time setup"
 Plugin hooks are **experimental** and subject to change. The API may evolve in future releases.
 </Warning>
 
-Runs plugin onboard hooks interactively. Onboard hooks are plugin-defined scripts that handle first-time setup tasks like creating webhook endpoints, generating signing secrets, or configuring external services.
+Runs onboard hooks interactively. Onboard hooks are scripts (defined at the swarm, identity, or plugin level) that handle first-time setup tasks like creating webhook endpoints, generating signing secrets, or configuring external services.
 
-For a comprehensive guide to all hook types, see [Plugin Hooks](/guides/plugin-hooks).
+For a comprehensive guide to all hook types, see [Lifecycle Hooks](/guides/hooks).
 
 ## Usage
 
@@ -72,5 +72,5 @@ clawup onboard --env-file /path/to/.env
 ```
 
 <Note>
-Onboard hooks are defined by plugin authors in the plugin manifest. Not all plugins have onboard hooks — only those that require interactive first-time configuration. See the [Plugin Hooks guide](/guides/plugin-hooks#onboard-hooks) for details on writing onboard hooks.
+Onboard hooks can be defined at the swarm level (`clawup.yaml`), identity level (`identity.yaml`), or plugin level. Not all levels require onboard hooks — only those that need interactive first-time configuration. See the [Lifecycle Hooks guide](/guides/hooks#onboard-hooks) for details on writing onboard hooks.
 </Note>

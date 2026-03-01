@@ -1,13 +1,175 @@
 ---
-title: "Plugin Hooks"
-description: "Use lifecycle hooks to resolve secrets, run interactive setup, and customize server provisioning"
+title: "Lifecycle Hooks"
+description: "Run shell scripts at deploy and provision time — at the swarm, identity, or plugin level"
 ---
 
 <Warning>
-Plugin hooks are **experimental** and subject to change. The API may evolve in future releases.
+Lifecycle hooks are **experimental** and subject to change. Multi-level hooks (swarm and identity) are new — the API may evolve in future releases.
 </Warning>
 
-Plugins can define **hooks** — shell scripts that run at specific points during deployment and provisioning. Hooks let you automate secret resolution, server setup, and pre-launch configuration without modifying the core deployment pipeline.
+Hooks are shell scripts that run at specific points during deployment and provisioning. They let you automate secret resolution, server setup, and pre-launch configuration without modifying the core deployment pipeline. Hooks are available at three levels — swarm, identity, and plugin — so you can scope automation to exactly where it belongs.
+
+## Three Levels
+
+| Level | Defined In | Scope | Example Use |
+|-------|-----------|-------|-------------|
+| Swarm | `clawup.yaml` | All agents in the deployment | Install monitoring, register team webhook |
+| Identity | `identity.yaml` | Agents using this identity | Role-specific tools, API setup |
+| Plugin | Plugin manifest | Per-plugin | Resolve derived secrets, configure integrations |
+
+### Swarm-Level Hooks
+
+Defined in `clawup.yaml`, swarm hooks run for **every agent** in your deployment. Use them for fleet-wide concerns.
+
+```yaml
+# clawup.yaml
+stackName: prod
+provider: hetzner
+region: fsn1
+instanceType: cx32
+ownerName: Jane Doe
+
+hooks:
+  postProvision: |
+    echo "Installing fleet monitoring agent..."
+    curl -sSL https://get.datadoghq.com/agent | sh
+  resolve:
+    SHARED_WEBHOOK_URL: |
+      curl -s https://api.example.com/webhook-url \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        | jq -r ".url"
+
+agents:
+  - name: agent-eng
+    identity: ./eng
+    # ...
+```
+
+### Identity-Level Hooks
+
+Defined in `identity.yaml`, identity hooks run for **all agents using that identity**. Use them for role-specific setup.
+
+```yaml
+# identity.yaml
+name: eng
+displayName: Titus
+role: eng
+emoji: building_construction
+description: Lead engineering, coding, shipping
+volumeSize: 50
+
+hooks:
+  postProvision: |
+    echo "Installing engineering-specific tools..."
+    npm install -g turbo
+  preStart: |
+    echo "Verifying repo access..."
+    gh auth status
+
+skills:
+  - eng-queue-handler
+templateVars:
+  - OWNER_NAME
+```
+
+### Plugin-Level Hooks
+
+Defined in a plugin's manifest, plugin hooks run for **that plugin only**. Resolve hooks at this level must match an `autoResolvable` secret key in the plugin manifest.
+
+```yaml
+# Plugin manifest (e.g., openclaw-linear)
+secrets:
+  apiKey:
+    envVar: LINEAR_API_KEY
+    autoResolvable: false
+  linearUserUuid:
+    envVar: LINEAR_USER_UUID
+    autoResolvable: true
+
+hooks:
+  resolve:
+    linearUserUuid: |
+      curl -s -X POST https://api.linear.app/graphql \
+        -H "Authorization: $LINEAR_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{"query":"{ viewer { id } }"}' \
+        | jq -r ".data.viewer.id"
+  postProvision: |
+    echo "Installing Linear CLI..."
+    deno install --global jsr:@schpet/linear-cli
+```
+
+## Execution Order
+
+### Lifecycle Hooks (postProvision, preStart)
+
+All levels run **sequentially**, broadest first:
+
+```
+swarm → identity → plugin
+```
+
+For a deployment with two agents using different identities and plugins:
+
+```
+Agent A:
+  1. swarm postProvision
+  2. identity:eng postProvision
+  3. plugin:openclaw-linear postProvision
+  4. plugin:slack postProvision
+
+Agent B:
+  1. swarm postProvision
+  2. identity:researcher postProvision
+  3. plugin:slack postProvision
+```
+
+### Resolve Hooks
+
+Resolve hooks use **most-specific-wins** on key conflicts:
+
+```
+plugin > identity > swarm
+```
+
+If the same environment variable key is defined at multiple levels, the most specific definition wins. Plugin-level resolve keys must match an `autoResolvable: true` secret in the plugin manifest. Swarm and identity-level resolve keys are environment variable names directly.
+
+### Onboard Hooks
+
+Onboard hooks run **sequentially**, broadest first. Swarm onboard runs once, then per agent: identity onboard followed by plugin onboards.
+
+```
+1. swarm onboard (once)
+2. Per agent:
+   a. identity onboard
+   b. plugin onboard(s)
+```
+
+## Execution Timeline
+
+The following shows where each hook type fires during the deployment lifecycle:
+
+```
+clawup deploy (your machine)
+│
+├─ Load clawup.yaml + .env
+├─ ▶ resolve hooks ◀──── swarm → identity → plugin (most-specific-wins per key)
+├─ ▶ onboard hooks ◀──── swarm (once) → per-agent: identity → plugin
+├─ Run Pulumi (provision infrastructure)
+│
+└─ Cloud-init (agent server)
+   │
+   ├─ Install system packages, Node.js, Docker
+   ├─ Install coding agent (Claude Code)
+   ├─ Write environment variables
+   ├─ Run dep post-install scripts
+   ├─ ▶ postProvision hooks ◀── swarm → identity → plugin
+   ├─ Inject workspace files (SOUL.md, etc.)
+   ├─ Install plugins, configure OpenClaw
+   ├─ ▶ preStart hooks ◀────── swarm → identity → plugin
+   ├─ Start Tailscale proxy
+   └─ Start OpenClaw gateway
+```
 
 ## Hook Types
 
@@ -20,30 +182,7 @@ Clawup supports four hook types, each running at a different stage:
 | `postProvision` | During cloud-init | Agent server | Install tools after base provisioning |
 | `preStart` | During cloud-init | Agent server | Final config before gateway starts |
 
-## Execution Timeline
-
-The following shows where each hook type fires during the deployment lifecycle:
-
-```
-clawup deploy (your machine)
-│
-├─ Load clawup.yaml + .env
-├─ ▶ resolve hooks ◀──────── Auto-resolve derived secrets
-├─ Run Pulumi (provision infrastructure)
-│
-└─ Cloud-init (agent server)
-   │
-   ├─ Install system packages, Node.js, Docker
-   ├─ Install coding agent (Claude Code)
-   ├─ Write environment variables
-   ├─ Run dep post-install scripts
-   ├─ ▶ postProvision hooks ◀── Server setup after base provisioning
-   ├─ Inject workspace files (SOUL.md, etc.)
-   ├─ Install plugins, configure OpenClaw
-   ├─ ▶ preStart hooks ◀────── Final config before gateway starts
-   ├─ Start Tailscale proxy
-   └─ Start OpenClaw gateway
-```
+All four hook types are available at all three levels (swarm, identity, plugin).
 
 ## Resolve Hooks
 
@@ -59,13 +198,16 @@ Resolve hooks auto-derive secret values from other secrets. They run on your mac
 
 ### How It Works
 
-Each resolve hook is a shell script keyed by a secret name. The secret must be marked `autoResolvable: true` in the plugin manifest. During deploy, Clawup runs the script and stores stdout as the secret's value.
+Each resolve hook is a shell script keyed by a secret name. At the **plugin level**, the key must match a secret marked `autoResolvable: true` in the plugin manifest. At the **swarm and identity levels**, keys are environment variable names directly.
 
-### Example: Resolving a Linear User UUID
+During deploy, Clawup runs each script and stores stdout as the secret's value. If the same key appears at multiple levels, the most specific definition wins (plugin > identity > swarm).
+
+### Example: Plugin-Level Resolve (Linear User UUID)
 
 The built-in `openclaw-linear` plugin resolves the Linear user UUID from the API key:
 
 ```yaml
+# Plugin manifest
 secrets:
   apiKey:
     envVar: LINEAR_API_KEY
@@ -90,47 +232,46 @@ hooks:
         | jq -r ".data.viewer.id"
 ```
 
-When the agent is deployed, Clawup runs the `linearUserUuid` script with `$LINEAR_API_KEY` available in the environment. The GraphQL response is piped through `jq` to extract the UUID, which is stored as `LINEAR_USER_UUID`.
+### Example: Identity-Level Resolve (Notion Workspace ID)
 
-### Example: Fetching a Notion Workspace ID
-
-A custom plugin that resolves a workspace ID from an API key:
+An engineering identity that resolves a workspace ID for all agents with this role:
 
 ```yaml
-secrets:
-  apiKey:
-    envVar: NOTION_API_KEY
-    scope: agent
-    isSecret: true
-    required: true
-    autoResolvable: false
-  workspaceId:
-    envVar: NOTION_WORKSPACE_ID
-    scope: agent
-    isSecret: false
-    required: false
-    autoResolvable: true
-
+# identity.yaml
 hooks:
   resolve:
-    workspaceId: |
+    NOTION_WORKSPACE_ID: |
       curl -s https://api.notion.com/v1/users/me \
         -H "Authorization: Bearer $NOTION_API_KEY" \
         -H "Notion-Version: 2022-06-28" \
         | jq -r ".bot.workspace_name"
 ```
 
+### Example: Swarm-Level Resolve (Shared Webhook URL)
+
+A swarm-level resolve hook that fetches a shared value for all agents:
+
+```yaml
+# clawup.yaml
+hooks:
+  resolve:
+    DEPLOY_WEBHOOK_URL: |
+      curl -s https://api.example.com/deployments/webhook \
+        -H "Authorization: Bearer $ADMIN_TOKEN" \
+        | jq -r ".webhookUrl"
+```
+
 ### Rules
 
-- The resolve hook key (e.g., `linearUserUuid`) must match a secret key in the manifest
-- That secret must have `autoResolvable: true`
+- **Plugin level:** The resolve hook key must match a secret key with `autoResolvable: true` in the plugin manifest
+- **Swarm/identity level:** The resolve hook key is the environment variable name directly
 - The script must print exactly one value to stdout (trailing whitespace is trimmed)
 - If the script exits non-zero or prints nothing, the deploy fails with an error
 - All environment variables from `.env` are available in the script
 
 ## Onboard Hooks
 
-Onboard hooks run interactive first-time setup for plugins that need it — like registering webhook URLs or configuring external services that require post-deploy information.
+Onboard hooks run interactive first-time setup — like registering webhook URLs or configuring external services that require post-deploy information.
 
 **When:** During `clawup onboard` or `clawup deploy --onboard`
 
@@ -142,7 +283,7 @@ Onboard hooks run interactive first-time setup for plugins that need it — like
 
 ### How It Works
 
-1. Clawup checks each plugin for an `onboard` hook definition
+1. Clawup checks each level (swarm, identity, plugin) for an `onboard` hook definition
 2. For each input defined in `inputs`, the user is prompted (or the value is read from `.env`)
 3. The hook script runs with all inputs and existing secrets as environment variables
 4. stdout is displayed as follow-up instructions to the user
@@ -204,27 +345,37 @@ PostProvision hooks run on the agent server during cloud-init, after base packag
 - Downloading ML models or large data files
 - Setting up database clients or drivers
 - Configuring system-level settings
+- Fleet-wide monitoring (swarm level)
+- Role-specific tooling (identity level)
 
-### Example: Installing a Custom CLI
+### Example: Swarm-Level PostProvision
 
 ```yaml
+# clawup.yaml
 hooks:
   postProvision: |
-    echo "Installing custom analysis tools..."
-    curl -sSL https://get.example.com/cli | sh
-    echo "Analysis CLI installed successfully"
+    echo "Installing fleet monitoring..."
+    curl -sSL https://get.datadoghq.com/agent | sh
 ```
 
-### Example: Downloading Model Weights
+### Example: Identity-Level PostProvision
 
 ```yaml
+# identity.yaml
 hooks:
   postProvision: |
-    echo "Downloading model weights..."
-    mkdir -p /home/ubuntu/.models
-    curl -sSL https://models.example.com/v2/weights.bin \
-      -o /home/ubuntu/.models/weights.bin
-    echo "Model weights ready"
+    echo "Installing engineering tools..."
+    npm install -g turbo prettier
+```
+
+### Example: Plugin-Level PostProvision
+
+```yaml
+# Plugin manifest
+hooks:
+  postProvision: |
+    echo "Installing analytics CLI..."
+    curl -sSL https://get.analytics.example.com/cli | sh
 ```
 
 ### Environment
@@ -280,11 +431,78 @@ PreStart hooks have access to everything postProvision hooks have, plus:
 - OpenClaw configuration (set via `openclaw config set`)
 - Installed plugins
 
-## Complete Plugin Manifest Example
+## Complete Examples
 
-Here's a full plugin manifest using all four hook types:
+### Swarm-Level: Fleet Monitoring
 
 ```yaml
+# clawup.yaml
+stackName: prod
+provider: hetzner
+region: fsn1
+instanceType: cx32
+ownerName: Jane Doe
+
+hooks:
+  resolve:
+    DATADOG_SITE: |
+      echo "datadoghq.com"
+  postProvision: |
+    echo "Installing Datadog agent..."
+    DD_API_KEY=$DATADOG_API_KEY DD_SITE=$DATADOG_SITE \
+      bash -c "$(curl -sSL https://install.datadoghq.com/scripts/install_script.sh)"
+  preStart: |
+    echo "Tagging agent in Datadog..."
+    datadog-agent config set tags "stack:prod,agent:$(hostname)"
+
+agents:
+  - name: agent-eng
+    identity: ./eng
+    volumeSize: 50
+```
+
+### Identity-Level: Engineering Setup
+
+```yaml
+# identity.yaml
+name: eng
+displayName: Titus
+role: eng
+emoji: building_construction
+description: Lead engineering, coding, shipping
+volumeSize: 50
+
+hooks:
+  resolve:
+    SENTRY_PROJECT_SLUG: |
+      curl -s https://sentry.io/api/0/projects/ \
+        -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+        | jq -r '.[0].slug'
+  postProvision: |
+    echo "Installing engineering tools..."
+    npm install -g turbo prettier
+    pip install pre-commit
+  preStart: |
+    echo "Cloning working repo..."
+    cd /home/ubuntu
+    gh repo clone $GITHUB_REPO workspace-repo
+
+deps:
+  - gh
+plugins:
+  - openclaw-linear
+  - slack
+skills:
+  - eng-queue-handler
+templateVars:
+  - OWNER_NAME
+  - GITHUB_REPO
+```
+
+### Plugin-Level: Full Analytics Plugin
+
+```yaml
+# Plugin manifest
 name: my-analytics
 displayName: Analytics Dashboard
 installable: true
@@ -313,14 +531,11 @@ secrets:
     autoResolvable: true
 
 hooks:
-  # Resolve: derive project ID from API key
   resolve:
     projectId: |
       curl -s https://api.analytics.example.com/v1/me \
         -H "Authorization: Bearer $ANALYTICS_API_KEY" \
         | jq -r ".defaultProjectId"
-
-  # Onboard: register webhook (runs once)
   onboard:
     description: "Register analytics event webhook"
     inputs:
@@ -334,13 +549,9 @@ hooks:
         -d '{"events": ["deploy", "error"]}'
       echo "Analytics webhook registered"
     runOnce: true
-
-  # PostProvision: install the analytics CLI
   postProvision: |
     curl -sSL https://get.analytics.example.com/cli | sh
     analytics-cli --version
-
-  # PreStart: validate config and warm cache
   preStart: |
     analytics-cli validate --config /home/ubuntu/.openclaw/config.json
     analytics-cli cache warm --project $ANALYTICS_PROJECT_ID
@@ -360,6 +571,8 @@ curl -sSf https://example.com/install.sh | sh || {
 ```
 
 **Keep hooks focused.** Each hook should do one thing well. If you need complex setup, consider splitting across `postProvision` (system setup) and `preStart` (app config).
+
+**Use the right level.** Put fleet-wide concerns (monitoring, shared tooling) at the swarm level. Put role-specific setup (engineering tools, research APIs) at the identity level. Put plugin-specific automation (secret resolution, plugin CLI) at the plugin level.
 
 **Test locally.** You can test hook scripts locally before deploying:
 

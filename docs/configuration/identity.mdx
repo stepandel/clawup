@@ -26,6 +26,7 @@ interface IdentityManifest {
   deps?: string[];           // System dependencies
   plugins?: string[];        // OpenClaw plugins
   pluginDefaults?: Record<string, Record<string, unknown>>;
+  hooks?: Hooks;                 // Identity-level lifecycle hooks
   requiredSecrets?: string[];  // Additional secret keys beyond plugins/deps
 }
 ```
@@ -81,6 +82,31 @@ interface IdentityManifest {
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `requiredSecrets` | string[] | `[]` | Additional secret keys this identity needs beyond what `plugins` and `deps` imply. Each entry is a camelCase key (e.g., `notionApiKey`) that maps to a `<ROLE>_SCREAMING_SNAKE_CASE` env var. See [Environment Variables](/configuration/environment#identity-requiredsecrets). |
+
+### Hooks
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `hooks` | `Hooks` | — | Identity-level lifecycle hooks that run for all agents using this identity. |
+
+Identity-level hooks run for **every agent that uses this identity**. All four hook types are available (`resolve`, `onboard`, `postProvision`, `preStart`). Identity hooks execute after swarm hooks and before plugin hooks.
+
+```yaml
+hooks:
+  resolve:
+    SENTRY_PROJECT_SLUG: |
+      curl -s https://sentry.io/api/0/projects/ \
+        -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+        | jq -r '.[0].slug'
+  postProvision: |
+    echo "Installing engineering tools..."
+    npm install -g turbo prettier
+  preStart: |
+    echo "Verifying repo access..."
+    gh auth status
+```
+
+For the full reference including execution order and all hook types, see the [Lifecycle Hooks guide](/guides/hooks).
 
 ## Examples
 
@@ -180,6 +206,14 @@ pluginDefaults:
       allowFrom:
         - "*"
 
+hooks:
+  postProvision: |
+    echo "Installing engineering tools..."
+    npm install -g turbo prettier
+  preStart: |
+    echo "Cloning working repo..."
+    cd /home/ubuntu && gh repo clone $GITHUB_REPO workspace-repo
+
 skills:
   - eng-queue-handler
   - eng-ticket-workflow
@@ -237,9 +271,9 @@ OpenClaw plugins declared via the `plugins` field.
 
 Defined in `packages/core/src/plugin-registry.ts`.
 
-### Plugin Hooks
+### Lifecycle Hooks
 
-Plugins can define **lifecycle hooks** (experimental) — shell scripts that run at specific points during deployment. Hooks can auto-resolve derived secrets, run interactive onboarding, install server-side tools, and perform pre-launch configuration. See the [Plugin Hooks guide](/guides/plugin-hooks) for details.
+Hooks are shell scripts that run at specific points during deployment. They're available at the swarm (`clawup.yaml`), identity (`identity.yaml`), and plugin level. Hooks can auto-resolve derived secrets, run interactive onboarding, install server-side tools, and perform pre-launch configuration. See the [Lifecycle Hooks guide](/guides/hooks) for details.
 
 ## Plugin Defaults
 
