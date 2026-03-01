@@ -10,7 +10,7 @@
 
 [![npm](https://img.shields.io/npm/v/clawup)](https://www.npmjs.com/package/clawup)
 
-Command-line tool for deploying and managing your fleet of [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud**.
+The secure golden path for deploying and managing [OpenClaw](https://openclaw.bot/) agent swarms on **AWS** or **Hetzner Cloud** — identity-driven, infrastructure-as-code, zero public ports.
 
 ## Installation
 

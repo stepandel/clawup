@@ -1,13 +1,13 @@
 ---
 title: "What is Clawup?"
-description: "Deploy a fleet of autonomous AI agents on your own cloud infrastructure"
+description: "The secure golden path for deploying OpenClaw agent swarms on your own cloud infrastructure"
 ---
 
-Clawup deploys autonomous [OpenClaw](https://openclaw.ai) AI agents on your own cloud infrastructure — AWS or Hetzner. Each agent is defined by a composable **identity** that packages personality, skills, model preferences, and tool configuration into a self-contained, reusable unit. Agents run 24/7 on dedicated servers, coordinating through integrations like Linear, GitHub, and Slack.
+Clawup is the secure golden path for deploying [OpenClaw](https://openclaw.ai) agent swarms on your own cloud infrastructure — AWS or Hetzner. Each agent is defined by a composable **identity** that packages personality, skills, model preferences, and tool configuration into a self-contained, reusable unit. Agents run 24/7 on dedicated servers with **zero public port exposure**, communicating over an encrypted Tailscale mesh VPN.
 
 ## Why Clawup?
 
-You define _what_ your agents do through identities. Clawup handles _where_ and _how_ they run — provisioning servers, installing tools, configuring networking, and keeping agents operational.
+You define _what_ your agents do through identities. Clawup handles _where_ and _how_ they run — provisioning servers, installing tools, configuring secure networking, and keeping agents operational.
 
 Each agent has a specific role, persistent memory, and the tools to do its job. Create identities for any role you need — PM, engineer, QA, researcher, or anything else.
 
@@ -21,6 +21,9 @@ Each agent has a specific role, persistent memory, and the tools to do its job. 
 ## Key Features
 
 <CardGroup cols={2}>
+  <Card title="Secure by Default" icon="shield-halved">
+    Zero public ports, encrypted secrets via Pulumi, Tailscale mesh VPN, and Docker isolation. No security configuration required.
+  </Card>
   <Card title="One-Command Deploy" icon="rocket">
     Generate config with `clawup init`, then deploy your entire fleet with `clawup deploy`.
   </Card>

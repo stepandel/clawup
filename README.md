@@ -11,13 +11,21 @@
 [![npm](https://img.shields.io/npm/v/clawup)](https://www.npmjs.com/package/clawup)
 [![license](https://img.shields.io/npm/l/clawup)](./LICENSE)
 
-Deploy a fleet of specialized [OpenClaw](https://openclaw.bot/) AI agents on **AWS** or **Hetzner Cloud** — managed entirely from your terminal.
+The secure golden path for deploying [OpenClaw](https://openclaw.bot/) agent swarms — identity-driven, infrastructure-as-code, zero public ports.
 
 ## What Is This?
 
-Clawup provisions autonomous AI agents with persistent memory, role-specific behavior, and secure networking. Each agent runs in a Docker sandbox with its own identity — personality, skills, tools, and model preferences — connected over a Tailscale mesh VPN with no public port exposure.
+Clawup provisions autonomous AI agents with persistent memory, role-specific behavior, and **secure-by-default networking**. Each agent runs in a Docker sandbox with its own identity — personality, skills, tools, and model preferences — connected over a Tailscale mesh VPN with no public port exposure.
 
-You define _what_ your agents do. Clawup handles _where_ and _how_ they run.
+You define _what_ your agents do. Clawup handles _where_ and _how_ they run — securely.
+
+### Security Guarantees
+
+- **Zero public ports** — all agent ports bind to `127.0.0.1`, accessible only via Tailscale
+- **Encrypted secrets** — API keys and tokens stored via Pulumi encrypted config
+- **Mesh VPN** — agents communicate over Tailscale's encrypted peer-to-peer network
+- **Docker isolation** — each agent runs in a sandboxed container
+- **Token-based auth** — gateway access requires authentication
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
