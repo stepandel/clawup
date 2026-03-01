@@ -7,8 +7,13 @@ volumeSize: 20
 model: anthropic/claude-sonnet-4-5
 codingAgent: claude-code
 
+# System dependencies provisioned on the agent server.
+# Each dep is installed via postProvision hooks during cloud-init:
+#   - Install scripts run as root (e.g., apt-get)
+#   - Post-install scripts run as ubuntu (e.g., auth, config)
+# Available deps: gh (GitHub CLI), brave-search (web search API)
 deps:
-  - brave-search
+  - brave-search    # Configures OpenClaw web search (openclaw config set tools.web.search)
 
 plugins:
   - slack

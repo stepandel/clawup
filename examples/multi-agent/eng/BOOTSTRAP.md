@@ -11,6 +11,7 @@ Run each check in order. If any step fails, stop and report the failure — do n
 - Confirm the ticket was created and note the ticket ID
 
 ### 2. GitHub
+- Verify `gh` CLI is installed and authenticated (the `gh` dep handles this during provisioning)
 - Clone this repo: `{{GITHUB_REPO}}`
 - Confirm the clone succeeded and you can read the repo contents
 

@@ -6,7 +6,8 @@ Verify all tool integrations are working before entering normal operation.
 ## Integration Checks
 
 ### 1. Brave Search
-Run a test search query to confirm the API key is configured and returning results.
+Run a test search query to confirm web search is working. The `brave-search` dep
+auto-configures `tools.web.search` during provisioning — just verify it works.
 
 ### 2. Slack
 Send a test message to confirm bot connectivity. Verify DM capability works.
