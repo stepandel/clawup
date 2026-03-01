@@ -7,11 +7,9 @@ volumeSize: 30
 model: anthropic/claude-opus-4-6
 codingAgent: claude-code
 
-# System dependencies provisioned on the agent server.
-# Install scripts run as root, post-install scripts run as ubuntu.
 deps:
-  - gh              # Installs GitHub CLI (apt-get) + authenticates with GITHUB_TOKEN
-  - brave-search    # Configures OpenClaw web search with BRAVE_API_KEY
+  - gh
+  - brave-search
 
 plugins:
   - openclaw-linear
