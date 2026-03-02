@@ -267,10 +267,13 @@ function buildPluginsForAgent(
     // Apply Linear-specific transform (build agentMapping from linearUserUuid)
     // This is the one piece of runtime logic that can't be purely declarative
     if (pluginName === "openclaw-linear") {
-      const uuid = mergedConfig.linearUserUuid as string | undefined;
+      const uuid = (mergedConfig.linearUserUuid as string | undefined)
+        ?? config.get(`${agent.role}LinearUserUuid`)
+        ?? undefined;
+      const agentName = agent.displayName || identityResult?.manifest.displayName || agent.name;
       const mapping: Record<string, string> = {};
       if (uuid) mapping[uuid] = "default";
-      mapping["$AGENT_NAME"] = "default";
+      mapping[agentName] = "default";
       mergedConfig.agentMapping = mapping;
     }
 

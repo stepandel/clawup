@@ -161,7 +161,9 @@ export const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = Object.fromE
       defaultConfig: manifest.defaultConfig,
     };
 
-    // Preserve the Linear transformConfig behavior
+    // Linear agentMapping is now built at deploy time in buildPluginsForAgent()
+    // where the actual agent name and Pulumi config are available.
+    // This legacy transformConfig is kept as a no-op for backward compatibility.
     if (name === "openclaw-linear") {
       entry.transformConfig = (config) => {
         const uuid = config.linearUserUuid as string | undefined;
@@ -169,7 +171,7 @@ export const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = Object.fromE
         if (uuid) {
           mapping[uuid] = "default";
         }
-        mapping["$AGENT_NAME"] = "default";
+        // Note: "$AGENT_NAME" placeholder removed — real name is resolved at deploy time
         config.agentMapping = mapping;
         return config;
       };
