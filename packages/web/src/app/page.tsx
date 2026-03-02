@@ -206,6 +206,63 @@ export default function Home() {
               </tbody>
             </table>
           </div>
+          <p className="text-xs text-muted-foreground mt-5 mb-2">Get started quickly with pre-built agent identities:</p>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-background border border-border font-mono text-sm">
+            <span className="text-accent-emerald">$</span>
+            <code className="text-foreground">npx army-create{" "}<span className="text-muted-foreground/50">&lt;project-name&gt;</span></code>
+            <button
+              onClick={(e) => {
+                const text = "npx army-create my-project";
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(text).catch(() => {});
+                } else {
+                  const ta = document.createElement("textarea");
+                  ta.value = text;
+                  ta.style.position = "fixed";
+                  ta.style.opacity = "0";
+                  document.body.appendChild(ta);
+                  ta.select();
+                  document.execCommand("copy");
+                  document.body.removeChild(ta);
+                }
+                const btn = e.currentTarget;
+                btn.setAttribute("data-copied", "true");
+                setTimeout(() => btn.removeAttribute("data-copied"), 1500);
+              }}
+              className="group ml-auto text-muted-foreground hover:text-foreground transition-colors shrink-0 data-[copied]:text-accent-emerald"
+              title="Copy to clipboard"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="group-data-[copied]:hidden"
+              >
+                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+              </svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="hidden group-data-[copied]:block"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </button>
+          </div>
         </section>
 
         {/* Config Example */}
