@@ -31,6 +31,7 @@ import {
 import { fetchIdentitySync } from "@clawup/core/identity";
 import type { ClawupManifest, PluginConfigFile, IdentityResult, ResolvedAgent } from "@clawup/core";
 import { resolveAgentSync } from "@clawup/core/resolve";
+import { buildLinearAgentMapping } from "./components/linear-mapping";
 import * as os from "os";
 
 // -----------------------------------------------------------------------------
@@ -267,14 +268,13 @@ function buildPluginsForAgent(
     // Apply Linear-specific transform (build agentMapping from linearUserUuid)
     // This is the one piece of runtime logic that can't be purely declarative
     if (pluginName === "openclaw-linear") {
-      const uuid = (mergedConfig.linearUserUuid as string | undefined)
-        ?? config.get(`${agent.role}LinearUserUuid`)
-        ?? undefined;
-      const agentName = agent.displayName || identityResult?.manifest.displayName || agent.name;
-      const mapping: Record<string, string> = {};
-      if (uuid) mapping[uuid] = "default";
-      mapping[agentName] = "default";
-      mergedConfig.agentMapping = mapping;
+      mergedConfig.agentMapping = buildLinearAgentMapping({
+        configUuid: mergedConfig.linearUserUuid as string | undefined,
+        pulumiConfigUuid: config.get(`${agent.role}LinearUserUuid`) ?? undefined,
+        agentDisplayName: agent.displayName,
+        identityDisplayName: identityResult?.manifest.displayName,
+        agentName: agent.name,
+      });
     }
 
     plugins.push({
