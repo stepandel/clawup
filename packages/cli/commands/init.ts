@@ -384,6 +384,60 @@ export function matchIdentitiesToAgents(
 }
 
 /**
+ * Serialize a manifest to YAML with inline comments explaining each field,
+ * available options, and how to populate values.
+ */
+function stringifyManifestWithComments(manifest: ClawupManifest): string {
+  const doc = new YAML.Document(manifest);
+
+  doc.commentBefore = " Clawup Deployment Manifest — edit then run `clawup deploy`";
+
+  const contents = doc.contents;
+  if (!YAML.isMap(contents)) return doc.toString();
+
+  // Helper: attach a comment (and optional blank line) above a top-level key
+  const setComment = (key: string, text: string, spaceBefore = false) => {
+    const pair = contents.items.find(
+      (p) => YAML.isScalar(p.key) && (p.key as YAML.Scalar).value === key,
+    );
+    if (!pair || !YAML.isScalar(pair.key)) return;
+    pair.key.commentBefore = text;
+    if (spaceBefore) pair.key.spaceBefore = true;
+  };
+
+  setComment("provider", ' "aws" | "hetzner" | "local"');
+
+  setComment("region", [
+    " AWS: us-east-1, us-east-2, us-west-2, eu-west-1, eu-central-1, ap-southeast-1, ap-northeast-1",
+    " Hetzner: fsn1 (DE), nbg1 (DE), hel1 (FI), ash (US)",
+  ].join("\n"));
+
+  setComment("instanceType", [
+    " AWS:        t3.small (~$15/mo) | t3.medium (~$30/mo) | t3.large (~$60/mo)",
+    " Hetzner EU: cx22 (~$4/mo) | cx32 (~$7/mo) | cx42 (~$14/mo)",
+    " Hetzner US: cpx21 (~$5/mo) | cpx31 (~$9/mo) | cpx41 (~$16/mo)",
+  ].join("\n"));
+
+  setComment("ownerName", " Owner info — shared with agents via workspace template variables", true);
+
+  setComment("templateVars", [
+    " {{VAR_NAME}} substitution in workspace files (SOUL.md, IDENTITY.md, etc.)",
+    " Empty values must be filled in before deploying.",
+  ].join("\n"), true);
+
+  setComment("secrets", [
+    " Resolved from .env at deploy time — see .env.example. Do NOT put raw secrets here.",
+  ].join("\n"), true);
+
+  setComment("agents", [
+    " Local path or Git URL to identity directory. Per-agent overrides:",
+    " name, role, instanceType, volumeSize, plugins, secrets, envVars",
+  ].join("\n"), true);
+
+  return doc.toString();
+}
+
+/**
  * Write/update clawup.yaml + .env.example with current identity data.
  * Slim manifest: agent entries are minimal, secrets/plugins derived at deploy time.
  */
@@ -439,9 +493,9 @@ function writeManifest(
   }
   manifest.secrets = { ...existingGlobal, ...manifestSecrets.global };
 
-  // Write manifest
+  // Write manifest with inline comments
   const manifestPath = path.join(outputDir, MANIFEST_FILE);
-  fs.writeFileSync(manifestPath, YAML.stringify(manifest), "utf-8");
+  fs.writeFileSync(manifestPath, stringifyManifestWithComments(manifest), "utf-8");
 
   // Generate .env.example (uses identity data for agent info)
   const envExampleContent = generateEnvExample({
