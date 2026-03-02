@@ -449,6 +449,7 @@ function buildBaseAgentArgs(agent: ResolvedAgent): {
       codingAgent: agentCodingAgent,
       workspaceFiles,
       envVars: {
+        ...templateVars,
         AGENT_ROLE: agent.role,
         AGENT_NAME: agentDisplayName,
         AGENT_EMOJI: agentEmoji,

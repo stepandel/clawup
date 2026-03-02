@@ -199,7 +199,9 @@ phase_hooks_post_provision() {
     local name=$(cfg ".postProvisionHooks[$i].name")
     local run_as=$(cfg ".postProvisionHooks[$i].runAs // \\"ubuntu\\"")
     echo "Running postProvision hook for $name (as $run_as)..."
-    run_encoded_script "$(cfg ".postProvisionHooks[$i].script")" "$run_as"
+    if ! run_encoded_script "$(cfg ".postProvisionHooks[$i].script")" "$run_as"; then
+      echo "WARNING: postProvision hook '$name' failed (exit $?) — continuing"
+    fi
     echo "postProvision hook for $name complete"
   done
 }
@@ -292,7 +294,9 @@ phase_hooks_pre_start() {
     local name=$(cfg ".preStartHooks[$i].name")
     local run_as=$(cfg ".preStartHooks[$i].runAs // \\"ubuntu\\"")
     echo "Running preStart hook for $name (as $run_as)..."
-    run_encoded_script "$(cfg ".preStartHooks[$i].script")" "$run_as"
+    if ! run_encoded_script "$(cfg ".preStartHooks[$i].script")" "$run_as"; then
+      echo "WARNING: preStart hook '$name' failed (exit $?) — continuing"
+    fi
     echo "preStart hook for $name complete"
   done
 }

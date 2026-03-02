@@ -364,6 +364,8 @@ export const pushTool: ToolImplementation<PushOptions> = async (
 
     // 4. OpenClaw upgrade
     if (options.openclaw) {
+      const nvmPreamble = `export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"`;
+
       const cmd = `npm install -g openclaw@latest 2>&1`;
       const result = remoteExec(cmd);
       if (result.ok) {
@@ -372,6 +374,17 @@ export const pushTool: ToolImplementation<PushOptions> = async (
       } else {
         console.log(`    ${pc.red("FAIL")}  openclaw upgrade failed: ${result.output.substring(0, 100)}`);
         allOk = false;
+      }
+
+      // Daemon install (cloud only — local uses foreground mode)
+      if (!isLocal) {
+        const daemonCmd = `${nvmPreamble} && XDG_RUNTIME_DIR=/run/user/1000 openclaw daemon install 2>&1`;
+        const daemonResult = remoteExec(daemonCmd);
+        if (daemonResult.ok) {
+          console.log(`    ${pc.green("OK")}  daemon installed`);
+        } else {
+          console.log(`    ${pc.yellow("WARN")}  daemon install failed (may already exist): ${daemonResult.output.substring(0, 100)}`);
+        }
       }
     }
 
@@ -411,6 +424,16 @@ export const pushTool: ToolImplementation<PushOptions> = async (
       } else {
         console.log(`    ${pc.red("FAIL")}  gateway restart failed: ${result.output.substring(0, 100)}`);
         allOk = false;
+      }
+
+      // Auto-approve device pairing after restart
+      const nvmPreamble = `export NVM_DIR="$HOME/.nvm" && [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"`;
+      const approveCmd = `sleep 2 && ${nvmPreamble} && openclaw devices approve --latest 2>&1`;
+      const approveResult = remoteExec(approveCmd);
+      if (approveResult.ok) {
+        console.log(`    ${pc.green("OK")}  device pairing auto-approved`);
+      } else {
+        console.log(`    ${pc.yellow("WARN")}  device auto-approve skipped (may already be paired)`);
       }
     }
 
