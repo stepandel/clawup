@@ -13,6 +13,8 @@
 
 The secure golden path for deploying [OpenClaw](https://openclaw.bot/) agent swarms — identity-driven, infrastructure-as-code, zero public ports.
 
+[Watch the demo on X](https://x.com/stepanarsent/status/2028345362822684821)
+
 ## What Is This?
 
 Clawup provisions autonomous AI agents with persistent memory, role-specific behavior, and **secure-by-default networking**. Each agent runs in a Docker sandbox with its own identity — personality, skills, tools, and model preferences — connected over a Tailscale mesh VPN with no public port exposure.
