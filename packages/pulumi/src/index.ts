@@ -82,6 +82,20 @@ function processTemplates(
   return processed;
 }
 
+/**
+ * Process template placeholders in a single string (used for hook scripts)
+ */
+function processTemplateString(
+  input: string,
+  variables: Record<string, string>
+): string {
+  let result = input;
+  for (const [key, value] of Object.entries(variables)) {
+    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+  }
+  return result;
+}
+
 // -----------------------------------------------------------------------------
 // Load Manifest (YAML)
 // -----------------------------------------------------------------------------
@@ -366,24 +380,33 @@ function buildBaseAgentArgs(agent: ResolvedAgent): {
   agentDisplayName: string;
   agentVolumeSize: number;
 } {
-  const templateVars: Record<string, string> = {
-    OWNER_NAME: ownerName,
-    TIMEZONE: timezone,
-    WORKING_HOURS: workingHours,
-    USER_NOTES: userNotes,
-    ...(manifest.templateVars ?? {}),
-  };
-
   // Fetch identity (always required)
   const identity = fetchIdentitySync(agent.identity, identityCacheDir);
-
-  // Identity files are the workspace files
-  const workspaceFiles = processTemplates(identity.files, templateVars);
 
   // Pull defaults from identity manifest
   const agentEmoji = identity.manifest.emoji ?? "";
   const agentDisplayName = agent.displayName || identity.manifest.displayName;
   const agentVolumeSize = agent.volumeSize ?? identity.manifest.volumeSize ?? 30;
+
+  // Build the FULL template vars dict with all sources before any processing
+  const allTemplateVars: Record<string, string> = {
+    // Built-in vars
+    OWNER_NAME: ownerName,
+    TIMEZONE: timezone,
+    WORKING_HOURS: workingHours,
+    USER_NOTES: userNotes,
+    // Manifest-level custom vars
+    ...(manifest.templateVars ?? {}),
+    // Agent-specific vars
+    AGENT_ROLE: agent.role,
+    AGENT_NAME: agentDisplayName,
+    AGENT_EMOJI: agentEmoji,
+    // Per-agent envVars from manifest
+    ...agent.envVars,
+  };
+
+  // Process workspace files with the complete variable set
+  const workspaceFiles = processTemplates(identity.files, allTemplateVars);
 
   // Extract public (clawhub) skills from identity manifest
   const { public: publicSkills } = classifySkills(identity.manifest.skills);
@@ -422,22 +445,23 @@ function buildBaseAgentArgs(agent: ResolvedAgent): {
   }
 
   // Collect swarm + identity lifecycle hooks (broadest → most specific)
+  // Apply {{VAR}} substitution to hook scripts at build time
   const extraHooks: {
     postProvision: Array<{ label: string; script: string }>;
     preStart: Array<{ label: string; script: string }>;
   } = { postProvision: [], preStart: [] };
 
   if (manifest.hooks?.postProvision) {
-    extraHooks.postProvision.push({ label: "swarm", script: manifest.hooks.postProvision });
+    extraHooks.postProvision.push({ label: "swarm", script: processTemplateString(manifest.hooks.postProvision, allTemplateVars) });
   }
   if (identity.manifest.hooks?.postProvision) {
-    extraHooks.postProvision.push({ label: `identity:${identity.manifest.name}`, script: identity.manifest.hooks.postProvision });
+    extraHooks.postProvision.push({ label: `identity:${identity.manifest.name}`, script: processTemplateString(identity.manifest.hooks.postProvision, allTemplateVars) });
   }
   if (manifest.hooks?.preStart) {
-    extraHooks.preStart.push({ label: "swarm", script: manifest.hooks.preStart });
+    extraHooks.preStart.push({ label: "swarm", script: processTemplateString(manifest.hooks.preStart, allTemplateVars) });
   }
   if (identity.manifest.hooks?.preStart) {
-    extraHooks.preStart.push({ label: `identity:${identity.manifest.name}`, script: identity.manifest.hooks.preStart });
+    extraHooks.preStart.push({ label: `identity:${identity.manifest.name}`, script: processTemplateString(identity.manifest.hooks.preStart, allTemplateVars) });
   }
 
   const hasExtraHooks = extraHooks.postProvision.length > 0 || extraHooks.preStart.length > 0;
@@ -451,13 +475,7 @@ function buildBaseAgentArgs(agent: ResolvedAgent): {
       backupModel: agentBackupModel,
       codingAgent: agentCodingAgent,
       workspaceFiles,
-      envVars: {
-        ...templateVars,
-        AGENT_ROLE: agent.role,
-        AGENT_NAME: agentDisplayName,
-        AGENT_EMOJI: agentEmoji,
-        ...agent.envVars,
-      },
+      envVars: allTemplateVars,
       plugins,
       pluginSecrets,
       enableFunnel,
