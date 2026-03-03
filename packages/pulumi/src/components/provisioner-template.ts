@@ -362,11 +362,40 @@ phase_daemon() {
   else
     # Install daemon service AFTER config patch so gateway token matches
     echo "Installing OpenClaw daemon..."
-    sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 bash -c '
+    sudo -H -u ubuntu XDG_RUNTIME_DIR=/run/user/1000 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus bash -c '
       export HOME=/home/ubuntu
       export NVM_DIR="$HOME/.nvm"
       [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-      openclaw daemon install || echo "WARNING: Daemon install failed."
+      if openclaw daemon install 2>&1; then
+        echo "Daemon installed via openclaw CLI"
+      else
+        echo "WARNING: openclaw daemon install failed — creating systemd service manually..."
+        OPENCLAW_BIN=$(which openclaw)
+        NODE_BIN_DIR=$(dirname $(which node))
+        mkdir -p ~/.config/systemd/user
+        cat > ~/.config/systemd/user/openclaw-gateway.service << SVCEOF
+[Unit]
+Description=OpenClaw Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=/home/ubuntu
+Environment=NVM_DIR=/home/ubuntu/.nvm
+Environment=PATH=$NODE_BIN_DIR:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=$OPENCLAW_BIN gateway run
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+SVCEOF
+        systemctl --user daemon-reload
+        systemctl --user enable openclaw-gateway.service
+        systemctl --user start openclaw-gateway.service
+        echo "Daemon installed via manual systemd service"
+      fi
     '
 
     # Run openclaw doctor
