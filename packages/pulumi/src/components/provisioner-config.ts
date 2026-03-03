@@ -391,6 +391,13 @@ function buildConfigSetCommands(config: CloudInitConfig): ConfigSetCommand[] {
     });
   }
 
+  // 15. Tools profile — default to "full" so agents get exec, file I/O, etc.
+  cmds.push({
+    key: "tools.profile",
+    value: "full",
+    comment: "Tools profile (full access)",
+  });
+
   return cmds;
 }
 
